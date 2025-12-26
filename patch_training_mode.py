@@ -4,15 +4,20 @@ Dr. Mario Training Mode Patch
 =============================
 This patch modifies Dr. Mario (NES) to:
 1. Show the playfield during pause (no blackout)
-2. Remove the PAUSE text completely (clean study view)
+2. Display "STUDY" text at top of screen instead of "PAUSE"
 
 Technical details:
 - ROM offset 0x17CA: PPU_MASK value during pause
   Original: $16 (background disabled), Patched: $1E (background enabled)
 
-- ROM offset 0x17E3-0x17E5: JSR $88F6 (draw PAUSE text)
-  Original: 20 F6 88 (JSR $88F6), Patched: EA EA EA (NOP NOP NOP)
-  This disables the PAUSE text rendering entirely for a clean study view.
+- ROM offset 0x17DC: Y position for text
+  Original: $77 (center), Patched: $0F (top of screen)
+
+- ROM offset 0x2968+: Sprite data for pause text
+  Modified to show "STUDY" using tiles S(0x0D), T(new), U(0x0C), D(new), Y(0x1F)
+
+- CHR ROM: Add new T and D tiles at positions 0x06 and 0x07
+  (These positions had number graphics that are duplicated elsewhere)
 """
 
 import hashlib
@@ -20,62 +25,148 @@ import hashlib
 INPUT_ROM = "drmario.nes"
 OUTPUT_ROM = "drmario_training.nes"
 
-# Patch definitions: (offset, original_byte, patched_byte, description)
-PATCHES = [
-    # Enable background during pause
-    (0x17CA, 0x16, 0x1E, "PPU_MASK during pause: enable background rendering"),
+# NES tile format: 8x8 pixels, 2 bit planes
+# Each tile is 16 bytes: 8 bytes plane 0, then 8 bytes plane 1
+# Pixel value = plane0_bit + (plane1_bit * 2)
 
-    # NOP out the JSR $88F6 call that draws PAUSE text
-    # JSR $88F6 = 20 F6 88 at offset 0x17E3
-    (0x17E3, 0x20, 0xEA, "NOP out PAUSE text draw (byte 1/3)"),
-    (0x17E4, 0xF6, 0xEA, "NOP out PAUSE text draw (byte 2/3)"),
-    (0x17E5, 0x88, 0xEA, "NOP out PAUSE text draw (byte 3/3)"),
+def create_tile(pattern, use_plane1=False):
+    """Create NES tile from 8x8 pattern string (. = 0, # = color)"""
+    plane0 = bytearray(8)
+    plane1 = bytearray(8)
+    for row, line in enumerate(pattern):
+        for col, char in enumerate(line[:8]):
+            if char == '#':
+                if use_plane1:
+                    # Set plane 1 for color 2 (white in Banks 1,2)
+                    plane1[row] |= (0x80 >> col)
+                else:
+                    # Set plane 0 for color 1 (white in Banks 0,3)
+                    plane0[row] |= (0x80 >> col)
+    return bytes(plane0) + bytes(plane1)
+
+# Letter patterns
+T_PATTERN = [
+    "########",
+    "########",
+    "...##...",
+    "...##...",
+    "...##...",
+    "...##...",
+    "...##...",
+    "........",
 ]
 
-def calculate_checksum(data):
-    """Calculate MD5 checksum of ROM data"""
-    return hashlib.md5(data).hexdigest()
+D_PATTERN = [
+    "#####...",
+    "##..##..",
+    "##...##.",
+    "##...##.",
+    "##...##.",
+    "##..##..",
+    "#####...",
+    "........",
+]
 
-def apply_patches(input_path, output_path, patches):
-    """Apply binary patches to ROM"""
+Y_PATTERN = [
+    "##...##.",
+    "##...##.",
+    ".##.##..",
+    "..###...",
+    "...##...",
+    "...##...",
+    "...##...",
+    "........",
+]
+
+# Create tiles for both plane encodings
+# Banks 0,3 use Plane 0; Banks 1,2 use Plane 1
+TILE_T_P0 = create_tile(T_PATTERN, use_plane1=False)
+TILE_D_P0 = create_tile(D_PATTERN, use_plane1=False)
+TILE_Y_P0 = create_tile(Y_PATTERN, use_plane1=False)
+
+TILE_T_P1 = create_tile(T_PATTERN, use_plane1=True)
+TILE_D_P1 = create_tile(D_PATTERN, use_plane1=True)
+TILE_Y_P1 = create_tile(Y_PATTERN, use_plane1=True)
+
+# CHR ROM offset = 16 (header) + 32768 (PRG ROM)
+CHR_START = 16 + 32768
+
+# Use low-numbered blank tile slots (near PAUSE tiles 0x0A-0x0E)
+# These tiles are blank in Bank 1 PT1 and in the accessible sprite range
+TILE_T_NUM = 0x16  # Blank in Bank 1 PT1
+TILE_D_NUM = 0x17  # Blank in Bank 1 PT1
+TILE_Y_NUM = 0x18  # Blank in Bank 1 PT1
+
+# MMC1 can switch between 4 CHR banks (each 8KB = 2 pattern tables)
+# Write to ALL possible locations across all 4 banks
+CHR_BANK_SIZE = 8192  # 8KB per bank
+NUM_CHR_BANKS = 4
+
+# Sprite data for "STUDY" - 5 sprites, 4 bytes each
+# Format: Y_offset, Tile, Attribute, X_offset
+# S=0x0D, T=0x0F, U=0x0C, D=0x0A(was P), Y=0x0E(was E)
+STUDY_SPRITES = bytes([
+    0x00, 0x0D, 0x00, 0x00,  # S (existing)
+    0x00, TILE_T_NUM, 0x00, 0x08,  # T (at 0x0F)
+    0x00, 0x0C, 0x00, 0x10,  # U (existing)
+    0x00, TILE_D_NUM, 0x00, 0x18,  # D (at 0x0A, was P)
+    0x00, TILE_Y_NUM, 0x00, 0x20,  # Y (at 0x0E, was E)
+    0x80,                     # Terminator
+])
+
+SPRITE_DATA_OFFSET = 0x2968  # ROM offset for PAUSE sprite data
+
+def apply_patches(input_path, output_path):
+    """Apply all patches to ROM"""
     with open(input_path, 'rb') as f:
         rom_data = bytearray(f.read())
 
-    original_checksum = calculate_checksum(rom_data)
+    original_checksum = hashlib.md5(rom_data).hexdigest()
     print(f"Original ROM: {input_path}")
     print(f"Original checksum: {original_checksum}")
     print(f"ROM size: {len(rom_data)} bytes")
     print()
 
-    for offset, original, patched, description in patches:
-        current = rom_data[offset]
+    # Patch 1: Enable background during pause
+    print("✓ Patching PPU_MASK (0x17CA): $16 -> $1E")
+    rom_data[0x17CA] = 0x1E
 
-        if current == original:
-            print(f"✓ Patching offset 0x{offset:04X}:")
-            print(f"  {description}")
-            print(f"  ${original:02X} -> ${patched:02X}")
-            rom_data[offset] = patched
-        elif current == patched:
-            print(f"! Offset 0x{offset:04X} already patched (found ${current:02X})")
-        else:
-            print(f"✗ ERROR at offset 0x{offset:04X}:")
-            print(f"  Expected ${original:02X}, found ${current:02X}")
-            print(f"  This may be a different ROM version")
-            return False
+    # Patch 2: Move text to top of screen
+    print("✓ Patching Y position (0x17DC): $77 -> $0F")
+    rom_data[0x17DC] = 0x0F
+
+    # Patch 3-5: Add T, D, Y tiles to Bank 1 PT0 ONLY
+    # Bank 1 has the actual PAUSE letter tiles (S at 0x0D uses Plane 1)
+    # Only modify Bank 1 to minimize side effects on other graphics
+    bank = 1
+    pt0_offset = bank * CHR_BANK_SIZE  # PT0 (sprites in this game)
+    t_off = CHR_START + pt0_offset + (TILE_T_NUM * 16)
+    d_off = CHR_START + pt0_offset + (TILE_D_NUM * 16)
+    y_off = CHR_START + pt0_offset + (TILE_Y_NUM * 16)
+
+    # Bank 1 uses Plane 1 for white color
+    rom_data[t_off:t_off+16] = TILE_T_P1
+    rom_data[d_off:d_off+16] = TILE_D_P1
+    rom_data[y_off:y_off+16] = TILE_Y_P1
+    print(f"✓ Added T,D,Y (P1) to Bank1-PT0 only (0x{t_off:04X}, 0x{d_off:04X}, 0x{y_off:04X})")
+
+    # Patch 6: Change sprite data from PAUSE to STUDY
+    print(f"✓ Changing sprite text to STUDY at 0x{SPRITE_DATA_OFFSET:04X}")
+    rom_data[SPRITE_DATA_OFFSET:SPRITE_DATA_OFFSET+len(STUDY_SPRITES)] = STUDY_SPRITES
 
     with open(output_path, 'wb') as f:
         f.write(rom_data)
 
-    patched_checksum = calculate_checksum(rom_data)
+    patched_checksum = hashlib.md5(rom_data).hexdigest()
     print()
     print(f"Patched ROM: {output_path}")
     print(f"Patched checksum: {patched_checksum}")
     print()
     print("Training Mode patch applied successfully!")
     print("- Playfield remains visible during pause")
-    print("- PAUSE text removed for clean study view")
+    print("- Shows 'STUDY' at top of screen")
 
     return True
 
 if __name__ == "__main__":
-    apply_patches(INPUT_ROM, OUTPUT_ROM, PATCHES)
+    apply_patches(INPUT_ROM, OUTPUT_ROM)
