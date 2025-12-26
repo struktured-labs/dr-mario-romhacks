@@ -44,6 +44,9 @@ def create_ips_patch(patches, output_path):
 # Same patches as the main script
 PATCHES = [
     (0x17CA, 0x16, 0x1E, "PPU_MASK during pause: enable background rendering"),
+    (0x17E3, 0x20, 0xEA, "NOP out PAUSE text draw (byte 1/3)"),
+    (0x17E4, 0xF6, 0xEA, "NOP out PAUSE text draw (byte 2/3)"),
+    (0x17E5, 0x88, 0xEA, "NOP out PAUSE text draw (byte 3/3)"),
 ]
 
 if __name__ == "__main__":

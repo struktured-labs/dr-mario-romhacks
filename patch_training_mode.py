@@ -2,19 +2,19 @@
 """
 Dr. Mario Training Mode Patch
 =============================
-This patch modifies Dr. Mario (NES) to show the playfield during pause,
-allowing players to analyze the board state while paused.
-
-The original game sets PPU_MASK to $16 during pause which hides the background.
-This patch changes it to $1E to keep the background visible.
+This patch modifies Dr. Mario (NES) to:
+1. Show the playfield during pause (no blackout)
+2. Remove the PAUSE text completely (clean study view)
 
 Technical details:
 - ROM offset 0x17CA: PPU_MASK value during pause
-- Original: $16 (00010110) - background disabled, sprites enabled
-- Patched:  $1E (00011110) - background enabled, sprites enabled
+  Original: $16 (background disabled), Patched: $1E (background enabled)
+
+- ROM offset 0x17E3-0x17E5: JSR $88F6 (draw PAUSE text)
+  Original: 20 F6 88 (JSR $88F6), Patched: EA EA EA (NOP NOP NOP)
+  This disables the PAUSE text rendering entirely for a clean study view.
 """
 
-import shutil
 import hashlib
 
 INPUT_ROM = "drmario.nes"
@@ -22,7 +22,14 @@ OUTPUT_ROM = "drmario_training.nes"
 
 # Patch definitions: (offset, original_byte, patched_byte, description)
 PATCHES = [
+    # Enable background during pause
     (0x17CA, 0x16, 0x1E, "PPU_MASK during pause: enable background rendering"),
+
+    # NOP out the JSR $88F6 call that draws PAUSE text
+    # JSR $88F6 = 20 F6 88 at offset 0x17E3
+    (0x17E3, 0x20, 0xEA, "NOP out PAUSE text draw (byte 1/3)"),
+    (0x17E4, 0xF6, 0xEA, "NOP out PAUSE text draw (byte 2/3)"),
+    (0x17E5, 0x88, 0xEA, "NOP out PAUSE text draw (byte 3/3)"),
 ]
 
 def calculate_checksum(data):
@@ -31,7 +38,6 @@ def calculate_checksum(data):
 
 def apply_patches(input_path, output_path, patches):
     """Apply binary patches to ROM"""
-    # Read original ROM
     with open(input_path, 'rb') as f:
         rom_data = bytearray(f.read())
 
@@ -41,7 +47,6 @@ def apply_patches(input_path, output_path, patches):
     print(f"ROM size: {len(rom_data)} bytes")
     print()
 
-    # Apply each patch
     for offset, original, patched, description in patches:
         current = rom_data[offset]
 
@@ -58,7 +63,6 @@ def apply_patches(input_path, output_path, patches):
             print(f"  This may be a different ROM version")
             return False
 
-    # Write patched ROM
     with open(output_path, 'wb') as f:
         f.write(rom_data)
 
@@ -68,7 +72,8 @@ def apply_patches(input_path, output_path, patches):
     print(f"Patched checksum: {patched_checksum}")
     print()
     print("Training Mode patch applied successfully!")
-    print("The playfield will now remain visible during pause.")
+    print("- Playfield remains visible during pause")
+    print("- PAUSE text removed for clean study view")
 
     return True
 
