@@ -5,19 +5,22 @@ Dr. Mario Training Mode Patch
 This patch modifies Dr. Mario (NES) to:
 1. Show the playfield during pause (no blackout)
 2. Display "STUDY" text at top of screen instead of "PAUSE"
+3. Keep sprites visible during pause (dropping capsule, Dr. Mario)
 
 Technical details:
 - ROM offset 0x17CA: PPU_MASK value during pause
   Original: $16 (background disabled), Patched: $1E (background enabled)
 
+- ROM offset 0x17D4: Sprite hide routine call
+  Original: JSR $B894 (fills OAM with $FF), Patched: NOP NOP NOP
+
 - ROM offset 0x17DC: Y position for text
   Original: $77 (center), Patched: $0F (top of screen)
 
 - ROM offset 0x2968+: Sprite data for pause text
-  Modified to show "STUDY" using tiles S(0x0D), T(new), U(0x0C), D(new), Y(0x1F)
+  Modified to show "STUDY" using tiles S(0x0D), T(0x16), U(0x0C), D(0x17), Y(0x18)
 
-- CHR ROM: Add new T and D tiles at positions 0x06 and 0x07
-  (These positions had number graphics that are duplicated elsewhere)
+- CHR ROM Bank 1 PT0: Added T, D, Y letter tiles at positions 0x16, 0x17, 0x18
 """
 
 import hashlib
@@ -131,6 +134,20 @@ def apply_patches(input_path, output_path):
     print("✓ Patching PPU_MASK (0x17CA): $16 -> $1E")
     rom_data[0x17CA] = 0x1E
 
+    # Patch 1b: Keep sprites visible during pause
+    # NOP out the JSR $B894 at 0x17D4 (pause entry sprite clear)
+    print("✓ Patching sprite hide (0x17D4): JSR $B894 -> NOP NOP NOP")
+    rom_data[0x17D4] = 0xEA  # NOP
+    rom_data[0x17D5] = 0xEA  # NOP
+    rom_data[0x17D6] = 0xEA  # NOP
+
+    # Patch 1c: NOP the JSR $B894 inside $B654 routine (at ROM 0x367C)
+    # This prevents sprite clearing in the pause loop
+    print("✓ Patching B654 sprite clear (0x367C): JSR $B894 -> NOP NOP NOP")
+    rom_data[0x367C] = 0xEA  # NOP
+    rom_data[0x367D] = 0xEA  # NOP
+    rom_data[0x367E] = 0xEA  # NOP
+
     # Patch 2: Move text to top of screen
     print("✓ Patching Y position (0x17DC): $77 -> $0F")
     rom_data[0x17DC] = 0x0F
@@ -164,6 +181,7 @@ def apply_patches(input_path, output_path):
     print()
     print("Training Mode patch applied successfully!")
     print("- Playfield remains visible during pause")
+    print("- Sprites remain visible (capsule, Dr. Mario)")
     print("- Shows 'STUDY' at top of screen")
 
     return True
