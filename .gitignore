@@ -1,0 +1,14 @@
+# Virtual environment
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# ROMs (don't commit copyrighted content)
+*.nes
+
+# Emulator save states and configs
+*.sav
+*.srm
+*.state
