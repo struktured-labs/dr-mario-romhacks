@@ -94,11 +94,11 @@ TILE_Y_P1 = create_tile(Y_PATTERN, use_plane1=True)
 # CHR ROM offset = 16 (header) + 32768 (PRG ROM)
 CHR_START = 16 + 32768
 
-# Use low-numbered blank tile slots (near PAUSE tiles 0x0A-0x0E)
-# These tiles are blank in Bank 1 PT1 and in the accessible sprite range
-TILE_T_NUM = 0x16  # Blank in Bank 1 PT1
-TILE_D_NUM = 0x17  # Blank in Bank 1 PT1
-TILE_Y_NUM = 0x18  # Blank in Bank 1 PT1
+# Use high-numbered blank tile slots to avoid conflicts with title screen
+# These tiles are blank in Bank 1 PT0 and won't affect Mario's eyes
+TILE_T_NUM = 0xF0  # Blank in Bank 1 PT0
+TILE_D_NUM = 0xF1  # Blank in Bank 1 PT0
+TILE_Y_NUM = 0xF2  # Blank in Bank 1 PT0
 
 # MMC1 can switch between 4 CHR banks (each 8KB = 2 pattern tables)
 # Write to ALL possible locations across all 4 banks
