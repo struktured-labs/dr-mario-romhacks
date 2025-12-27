@@ -1,4 +1,4 @@
-Dr. Mario Training Mode v5
+Dr. Mario Training Edition v5
 ===========================
 
 A ROM hack that transforms the pause screen into a study mode for practicing Dr. Mario strategies and analyzing virus/capsule positions.
