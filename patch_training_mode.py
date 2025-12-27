@@ -94,11 +94,12 @@ TILE_Y_P1 = create_tile(Y_PATTERN, use_plane1=True)
 # CHR ROM offset = 16 (header) + 32768 (PRG ROM)
 CHR_START = 16 + 32768
 
-# Use high-numbered blank tile slots to avoid conflicts with title screen
-# These tiles are blank in Bank 1 PT0 and won't affect Mario's eyes
-TILE_T_NUM = 0xF0  # Blank in Bank 1 PT0
-TILE_D_NUM = 0xF1  # Blank in Bank 1 PT0
-TILE_Y_NUM = 0xF2  # Blank in Bank 1 PT0
+# Use blank tile slots that aren't referenced by any sprite data in the ROM
+# 0xF0-0xF2 were used by other sprite blocks causing FEVER menu corruption
+# 0xA0-0xA2 are blank in Bank 1 PT0 and not used elsewhere
+TILE_T_NUM = 0xA0  # Blank in Bank 1 PT0, not used by game sprites
+TILE_D_NUM = 0xA1  # Blank in Bank 1 PT0, not used by game sprites
+TILE_Y_NUM = 0xA2  # Blank in Bank 1 PT0, not used by game sprites
 
 # MMC1 can switch between 4 CHR banks (each 8KB = 2 pattern tables)
 # Write to ALL possible locations across all 4 banks
