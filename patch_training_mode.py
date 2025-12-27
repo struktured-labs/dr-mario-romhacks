@@ -149,6 +149,7 @@ def apply_patches(input_path, output_path):
     rom_data[0x367E] = 0xEA  # NOP
 
     # Patch 2: Move text to top of screen
+    # Using Y=0x0F places it near scanline 15, well above the playfield
     print("✓ Patching Y position (0x17DC): $77 -> $0F")
     rom_data[0x17DC] = 0x0F
 
