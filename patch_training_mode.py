@@ -142,12 +142,9 @@ def apply_patches(input_path, output_path):
     rom_data[0x17D5] = 0xEA  # NOP
     rom_data[0x17D6] = 0xEA  # NOP
 
-    # Patch 1c: NOP the JSR $B894 inside $B654 routine (at ROM 0x367C)
-    # This prevents sprite clearing in the pause loop
-    print("✓ Patching B654 sprite clear (0x367C): JSR $B894 -> NOP NOP NOP")
-    rom_data[0x367C] = 0xEA  # NOP
-    rom_data[0x367D] = 0xEA  # NOP
-    rom_data[0x367E] = 0xEA  # NOP
+    # NOTE: We previously NOPed 0x367C but that broke the FEVER menu
+    # The $B654 routine is shared between pause and menu screens
+    # Dr. Mario sprite may disappear during pause, but menu will work correctly
 
     # Patch 2: Move text to top of screen
     # Using Y=0x0F places it near scanline 15, well above the playfield
