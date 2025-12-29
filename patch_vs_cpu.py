@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Dr. Mario VS CPU Mode Patch
-============================
-Converts 2-PLAYER mode into VS CPU mode where Player 2 is controlled by AI.
-
-Phase 1: Random Bot - randomly moves and rotates capsules
+Dr. Mario Training Edition v6 - VS CPU Mode + Study Mode
+=========================================================
+Combines:
+1. VS CPU Mode: 2-PLAYER mode has AI-controlled Player 2
+2. Study Mode: Pause shows "STUDY" with visible playfield
 
 Technical details:
 - $F6: Player 2 controller input
@@ -18,6 +18,80 @@ import hashlib
 INPUT_ROM = "drmario.nes"
 OUTPUT_ROM = "drmario_vs_cpu.nes"
 
+# =========================================
+# Study Mode tile definitions
+# =========================================
+
+def create_tile(pattern, use_plane1=False):
+    """Create NES tile from 8x8 pattern string (. = 0, # = color)"""
+    plane0 = bytearray(8)
+    plane1 = bytearray(8)
+    for row, line in enumerate(pattern):
+        for col, char in enumerate(line[:8]):
+            if char == '#':
+                if use_plane1:
+                    plane1[row] |= (0x80 >> col)
+                else:
+                    plane0[row] |= (0x80 >> col)
+    return bytes(plane0) + bytes(plane1)
+
+T_PATTERN = [
+    "########",
+    "########",
+    "...##...",
+    "...##...",
+    "...##...",
+    "...##...",
+    "...##...",
+    "........",
+]
+
+D_PATTERN = [
+    "#####...",
+    "##..##..",
+    "##...##.",
+    "##...##.",
+    "##...##.",
+    "##..##..",
+    "#####...",
+    "........",
+]
+
+Y_PATTERN = [
+    "##...##.",
+    "##...##.",
+    ".##.##..",
+    "..###...",
+    "...##...",
+    "...##...",
+    "...##...",
+    "........",
+]
+
+# Bank 1 uses Plane 1 for white color
+TILE_T_P1 = create_tile(T_PATTERN, use_plane1=True)
+TILE_D_P1 = create_tile(D_PATTERN, use_plane1=True)
+TILE_Y_P1 = create_tile(Y_PATTERN, use_plane1=True)
+
+# Tile slots in CHR ROM
+TILE_T_NUM = 0xA0
+TILE_D_NUM = 0xA1
+TILE_Y_NUM = 0xA2
+
+# CHR ROM offset = 16 (header) + 32768 (PRG ROM)
+CHR_START = 16 + 32768
+CHR_BANK_SIZE = 8192
+
+# Sprite data for "STUDY"
+STUDY_SPRITES = bytes([
+    0x00, 0x0D, 0x00, 0x00,      # S
+    0x00, TILE_T_NUM, 0x00, 0x08, # T
+    0x00, 0x0C, 0x00, 0x10,      # U
+    0x00, TILE_D_NUM, 0x00, 0x18, # D
+    0x00, TILE_Y_NUM, 0x00, 0x20, # Y
+    0x80,                         # Terminator
+])
+
 def apply_patches(input_path, output_path):
     """Apply VS CPU patches to ROM"""
     with open(input_path, 'rb') as f:
@@ -30,7 +104,42 @@ def apply_patches(input_path, output_path):
     print()
 
     # =========================================
-    # Hook at 0x37CF (original location - replaces STA $F6; RTS)
+    # STUDY MODE PATCHES
+    # =========================================
+
+    # Enable background during pause
+    print("✓ Study Mode: Enable background during pause (0x17CA)")
+    rom_data[0x17CA] = 0x1E
+
+    # Keep sprites visible during pause (NOP out JSR $B894)
+    print("✓ Study Mode: Keep sprites visible (0x17D4)")
+    rom_data[0x17D4] = 0xEA  # NOP
+    rom_data[0x17D5] = 0xEA  # NOP
+    rom_data[0x17D6] = 0xEA  # NOP
+
+    # Move text to top of screen
+    print("✓ Study Mode: Move text to top (0x17DC)")
+    rom_data[0x17DC] = 0x0F
+
+    # Add T, D, Y tiles to Bank 1 PT0
+    bank = 1
+    pt0_offset = bank * CHR_BANK_SIZE
+    t_off = CHR_START + pt0_offset + (TILE_T_NUM * 16)
+    d_off = CHR_START + pt0_offset + (TILE_D_NUM * 16)
+    y_off = CHR_START + pt0_offset + (TILE_Y_NUM * 16)
+    rom_data[t_off:t_off+16] = TILE_T_P1
+    rom_data[d_off:d_off+16] = TILE_D_P1
+    rom_data[y_off:y_off+16] = TILE_Y_P1
+    print(f"✓ Study Mode: Added T,D,Y tiles to CHR Bank 1")
+
+    # Change sprite data from PAUSE to STUDY
+    sprite_offset = 0x2968
+    rom_data[sprite_offset:sprite_offset+len(STUDY_SPRITES)] = STUDY_SPRITES
+    print(f"✓ Study Mode: Changed text to 'STUDY'")
+    print()
+
+    # =========================================
+    # VS CPU MODE: Hook at 0x37CF
     # =========================================
     print("✓ Hooking controller (0x37CF): JMP $FF40")
     rom_data[0x37CF] = 0x4C  # JMP
@@ -136,9 +245,10 @@ def apply_patches(input_path, output_path):
     print(f"Patched ROM: {output_path}")
     print(f"Patched checksum: {patched_checksum}")
     print()
-    print("VS CPU Mode patch applied successfully!")
-    print("- 2-PLAYER mode now has AI-controlled Player 2")
-    print("- AI seeks viruses matching capsule color (Phase 2)")
+    print("Dr. Mario Training Edition v6 applied successfully!")
+    print("Features:")
+    print("- VS CPU Mode: 2-PLAYER has AI-controlled Player 2")
+    print("- Study Mode: Pause shows 'STUDY' with visible playfield")
 
     return True
 
