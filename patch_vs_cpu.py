@@ -65,34 +65,56 @@ def apply_patches(input_path, output_path):
     # Uses frame counter bits:
     #   bit 4: 0=Right, 1=Left
     #   bit 5: 0=no rotate, 1=rotate (A button)
+    # Layout with correct offsets:
+    # 0x00: STA $F6 (2 bytes)
+    # 0x02: LDA $43 (2)
+    # 0x04: AND #$0F (2)
+    # 0x06: BNE to RTS at 0x20 (operand = 0x20 - 0x08 = 0x18)
+    # 0x08: LDA $43 (2)
+    # 0x0A: AND #$20 (2)
+    # 0x0C: BNE to do_rotate at 0x1C (operand = 0x1C - 0x0E = 0x0E)
+    # 0x0E: LDA $43 (2)
+    # 0x10: AND #$10 (2)
+    # 0x12: BEQ to do_right at 0x18 (operand = 0x18 - 0x14 = 0x04)
+    # 0x14: LDA #$02 (2)
+    # 0x16: BNE to store at 0x1E (operand = 0x1E - 0x18 = 0x06)
+    # 0x18: LDA #$01 (do_right) (2)
+    # 0x1A: BNE to store at 0x1E (operand = 0x1E - 0x1C = 0x02)
+    # 0x1C: LDA #$40 (do_rotate) (2)
+    # 0x1E: STA $F6 (store) (2)
+    # 0x20: RTS (exit) (1)
     ai_routine = bytes([
         # Complete original STA $F6
         0x85, 0xF6,           # 00: STA $F6
 
-        # Throttle: every 4 frames
+        # Throttle: every 16 frames (~266ms, human-like speed)
         0xA5, 0x43,           # 02: LDA $43
-        0x29, 0x03,           # 04: AND #$03
-        0xD0, 0x10,           # 06: BNE exit (0x08+0x10=0x18 -> RTS)
+        0x29, 0x0F,           # 04: AND #$0F (every 16 frames)
+        0xD0, 0x18,           # 06: BNE exit (branch to RTS at 0x20)
 
-        # Start with Right (0x01)
-        0xA9, 0x01,           # 08: LDA #$01
+        # Bit 5: Choose mode (0=movement, 1=rotation only)
+        0xA5, 0x43,           # 08: LDA $43
+        0x29, 0x20,           # 0A: AND #$20 (isolate bit 5)
+        0xD0, 0x0E,           # 0C: BNE do_rotate at 0x1C
 
-        # Check bit 4 of frame counter for Left/Right
-        0xA6, 0x43,           # 0A: LDX $43 (load frame counter to X)
-        0xE0, 0x10,           # 0C: CPX #$10 (compare with 0x10)
-        0x90, 0x02,           # 0E: BCC skip_left (if frame < 16, use Right)
-        0xA9, 0x02,           # 10: LDA #$02 (Left)
-        # 12: skip_left
+        # Movement mode: check bit 4 for L/R
+        0xA5, 0x43,           # 0E: LDA $43
+        0x29, 0x10,           # 10: AND #$10 (isolate bit 4)
+        0xF0, 0x04,           # 12: BEQ do_right at 0x18
+        0xA9, 0x02,           # 14: LDA #$02 (Left)
+        0xD0, 0x06,           # 16: BNE store at 0x1E
 
-        # Check bit 5 for rotation - add 0x40 if bit 5 is set
-        0xA6, 0x43,           # 12: LDX $43
-        0xE0, 0x20,           # 14: CPX #$20
-        0x90, 0x02,           # 16: BCC store (skip rotation if frame < 32)
-        0x09, 0x40,           # 18: ORA #$40 (add A button)
+        # do_right:
+        0xA9, 0x01,           # 18: LDA #$01 (Right)
+        0xD0, 0x02,           # 1A: BNE store at 0x1E
 
-        # 1A: store and exit
-        0x85, 0xF6,           # 1A: STA $F6
-        0x60,                 # 1C: RTS
+        # do_rotate:
+        0xA9, 0x40,           # 1C: LDA #$40 (A button only)
+
+        # store:
+        0x85, 0xF6,           # 1E: STA $F6
+        # exit:
+        0x60,                 # 20: RTS
     ])
 
     ai_routine_offset = 0x7F50
