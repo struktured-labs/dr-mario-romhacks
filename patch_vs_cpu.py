@@ -167,126 +167,129 @@ def apply_patches(input_path, output_path):
     # Tile values: $D0=Yellow virus, $D1=Red virus, $D2=Blue virus
     # Buttons: Right=0x01, Left=0x02, A=0x40, B=0x80
     #
-    # Layout (with game-active check + rotate during movement):
+    # Layout (with soft-drop bypassing throttle):
     # 00-01: STA $F6        - complete original op
-    # 02-03: LDA $43        - throttle check
-    # 04-05: AND #$07
-    # 06-07: BNE exit       - skip if not every 8 frames (-> 0x53)
-    # 08-0A: LDA $03A4      - load P2 virus count
-    # 0B-0C: BEQ exit       - skip AI if no viruses (-> 0x53)
-    # 0D-0F: LDA $0381      - get capsule left color
-    # 10:    CLC
-    # 11-12: ADC #$D0       - convert to virus tile
-    # 13-14: STA $00        - store target tile
-    # 15-16: LDX #$7F       - scan from bottom (127)
-    # scan_loop (17):
-    # 17-19: LDA $0500,X    - read playfield tile
-    # 1A-1B: CMP $00        - match target virus?
-    # 1C-1D: BEQ found      - yes, found it (-> 0x25)
-    # 1E:    DEX            - next tile
-    # 1F-20: BPL scan_loop  - continue if X >= 0 (-> 0x17)
-    # 21-22: LDA #$03       - no match, target center
-    # 23-24: BNE compare    - (always taken) (-> 0x28)
-    # found (25):
-    # 25:    TXA            - get offset in A
-    # 26-27: AND #$07       - extract column (0-7)
-    # compare (28):
-    # 28-29: STA $01        - store target column
-    # 2A-2C: LDA $0385      - get current X position
-    # 2D-2E: CMP $01        - compare with target
-    # 2F-30: BEQ done       - at target (-> 0x4F)
-    # 31-32: BCS go_left    - current > target (-> 0x41)
-    # go_right (33): sometimes rotate while moving
-    # 33-34: LDA $43        - frame counter
-    # 35-36: AND #$30       - check bits 4,5
-    # 37-38: BNE right_only - skip rotate (-> 0x3D)
-    # 39-3A: LDA #$41       - Right + A
-    # 3B-3C: BNE store      - (-> 0x51)
-    # 3D-3E: LDA #$01       - right_only: Right only
-    # 3F-40: BNE store      - (-> 0x51)
-    # go_left (41): sometimes rotate while moving
-    # 41-42: LDA $43
-    # 43-44: AND #$30
-    # 45-46: BNE left_only  - (-> 0x4B)
-    # 47-48: LDA #$42       - Left + A
-    # 49-4A: BNE store      - (-> 0x51)
-    # 4B-4C: LDA #$02       - left_only: Left only
-    # 4D-4E: BNE store      - (-> 0x51)
-    # done (4F):
-    # 4F-50: LDA #$00       - no button (let it drop)
-    # store (51):
-    # 51-52: STA $F6        - write P2 input
-    # exit (53):
-    # 53:    RTS
+    # 02-04: LDA $03A4      - game-active check (before throttle!)
+    # 05-06: BEQ exit       - skip AI if no viruses
+    # 07-09: LDA $0381      - get capsule left color
+    # 0A:    CLC
+    # 0B-0C: ADC #$D0       - convert to virus tile
+    # 0D-0E: STA $00        - store target tile
+    # 0F-10: LDX #$7F       - scan from bottom
+    # scan_loop (11):
+    # 11-13: LDA $0500,X    - read playfield tile
+    # 14-15: CMP $00        - match target virus?
+    # 16-17: BEQ found      - yes (-> 0x1F)
+    # 18:    DEX
+    # 19-1A: BPL scan_loop  - continue (-> 0x11)
+    # 1B-1C: LDA #$03       - no match, target center
+    # 1D-1E: BNE compare    - (-> 0x22)
+    # found (1F):
+    # 1F:    TXA
+    # 20-21: AND #$07       - extract column
+    # compare (22):
+    # 22-23: STA $01        - store target column
+    # 24-26: LDA $0385      - get current X
+    # 27-28: CMP $01        - compare with target
+    # 29-2A: BEQ at_target  - at target, soft-drop! (-> 0x4D)
+    # 2B-2C: LDA $43        - NOT at target: apply throttle
+    # 2D-2E: AND #$07
+    # 2F-30: BNE exit       - skip if not throttle frame (-> 0x51)
+    # 31-33: LDA $0385      - reload X position
+    # 34-35: CMP $01        - compare again
+    # 36-37: BCS go_left    - (-> 0x45)
+    # go_right (38):
+    # 38-39: LDA $43
+    # 3A-3B: AND #$30
+    # 3C-3D: BNE right_only - (-> 0x41)
+    # 3E-3F: LDA #$41       - Right + A
+    # 40:    BNE store      - (-> 0x4F)
+    # 41-42: LDA #$01       - right_only
+    # 43-44: BNE store      - (-> 0x4F)
+    # go_left (45):
+    # 45-46: LDA $43
+    # 47-48: AND #$30
+    # 49-4A: BNE left_only  - (-> 0x4D... wait, reuse at_target for left_only? No.)
+    # Actually let me recalc...
+    #
+    # Simpler: at_target just loads Down and stores, no throttle
     ai_routine = bytes([
         # Complete original STA $F6
         0x85, 0xF6,           # 00: STA $F6
 
-        # Throttle: every 8 frames
-        0xA5, 0x43,           # 02: LDA $43
-        0x29, 0x07,           # 04: AND #$07
-        0xD0, 0x4B,           # 06: BNE exit (-> 0x53)
-
-        # Game-active check: skip if no viruses (menu/results)
-        0xAD, 0xA4, 0x03,     # 08: LDA $03A4 (P2 virus count)
-        0xF0, 0x46,           # 0B: BEQ exit (-> 0x53, skip if 0)
+        # Game-active check FIRST (no throttle yet)
+        0xAD, 0xA4, 0x03,     # 02: LDA $03A4 (P2 virus count)
+        0xF0, 0x4D,           # 05: BEQ exit (-> 0x54, skip if 0)
 
         # Get capsule left color, convert to virus tile
-        0xAD, 0x81, 0x03,     # 0D: LDA $0381 (P2 capsule left color)
-        0x18,                 # 10: CLC
-        0x69, 0xD0,           # 11: ADC #$D0 (-> virus tile $D0/$D1/$D2)
-        0x85, 0x00,           # 13: STA $00 (store target virus tile)
+        0xAD, 0x81, 0x03,     # 07: LDA $0381 (P2 capsule left color)
+        0x18,                 # 0A: CLC
+        0x69, 0xD0,           # 0B: ADC #$D0 (-> virus tile)
+        0x85, 0x00,           # 0D: STA $00 (store target virus tile)
 
-        # Scan P2 playfield ($0500-$057F) from bottom up
-        0xA2, 0x7F,           # 15: LDX #$7F (start at offset 127)
-        # scan_loop:
-        0xBD, 0x00, 0x05,     # 17: LDA $0500,X (read playfield tile)
-        0xC5, 0x00,           # 1A: CMP $00 (match target virus?)
-        0xF0, 0x07,           # 1C: BEQ found (-> 0x25)
-        0xCA,                 # 1E: DEX
-        0x10, 0xF6,           # 1F: BPL scan_loop (-> 0x17)
+        # Scan P2 playfield from bottom up
+        0xA2, 0x7F,           # 0F: LDX #$7F
+        # scan_loop (11):
+        0xBD, 0x00, 0x05,     # 11: LDA $0500,X
+        0xC5, 0x00,           # 14: CMP $00
+        0xF0, 0x07,           # 16: BEQ found (-> 0x1F)
+        0xCA,                 # 18: DEX
+        0x10, 0xF6,           # 19: BPL scan_loop (-> 0x11)
 
-        # No virus found - target center column (3)
-        0xA9, 0x03,           # 21: LDA #$03
-        0xD0, 0x03,           # 23: BNE compare (-> 0x28)
+        # No virus found - target center
+        0xA9, 0x03,           # 1B: LDA #$03
+        0xD0, 0x03,           # 1D: BNE compare (-> 0x22)
 
-        # found: extract column from offset
-        0x8A,                 # 25: TXA
-        0x29, 0x07,           # 26: AND #$07 (column = offset % 8)
+        # found (1F):
+        0x8A,                 # 1F: TXA
+        0x29, 0x07,           # 20: AND #$07
 
-        # compare: target column in A
-        0x85, 0x01,           # 28: STA $01 (store target column)
-        0xAD, 0x85, 0x03,     # 2A: LDA $0385 (get current X position)
-        0xC5, 0x01,           # 2D: CMP $01 (compare with target)
-        0xF0, 0x1E,           # 2F: BEQ done (-> 0x4F, at target)
-        0xB0, 0x0E,           # 31: BCS go_left (-> 0x41, current > target)
+        # compare (22): target column in A
+        0x85, 0x01,           # 22: STA $01 (store target column)
+        0xAD, 0x85, 0x03,     # 24: LDA $0385 (current X)
+        0xC5, 0x01,           # 27: CMP $01
+        0xF0, 0x2A,           # 29: BEQ at_target (-> 0x55, soft-drop!)
 
-        # go_right: sometimes rotate while moving (Right + A)
-        0xA5, 0x43,           # 33: LDA $43 (frame counter)
-        0x29, 0x30,           # 35: AND #$30 (check bits 4,5)
-        0xD0, 0x04,           # 37: BNE right_only (-> 0x3D)
-        0xA9, 0x41,           # 39: LDA #$41 (Right + A)
-        0xD0, 0x14,           # 3B: BNE store (-> 0x51)
-        0xA9, 0x01,           # 3D: right_only: LDA #$01 (Right only)
-        0xD0, 0x10,           # 3F: BNE store (-> 0x51)
+        # NOT at target - now apply throttle for movement
+        0xA5, 0x43,           # 2B: LDA $43
+        0x29, 0x07,           # 2D: AND #$07
+        0xD0, 0x23,           # 2F: BNE exit (-> 0x54)
 
-        # go_left: sometimes rotate while moving (Left + A)
-        0xA5, 0x43,           # 41: LDA $43
-        0x29, 0x30,           # 43: AND #$30
-        0xD0, 0x04,           # 45: BNE left_only (-> 0x4B)
-        0xA9, 0x42,           # 47: LDA #$42 (Left + A)
-        0xD0, 0x06,           # 49: BNE store (-> 0x51)
-        0xA9, 0x02,           # 4B: left_only: LDA #$02 (Left only)
-        0xD0, 0x02,           # 4D: BNE store (-> 0x51)
+        # Movement: reload and compare
+        0xAD, 0x85, 0x03,     # 31: LDA $0385
+        0xC5, 0x01,           # 34: CMP $01
+        0xB0, 0x0E,           # 36: BCS go_left (-> 0x46)
 
-        # done: at target, just let it drop
-        0xA9, 0x00,           # 4F: LDA #$00
+        # go_right (38):
+        0xA5, 0x43,           # 38: LDA $43
+        0x29, 0x30,           # 3A: AND #$30
+        0xD0, 0x04,           # 3C: BNE right_only (-> 0x42)
+        0xA9, 0x41,           # 3E: LDA #$41 (Right + A)
+        0xD0, 0x10,           # 40: BNE store (-> 0x52)
+        # right_only (42):
+        0xA9, 0x01,           # 42: LDA #$01
+        0xD0, 0x0C,           # 44: BNE store (-> 0x52)
 
-        # store:
-        0x85, 0xF6,           # 51: STA $F6
+        # go_left (46):
+        0xA5, 0x43,           # 46: LDA $43
+        0x29, 0x30,           # 48: AND #$30
+        0xD0, 0x04,           # 4A: BNE left_only (-> 0x50)
+        0xA9, 0x42,           # 4C: LDA #$42 (Left + A)
+        0xD0, 0x02,           # 4E: BNE store (-> 0x52)
+        # left_only (50):
+        0xA9, 0x02,           # 50: LDA #$02
+        # falls through to store
 
-        # exit:
-        0x60,                 # 53: RTS
+        # store (52):
+        0x85, 0xF6,           # 52: STA $F6
+
+        # exit (54):
+        0x60,                 # 54: RTS
+
+        # at_target (55): soft-drop - NO THROTTLE, runs every frame!
+        0xA9, 0x04,           # 55: LDA #$04 (Down button)
+        0x85, 0xF6,           # 57: STA $F6
+        0x60,                 # 59: RTS
     ])
 
     ai_routine_offset = 0x7F50
