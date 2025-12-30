@@ -219,77 +219,92 @@ def apply_patches(input_path, output_path):
 
         # Game-active check FIRST (no throttle yet)
         0xAD, 0xA4, 0x03,     # 02: LDA $03A4 (P2 virus count)
-        0xF0, 0x4D,           # 05: BEQ exit (-> 0x54, skip if 0)
+        0xF0, 0x61,           # 05: BEQ exit (-> 0x68, skip if 0)
 
-        # Get capsule left color, convert to virus tile
+        # Get LEFT capsule color, convert to virus tile
         0xAD, 0x81, 0x03,     # 07: LDA $0381 (P2 capsule left color)
         0x18,                 # 0A: CLC
         0x69, 0xD0,           # 0B: ADC #$D0 (-> virus tile)
-        0x85, 0x00,           # 0D: STA $00 (store target virus tile)
+        0x85, 0x00,           # 0D: STA $00 (store left virus tile)
 
-        # Scan P2 playfield from bottom up
-        0xA2, 0x7F,           # 0F: LDX #$7F
-        # scan_loop (11):
-        0xBD, 0x00, 0x05,     # 11: LDA $0500,X
-        0xC5, 0x00,           # 14: CMP $00
-        0xF0, 0x07,           # 16: BEQ found (-> 0x1F)
-        0xCA,                 # 18: DEX
-        0x10, 0xF6,           # 19: BPL scan_loop (-> 0x11)
+        # Get RIGHT capsule color, convert to virus tile
+        0xAD, 0x82, 0x03,     # 0F: LDA $0382 (P2 capsule right color)
+        0x18,                 # 12: CLC
+        0x69, 0xD0,           # 13: ADC #$D0 (-> virus tile)
+        0x85, 0x02,           # 15: STA $02 (store right virus tile)
 
-        # No virus found - target center
-        0xA9, 0x03,           # 1B: LDA #$03
-        0xD0, 0x03,           # 1D: BNE compare (-> 0x22)
+        # Scan for LEFT color virus first
+        0xA2, 0x7F,           # 17: LDX #$7F
+        # scan_left (19):
+        0xBD, 0x00, 0x05,     # 19: LDA $0500,X
+        0xC5, 0x00,           # 1C: CMP $00 (match left?)
+        0xF0, 0x13,           # 1E: BEQ found (-> 0x33)
+        0xCA,                 # 20: DEX
+        0x10, 0xF6,           # 21: BPL scan_left (-> 0x19)
 
-        # found (1F):
-        0x8A,                 # 1F: TXA
-        0x29, 0x07,           # 20: AND #$07
+        # No left match - scan for RIGHT color virus
+        0xA2, 0x7F,           # 23: LDX #$7F
+        # scan_right (25):
+        0xBD, 0x00, 0x05,     # 25: LDA $0500,X
+        0xC5, 0x02,           # 28: CMP $02 (match right?)
+        0xF0, 0x07,           # 2A: BEQ found (-> 0x33)
+        0xCA,                 # 2C: DEX
+        0x10, 0xF6,           # 2D: BPL scan_right (-> 0x25)
 
-        # compare (22): target column in A
-        0x85, 0x01,           # 22: STA $01 (store target column)
-        0xAD, 0x85, 0x03,     # 24: LDA $0385 (current X)
-        0xC5, 0x01,           # 27: CMP $01
-        0xF0, 0x2A,           # 29: BEQ at_target (-> 0x55, soft-drop!)
+        # No match at all - target center column (3)
+        0xA9, 0x03,           # 2F: LDA #$03
+        0xD0, 0x03,           # 31: BNE compare (-> 0x36)
 
-        # NOT at target - now apply throttle for movement
-        0xA5, 0x43,           # 2B: LDA $43
-        0x29, 0x07,           # 2D: AND #$07
-        0xD0, 0x23,           # 2F: BNE exit (-> 0x54)
+        # found (33):
+        0x8A,                 # 33: TXA
+        0x29, 0x07,           # 34: AND #$07 (extract column)
+
+        # compare (36): target column in A
+        0x85, 0x01,           # 36: STA $01 (store target column)
+        0xAD, 0x85, 0x03,     # 38: LDA $0385 (current X)
+        0xC5, 0x01,           # 3B: CMP $01
+        0xF0, 0x2A,           # 3D: BEQ at_target (-> 0x69, soft-drop!)
+
+        # NOT at target - apply throttle for movement
+        0xA5, 0x43,           # 3F: LDA $43
+        0x29, 0x07,           # 41: AND #$07
+        0xD0, 0x23,           # 43: BNE exit (-> 0x68)
 
         # Movement: reload and compare
-        0xAD, 0x85, 0x03,     # 31: LDA $0385
-        0xC5, 0x01,           # 34: CMP $01
-        0xB0, 0x0E,           # 36: BCS go_left (-> 0x46)
+        0xAD, 0x85, 0x03,     # 45: LDA $0385
+        0xC5, 0x01,           # 48: CMP $01
+        0xB0, 0x0E,           # 4A: BCS go_left (-> 0x5A)
 
-        # go_right (38):
-        0xA5, 0x43,           # 38: LDA $43
-        0x29, 0x30,           # 3A: AND #$30
-        0xD0, 0x04,           # 3C: BNE right_only (-> 0x42)
-        0xA9, 0x41,           # 3E: LDA #$41 (Right + A)
-        0xD0, 0x10,           # 40: BNE store (-> 0x52)
-        # right_only (42):
-        0xA9, 0x01,           # 42: LDA #$01
-        0xD0, 0x0C,           # 44: BNE store (-> 0x52)
+        # go_right (4C):
+        0xA5, 0x43,           # 4C: LDA $43
+        0x29, 0x30,           # 4E: AND #$30
+        0xD0, 0x04,           # 50: BNE right_only (-> 0x56)
+        0xA9, 0x41,           # 52: LDA #$41 (Right + A)
+        0xD0, 0x10,           # 54: BNE store (-> 0x66)
+        # right_only (56):
+        0xA9, 0x01,           # 56: LDA #$01
+        0xD0, 0x0C,           # 58: BNE store (-> 0x66)
 
-        # go_left (46):
-        0xA5, 0x43,           # 46: LDA $43
-        0x29, 0x30,           # 48: AND #$30
-        0xD0, 0x04,           # 4A: BNE left_only (-> 0x50)
-        0xA9, 0x42,           # 4C: LDA #$42 (Left + A)
-        0xD0, 0x02,           # 4E: BNE store (-> 0x52)
-        # left_only (50):
-        0xA9, 0x02,           # 50: LDA #$02
+        # go_left (5A):
+        0xA5, 0x43,           # 5A: LDA $43
+        0x29, 0x30,           # 5C: AND #$30
+        0xD0, 0x04,           # 5E: BNE left_only (-> 0x64)
+        0xA9, 0x42,           # 60: LDA #$42 (Left + A)
+        0xD0, 0x02,           # 62: BNE store (-> 0x66)
+        # left_only (64):
+        0xA9, 0x02,           # 64: LDA #$02
         # falls through to store
 
-        # store (52):
-        0x85, 0xF6,           # 52: STA $F6
+        # store (66):
+        0x85, 0xF6,           # 66: STA $F6
 
-        # exit (54):
-        0x60,                 # 54: RTS
+        # exit (68):
+        0x60,                 # 68: RTS
 
-        # at_target (55): soft-drop - NO THROTTLE, runs every frame!
-        0xA9, 0x04,           # 55: LDA #$04 (Down button)
-        0x85, 0xF6,           # 57: STA $F6
-        0x60,                 # 59: RTS
+        # at_target (69): soft-drop - NO THROTTLE, runs every frame!
+        0xA9, 0x04,           # 69: LDA #$04 (Down button)
+        0x85, 0xF6,           # 6B: STA $F6
+        0x60,                 # 6D: RTS
     ])
 
     ai_routine_offset = 0x7F50
