@@ -167,13 +167,13 @@ def apply_patches(input_path, output_path):
     # Tile values: $D0=Yellow virus, $D1=Red virus, $D2=Blue virus
     # Buttons: Right=0x01, Left=0x02, A=0x40, B=0x80
     #
-    # Layout (with game-active check):
+    # Layout (with game-active check + rotate during movement):
     # 00-01: STA $F6        - complete original op
     # 02-03: LDA $43        - throttle check
     # 04-05: AND #$07
-    # 06-07: BNE exit       - skip if not every 8 frames
-    # 08-0A: LDA $03A4      - NEW: load P2 virus count
-    # 0B-0C: BEQ exit       - NEW: skip AI if no viruses (not in game)
+    # 06-07: BNE exit       - skip if not every 8 frames (-> 0x53)
+    # 08-0A: LDA $03A4      - load P2 virus count
+    # 0B-0C: BEQ exit       - skip AI if no viruses (-> 0x53)
     # 0D-0F: LDA $0381      - get capsule left color
     # 10:    CLC
     # 11-12: ADC #$D0       - convert to virus tile
@@ -182,11 +182,11 @@ def apply_patches(input_path, output_path):
     # scan_loop (17):
     # 17-19: LDA $0500,X    - read playfield tile
     # 1A-1B: CMP $00        - match target virus?
-    # 1C-1D: BEQ found      - yes, found it
+    # 1C-1D: BEQ found      - yes, found it (-> 0x25)
     # 1E:    DEX            - next tile
-    # 1F-20: BPL scan_loop  - continue if X >= 0
+    # 1F-20: BPL scan_loop  - continue if X >= 0 (-> 0x17)
     # 21-22: LDA #$03       - no match, target center
-    # 23-24: BNE compare    - (always taken)
+    # 23-24: BNE compare    - (always taken) (-> 0x28)
     # found (25):
     # 25:    TXA            - get offset in A
     # 26-27: AND #$07       - extract column (0-7)
@@ -194,19 +194,30 @@ def apply_patches(input_path, output_path):
     # 28-29: STA $01        - store target column
     # 2A-2C: LDA $0385      - get current X position
     # 2D-2E: CMP $01        - compare with target
-    # 2F-30: BEQ done       - at target, no move
-    # 31-32: BCS go_left    - current > target, go left
-    # 33-34: LDA #$01       - else go right
-    # 35-36: BNE store      - (always taken)
-    # go_left (37):
-    # 37-38: LDA #$02       - left button
-    # 39-3A: BNE store      - (always taken)
-    # done (3B):
-    # 3B-3C: LDA #$00       - no button
-    # store (3D):
-    # 3D-3E: STA $F6        - write P2 input
-    # exit (3F):
-    # 3F:    RTS
+    # 2F-30: BEQ done       - at target (-> 0x4F)
+    # 31-32: BCS go_left    - current > target (-> 0x41)
+    # go_right (33): sometimes rotate while moving
+    # 33-34: LDA $43        - frame counter
+    # 35-36: AND #$30       - check bits 4,5
+    # 37-38: BNE right_only - skip rotate (-> 0x3D)
+    # 39-3A: LDA #$41       - Right + A
+    # 3B-3C: BNE store      - (-> 0x51)
+    # 3D-3E: LDA #$01       - right_only: Right only
+    # 3F-40: BNE store      - (-> 0x51)
+    # go_left (41): sometimes rotate while moving
+    # 41-42: LDA $43
+    # 43-44: AND #$30
+    # 45-46: BNE left_only  - (-> 0x4B)
+    # 47-48: LDA #$42       - Left + A
+    # 49-4A: BNE store      - (-> 0x51)
+    # 4B-4C: LDA #$02       - left_only: Left only
+    # 4D-4E: BNE store      - (-> 0x51)
+    # done (4F):
+    # 4F-50: LDA #$00       - no button (let it drop)
+    # store (51):
+    # 51-52: STA $F6        - write P2 input
+    # exit (53):
+    # 53:    RTS
     ai_routine = bytes([
         # Complete original STA $F6
         0x85, 0xF6,           # 00: STA $F6
@@ -214,11 +225,11 @@ def apply_patches(input_path, output_path):
         # Throttle: every 8 frames
         0xA5, 0x43,           # 02: LDA $43
         0x29, 0x07,           # 04: AND #$07
-        0xD0, 0x37,           # 06: BNE exit (-> 0x3F)
+        0xD0, 0x4B,           # 06: BNE exit (-> 0x53)
 
         # Game-active check: skip if no viruses (menu/results)
         0xAD, 0xA4, 0x03,     # 08: LDA $03A4 (P2 virus count)
-        0xF0, 0x32,           # 0B: BEQ exit (-> 0x3F, skip if 0)
+        0xF0, 0x46,           # 0B: BEQ exit (-> 0x53, skip if 0)
 
         # Get capsule left color, convert to virus tile
         0xAD, 0x81, 0x03,     # 0D: LDA $0381 (P2 capsule left color)
@@ -247,25 +258,35 @@ def apply_patches(input_path, output_path):
         0x85, 0x01,           # 28: STA $01 (store target column)
         0xAD, 0x85, 0x03,     # 2A: LDA $0385 (get current X position)
         0xC5, 0x01,           # 2D: CMP $01 (compare with target)
-        0xF0, 0x0A,           # 2F: BEQ done (-> 0x3B, at target)
-        0xB0, 0x04,           # 31: BCS go_left (-> 0x37, current > target)
+        0xF0, 0x1E,           # 2F: BEQ done (-> 0x4F, at target)
+        0xB0, 0x0E,           # 31: BCS go_left (-> 0x41, current > target)
 
-        # go_right:
-        0xA9, 0x01,           # 33: LDA #$01 (Right button)
-        0xD0, 0x06,           # 35: BNE store (-> 0x3D)
+        # go_right: sometimes rotate while moving (Right + A)
+        0xA5, 0x43,           # 33: LDA $43 (frame counter)
+        0x29, 0x30,           # 35: AND #$30 (check bits 4,5)
+        0xD0, 0x04,           # 37: BNE right_only (-> 0x3D)
+        0xA9, 0x41,           # 39: LDA #$41 (Right + A)
+        0xD0, 0x14,           # 3B: BNE store (-> 0x51)
+        0xA9, 0x01,           # 3D: right_only: LDA #$01 (Right only)
+        0xD0, 0x10,           # 3F: BNE store (-> 0x51)
 
-        # go_left:
-        0xA9, 0x02,           # 37: LDA #$02 (Left button)
-        0xD0, 0x02,           # 39: BNE store (-> 0x3D)
+        # go_left: sometimes rotate while moving (Left + A)
+        0xA5, 0x43,           # 41: LDA $43
+        0x29, 0x30,           # 43: AND #$30
+        0xD0, 0x04,           # 45: BNE left_only (-> 0x4B)
+        0xA9, 0x42,           # 47: LDA #$42 (Left + A)
+        0xD0, 0x06,           # 49: BNE store (-> 0x51)
+        0xA9, 0x02,           # 4B: left_only: LDA #$02 (Left only)
+        0xD0, 0x02,           # 4D: BNE store (-> 0x51)
 
-        # done: at target column, no movement
-        0xA9, 0x00,           # 3B: LDA #$00 (no button)
+        # done: at target, just let it drop
+        0xA9, 0x00,           # 4F: LDA #$00
 
         # store:
-        0x85, 0xF6,           # 3D: STA $F6
+        0x85, 0xF6,           # 51: STA $F6
 
         # exit:
-        0x60,                 # 3F: RTS
+        0x60,                 # 53: RTS
     ])
 
     ai_routine_offset = 0x7F50
