@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Dr. Mario VS CPU Edition v8
-===========================
+Dr. Mario VS CPU Edition v11
+============================
 Features:
 1. VS CPU Mode: New 3rd menu option with AI-controlled Player 2
    - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU -> 1 PLAYER
@@ -195,10 +195,11 @@ def apply_patches(input_path, output_path):
     toggle_routine = bytes(toggle_code)
 
     # =========================================
-    # Level Select Mirror (VS CPU mode)
+    # Level Select Mirror (VS CPU mode) - with gameplay AI integration
     # =========================================
     # Uses $04 for VS CPU flag
-    # Only mirrors during level select (P2 virus count == 0), not gameplay
+    # Level select: mirror P1 to P2
+    # Gameplay: AI controls P2 (writes to $5B/$5C directly)
     mirror_code = []
 
     # Check $0727 == 2 (must be in 2P mode for game)
@@ -213,19 +214,28 @@ def apply_patches(input_path, output_path):
     load_p2_branch2 = len(mirror_code)
     mirror_code += [0xD0, 0x00]        # BNE load_p2 (not VS CPU)
 
-    # Check $03A4 == 0 (P2 has no viruses = level select, not gameplay)
+    # Check if in gameplay (need BOTH conditions):
+    # 1. $03A4 != 0 (viruses present)
+    # 2. $0386 < 16 (capsule Y is valid, meaning capsule is active)
     mirror_code += [0xAD, 0xA4, 0x03]  # LDA $03A4
-    load_p2_branch3 = len(mirror_code)
-    mirror_code += [0xD0, 0x00]        # BNE load_p2 (in gameplay, use P2)
+    mirror_branch1 = len(mirror_code)
+    mirror_code += [0xF0, 0x00]        # BEQ do_mirror (no viruses = level select)
 
-    # use_p1: Load P1 buttons for P2 (mirror mode - level select only)
+    # Viruses present, but is capsule active?
+    mirror_code += [0xAD, 0x86, 0x03]  # LDA $0386 (P2 capsule Y)
+    mirror_code += [0xC9, 0x10]        # CMP #$10 (is Y >= 16?)
+    ai_branch_pos = len(mirror_code)
+    mirror_code += [0x90, 0x00]        # BCC do_ai (Y < 16 = valid capsule)
+
+    # do_mirror: Level select - Load P1 buttons for P2 (mirror mode)
+    do_mirror_pos = len(mirror_code)
     mirror_code += [0xA5, 0xF5]        # LDA $F5
     mirror_code += [0x85, 0x5B]        # STA $5B
     mirror_code += [0xA5, 0xF7]        # LDA $F7
     mirror_code += [0x85, 0x5C]        # STA $5C
     mirror_code += [0x60]              # RTS
 
-    # load_p2: Load P2 buttons normally
+    # load_p2: Load P2 buttons normally (not VS CPU mode)
     load_p2_pos = len(mirror_code)
     mirror_code += [0xA5, 0xF6]        # LDA $F6
     mirror_code += [0x85, 0x5B]        # STA $5B
@@ -233,46 +243,100 @@ def apply_patches(input_path, output_path):
     mirror_code += [0x85, 0x5C]        # STA $5C
     mirror_code += [0x60]              # RTS
 
+    # do_ai: AI controls P2 during gameplay (writes to $5B/$5C)
+    do_ai_pos = len(mirror_code)
+    # Scan P2 playfield bottom-up for any virus
+    mirror_code += [0xA2, 0x7F]        # LDX #$7F (start at bottom)
+    scan_pos = len(mirror_code)
+    mirror_code += [0xBD, 0x00, 0x05]  # LDA $0500,X (P2 playfield)
+    mirror_code += [0xC9, 0xD0]        # CMP #$D0 (virus tile?)
+    ai_found_branch = len(mirror_code)
+    mirror_code += [0xB0, 0x00]        # BCS ai_found
+    mirror_code += [0xCA]              # DEX
+    mirror_code += [0x10, (scan_pos - (len(mirror_code) + 2)) & 0xFF]  # BPL scan
+    # No virus - target center
+    mirror_code += [0xA9, 0x03]        # LDA #$03
+    ai_compare_branch = len(mirror_code)
+    mirror_code += [0xD0, 0x00]        # BNE ai_compare
+
+    # ai_found: extract column
+    ai_found_pos = len(mirror_code)
+    mirror_code += [0x8A]              # TXA
+    mirror_code += [0x29, 0x07]        # AND #$07
+
+    # ai_compare: compare with current position
+    ai_compare_pos = len(mirror_code)
+    mirror_code += [0x85, 0x00]        # STA $00 (target col)
+    mirror_code += [0xAD, 0x85, 0x03]  # LDA $0385 (P2 X)
+    mirror_code += [0xC5, 0x00]        # CMP $00
+    ai_drop_branch = len(mirror_code)
+    mirror_code += [0xF0, 0x00]        # BEQ ai_drop
+
+    # Every 32 frames rotate (less frequent)
+    mirror_code += [0xA5, 0x43]        # LDA $43
+    mirror_code += [0x29, 0x1F]        # AND #$1F
+    ai_rotate_branch = len(mirror_code)
+    mirror_code += [0xF0, 0x00]        # BEQ ai_rotate
+
+    # Move toward target
+    mirror_code += [0xAD, 0x85, 0x03]  # LDA $0385
+    mirror_code += [0xC5, 0x00]        # CMP $00
+    ai_left_branch = len(mirror_code)
+    mirror_code += [0xB0, 0x00]        # BCS ai_left
+
+    # ai_right
+    mirror_code += [0xA9, 0x01]        # LDA #$01 (Right)
+    ai_store_branch = len(mirror_code)
+    mirror_code += [0xD0, 0x00]        # BNE ai_store
+
+    # ai_left
+    ai_left_pos = len(mirror_code)
+    mirror_code += [0xA9, 0x02]        # LDA #$02 (Left)
+    ai_store_branch2 = len(mirror_code)
+    mirror_code += [0xD0, 0x00]        # BNE ai_store
+
+    # ai_rotate
+    ai_rotate_pos = len(mirror_code)
+    mirror_code += [0xA9, 0x80]        # LDA #$80 (A button)
+    ai_store_branch3 = len(mirror_code)
+    mirror_code += [0xD0, 0x00]        # BNE ai_store
+
+    # ai_drop
+    ai_drop_pos = len(mirror_code)
+    mirror_code += [0xA9, 0x04]        # LDA #$04 (Down)
+
+    # ai_store: store AI input to $5B (and clear $5C for no held)
+    ai_store_pos = len(mirror_code)
+    mirror_code += [0x85, 0x5B]        # STA $5B
+    mirror_code += [0xA9, 0x00]        # LDA #$00
+    mirror_code += [0x85, 0x5C]        # STA $5C
+    mirror_code += [0x60]              # RTS
+
     # Fix branch offsets
     mirror_code[load_p2_branch1 + 1] = (load_p2_pos - (load_p2_branch1 + 2)) & 0xFF
     mirror_code[load_p2_branch2 + 1] = (load_p2_pos - (load_p2_branch2 + 2)) & 0xFF
-    mirror_code[load_p2_branch3 + 1] = (load_p2_pos - (load_p2_branch3 + 2)) & 0xFF
+    mirror_code[mirror_branch1 + 1] = (do_mirror_pos - (mirror_branch1 + 2)) & 0xFF
+    mirror_code[ai_branch_pos + 1] = (do_ai_pos - (ai_branch_pos + 2)) & 0xFF
+    mirror_code[ai_found_branch + 1] = (ai_found_pos - (ai_found_branch + 2)) & 0xFF
+    mirror_code[ai_compare_branch + 1] = (ai_compare_pos - (ai_compare_branch + 2)) & 0xFF
+    mirror_code[ai_drop_branch + 1] = (ai_drop_pos - (ai_drop_branch + 2)) & 0xFF
+    mirror_code[ai_rotate_branch + 1] = (ai_rotate_pos - (ai_rotate_branch + 2)) & 0xFF
+    mirror_code[ai_left_branch + 1] = (ai_left_pos - (ai_left_branch + 2)) & 0xFF
+    mirror_code[ai_store_branch + 1] = (ai_store_pos - (ai_store_branch + 2)) & 0xFF
+    mirror_code[ai_store_branch2 + 1] = (ai_store_pos - (ai_store_branch2 + 2)) & 0xFF
+    mirror_code[ai_store_branch3 + 1] = (ai_store_pos - (ai_store_branch3 + 2)) & 0xFF
 
     level_mirror_routine = bytes(mirror_code)
 
     # =========================================
-    # AI Routine - Simple version for debugging
+    # Controller Hook - Just complete original store (AI is in mirror routine now)
     # =========================================
-    # Original code at 0x37CF: STA $F6; RTS
-    # Our JMP overwrites both, so we do STA $F6 and RTS ourselves
-    #
-    # Button values: Right=1, Left=2, Down=4, A(rotate)=$80
-    code = []
-
-    code += [0x85, 0xF6]        # STA $F6 (complete original store)
-
-    # Check VS CPU mode ($04 == 1)
-    code += [0xA5, 0x04]        # LDA $04 (VS CPU flag)
-    code += [0xC9, 0x01]        # CMP #$01
-    exit_branch_pos = len(code)
-    code += [0xD0, 0x00]        # BNE exit (not VS CPU)
-
-    # Check game active (P2 has viruses)
-    code += [0xAD, 0xA4, 0x03]  # LDA $03A4
-    exit_branch2_pos = len(code)
-    code += [0xF0, 0x00]        # BEQ exit (no viruses = not in game)
-
-    # DEBUG: Just press Left constantly to prove AI is running
-    code += [0xA9, 0x02]        # LDA #$02 (Left)
-    code += [0x85, 0xF6]        # STA $F6
-    exit_pos = len(code)
-    code += [0x60]              # RTS
-
-    # Fix branch offsets
-    code[exit_branch_pos + 1] = (exit_pos - (exit_branch_pos + 2)) & 0xFF
-    code[exit_branch2_pos + 1] = (exit_pos - (exit_branch2_pos + 2)) & 0xFF
-
-    ai_routine = bytes(code)
+    # The original instruction at 0x37CF was STA $F6
+    # We just complete that and return
+    ai_routine = bytes([
+        0x85, 0xF6,  # STA $F6 (complete original store)
+        0x60,        # RTS
+    ])
 
     # =========================================
     # Calculate offsets and install everything
@@ -338,7 +402,7 @@ def apply_patches(input_path, output_path):
     print(f"Patched ROM: {output_path}")
     print(f"Patched checksum: {patched_checksum}")
     print()
-    print("Dr. Mario VS CPU Edition v8 applied successfully!")
+    print("Dr. Mario VS CPU Edition v11 applied successfully!")
     print("Features:")
     print("- VS CPU Mode: New 3rd menu option with AI-controlled Player 2")
     print("  - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU")
