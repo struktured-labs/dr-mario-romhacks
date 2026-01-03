@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "mednafen": {
+      "command": "python3",
+      "args": ["mednafen-mcp/mcp_server.py"],
+      "cwd": "/home/struktured/projects/dr-mario-mods"
+    }
+  }
+}

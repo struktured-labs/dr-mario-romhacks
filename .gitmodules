@@ -1,3 +1,6 @@
 [submodule "fceux"]
 	path = fceux
 	url = https://github.com/TASEmulators/fceux.git
+[submodule "mednafen-mcp"]
+	path = mednafen-mcp
+	url = git@github.com:struktured-labs/mednafen-mcp.git

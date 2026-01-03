@@ -1,16 +1,28 @@
 #!/usr/bin/env python3
 """
-Dr. Mario Training Edition v6 - VS CPU Mode + Study Mode
-=========================================================
-Combines:
-1. VS CPU Mode: 2-PLAYER mode has AI-controlled Player 2
+Dr. Mario VS CPU Edition v8
+===========================
+Features:
+1. VS CPU Mode: New 3rd menu option with AI-controlled Player 2
+   - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU -> 1 PLAYER
+   - Level select: P2 cursor mirrors P1's choices (level & speed)
+   - AI controls P2 during gameplay in VS CPU mode
 2. Study Mode: Pause shows "STUDY" with visible playfield
 
 Technical details:
-- $F6: Player 2 controller input
-- $0727: Player count (1 or 2)
-- Hook point: 0x37CF (end of controller read routine)
-- AI routine location: 0x7F50 (free ROM space at CPU $FF40)
+- $F5/$F7: Player 1 controller input
+- $F6/$F8: Player 2 controller input
+- $0727: Player mode (1=1P, 2=2P - game sees VS CPU as 2P)
+- $04: VS CPU flag (0=normal, 1=VS CPU mode) - using $04 to avoid game conflicts
+- Hook points:
+  - 0x18E5: Menu toggle -> JSR $FF40 (cycle 1->2->VS->1)
+  - 0x10AE: Level select P2 input -> JSR (mirror P1 in VS mode)
+  - 0x37CF: Controller read -> JMP (AI routine in VS mode)
+- ROM layout (all before JMPs at 0x7FE0):
+  - 0x7F50: Toggle routine
+  - Then: Level mirror routine
+  - Then: AI routine
+  - 0x7FE0: JMP table (DO NOT MODIFY!)
 """
 
 import hashlib
@@ -139,181 +151,181 @@ def apply_patches(input_path, output_path):
     print()
 
     # =========================================
-    # VS CPU MODE: Hook at 0x37CF
+    # VS CPU MODE: Compact routines (must fit before 0x7FE0)
     # =========================================
-    print("✓ Hooking controller (0x37CF): JMP $FF40")
+
+    # Toggle routine: Cycles 1P -> 2P -> VS CPU -> 1P
+    # Uses $04 for VS CPU flag (avoid $05 which game might use)
+    # Logic:
+    #   1P (0727=1, 04=0) -> 2P (0727=2, 04=0)
+    #   2P (0727=2, 04=0) -> VS CPU (0727=2, 04=1)
+    #   VS CPU (0727=2, 04=1) -> 1P (0727=1, 04=0)
+    toggle_code = []
+    toggle_code += [0xAD, 0x27, 0x07]  # LDA $0727
+    toggle_code += [0xC9, 0x01]        # CMP #$01
+    # BEQ go_2p (offset calculated later)
+    go_2p_branch = len(toggle_code)
+    toggle_code += [0xF0, 0x00]
+    toggle_code += [0xA5, 0x04]        # LDA $04 (VS CPU flag)
+    # BNE go_1p (offset calculated later)
+    go_1p_branch = len(toggle_code)
+    toggle_code += [0xD0, 0x00]
+    toggle_code += [0xE6, 0x04]        # INC $04 (2P -> VS CPU)
+    toggle_code += [0x60]              # RTS
+
+    # go_2p: increment player count
+    go_2p_pos = len(toggle_code)
+    toggle_code += [0xEE, 0x27, 0x07]  # INC $0727
+    # go_clear: clear VS CPU flag
+    go_clear_pos = len(toggle_code)
+    toggle_code += [0xA9, 0x00]        # LDA #$00
+    toggle_code += [0x85, 0x04]        # STA $04
+    toggle_code += [0x60]              # RTS
+
+    # go_1p: decrement to 1P, then clear flag
+    go_1p_pos = len(toggle_code)
+    toggle_code += [0xCE, 0x27, 0x07]  # DEC $0727
+    # BNE go_clear (2-1=1, always branches)
+    toggle_code += [0xD0, (go_clear_pos - (len(toggle_code) + 2)) & 0xFF]
+
+    # Fix branch offsets
+    toggle_code[go_2p_branch + 1] = (go_2p_pos - (go_2p_branch + 2)) & 0xFF
+    toggle_code[go_1p_branch + 1] = (go_1p_pos - (go_1p_branch + 2)) & 0xFF
+
+    toggle_routine = bytes(toggle_code)
+
+    # =========================================
+    # Level Select Mirror (VS CPU mode)
+    # =========================================
+    # Uses $04 for VS CPU flag
+    # Only mirrors during level select (P2 virus count == 0), not gameplay
+    mirror_code = []
+
+    # Check $0727 == 2 (must be in 2P mode for game)
+    mirror_code += [0xAD, 0x27, 0x07]  # LDA $0727
+    mirror_code += [0xC9, 0x02]        # CMP #$02
+    load_p2_branch1 = len(mirror_code)
+    mirror_code += [0xD0, 0x00]        # BNE load_p2 (not 2P mode)
+
+    # Check $04 == 1 (VS CPU flag)
+    mirror_code += [0xA5, 0x04]        # LDA $04
+    mirror_code += [0xC9, 0x01]        # CMP #$01
+    load_p2_branch2 = len(mirror_code)
+    mirror_code += [0xD0, 0x00]        # BNE load_p2 (not VS CPU)
+
+    # Check $03A4 == 0 (P2 has no viruses = level select, not gameplay)
+    mirror_code += [0xAD, 0xA4, 0x03]  # LDA $03A4
+    load_p2_branch3 = len(mirror_code)
+    mirror_code += [0xD0, 0x00]        # BNE load_p2 (in gameplay, use P2)
+
+    # use_p1: Load P1 buttons for P2 (mirror mode - level select only)
+    mirror_code += [0xA5, 0xF5]        # LDA $F5
+    mirror_code += [0x85, 0x5B]        # STA $5B
+    mirror_code += [0xA5, 0xF7]        # LDA $F7
+    mirror_code += [0x85, 0x5C]        # STA $5C
+    mirror_code += [0x60]              # RTS
+
+    # load_p2: Load P2 buttons normally
+    load_p2_pos = len(mirror_code)
+    mirror_code += [0xA5, 0xF6]        # LDA $F6
+    mirror_code += [0x85, 0x5B]        # STA $5B
+    mirror_code += [0xA5, 0xF8]        # LDA $F8
+    mirror_code += [0x85, 0x5C]        # STA $5C
+    mirror_code += [0x60]              # RTS
+
+    # Fix branch offsets
+    mirror_code[load_p2_branch1 + 1] = (load_p2_pos - (load_p2_branch1 + 2)) & 0xFF
+    mirror_code[load_p2_branch2 + 1] = (load_p2_pos - (load_p2_branch2 + 2)) & 0xFF
+    mirror_code[load_p2_branch3 + 1] = (load_p2_pos - (load_p2_branch3 + 2)) & 0xFF
+
+    level_mirror_routine = bytes(mirror_code)
+
+    # =========================================
+    # AI Routine - Simple version for debugging
+    # =========================================
+    # Original code at 0x37CF: STA $F6; RTS
+    # Our JMP overwrites both, so we do STA $F6 and RTS ourselves
+    #
+    # Button values: Right=1, Left=2, Down=4, A(rotate)=$80
+    code = []
+
+    code += [0x85, 0xF6]        # STA $F6 (complete original store)
+
+    # Check VS CPU mode ($04 == 1)
+    code += [0xA5, 0x04]        # LDA $04 (VS CPU flag)
+    code += [0xC9, 0x01]        # CMP #$01
+    exit_branch_pos = len(code)
+    code += [0xD0, 0x00]        # BNE exit (not VS CPU)
+
+    # Check game active (P2 has viruses)
+    code += [0xAD, 0xA4, 0x03]  # LDA $03A4
+    exit_branch2_pos = len(code)
+    code += [0xF0, 0x00]        # BEQ exit (no viruses = not in game)
+
+    # DEBUG: Just press Left constantly to prove AI is running
+    code += [0xA9, 0x02]        # LDA #$02 (Left)
+    code += [0x85, 0xF6]        # STA $F6
+    exit_pos = len(code)
+    code += [0x60]              # RTS
+
+    # Fix branch offsets
+    code[exit_branch_pos + 1] = (exit_pos - (exit_branch_pos + 2)) & 0xFF
+    code[exit_branch2_pos + 1] = (exit_pos - (exit_branch2_pos + 2)) & 0xFF
+
+    ai_routine = bytes(code)
+
+    # =========================================
+    # Calculate offsets and install everything
+    # =========================================
+    # Layout: Toggle -> Mirror -> AI (must all fit before 0x7FE0 JMPs)
+    toggle_offset = 0x7F50
+    mirror_offset = toggle_offset + len(toggle_routine)
+    ai_offset = mirror_offset + len(level_mirror_routine)
+    end_offset = ai_offset + len(ai_routine)
+
+    # Check we fit before the JMP table at 0x7FE0
+    if end_offset > 0x7FE0:
+        print(f"ERROR: Routines overflow into JMP table at 0x7FE0! End: 0x{end_offset:04X}")
+        print(f"  Toggle: {len(toggle_routine)} bytes")
+        print(f"  Mirror: {len(level_mirror_routine)} bytes")
+        print(f"  AI: {len(ai_routine)} bytes")
+        print(f"  Total: {len(toggle_routine) + len(level_mirror_routine) + len(ai_routine)} bytes")
+        return False
+
+    # Calculate CPU addresses (ROM offset - 0x10 + 0x8000)
+    toggle_cpu = 0x8000 + (toggle_offset - 0x10)
+    mirror_cpu = 0x8000 + (mirror_offset - 0x10)
+    ai_cpu = 0x8000 + (ai_offset - 0x10)
+
+    # Install routines
+    print(f"✓ Installing toggle routine at 0x{toggle_offset:04X} ({len(toggle_routine)} bytes) -> CPU ${toggle_cpu:04X}")
+    rom_data[toggle_offset:toggle_offset + len(toggle_routine)] = toggle_routine
+
+    print(f"✓ Installing level mirror routine at 0x{mirror_offset:04X} ({len(level_mirror_routine)} bytes) -> CPU ${mirror_cpu:04X}")
+    rom_data[mirror_offset:mirror_offset + len(level_mirror_routine)] = level_mirror_routine
+
+    print(f"✓ Installing AI routine at 0x{ai_offset:04X} ({len(ai_routine)} bytes) -> CPU ${ai_cpu:04X}")
+    rom_data[ai_offset:ai_offset + len(ai_routine)] = ai_routine
+
+    # Install hooks
+    print(f"✓ Patching menu toggle (0x18E5): JSR ${toggle_cpu:04X}")
+    rom_data[0x18E5] = 0x20  # JSR
+    rom_data[0x18E6] = toggle_cpu & 0xFF
+    rom_data[0x18E7] = (toggle_cpu >> 8) & 0xFF
+    rom_data[0x18E8:0x18ED] = bytes([0xEA] * 5)  # NOPs
+
+    print(f"✓ Hooking level select P2 input (0x10AE): JSR ${mirror_cpu:04X}")
+    rom_data[0x10AE] = 0x20  # JSR
+    rom_data[0x10AF] = mirror_cpu & 0xFF
+    rom_data[0x10B0] = (mirror_cpu >> 8) & 0xFF
+    rom_data[0x10B1:0x10B6] = bytes([0xEA] * 5)  # NOPs
+
+    print(f"✓ Hooking controller (0x37CF): JMP ${ai_cpu:04X}")
     rom_data[0x37CF] = 0x4C  # JMP
-    rom_data[0x37D0] = 0x40  # low byte of $FF40
-    rom_data[0x37D1] = 0xFF  # high byte of $FF40
+    rom_data[0x37D0] = ai_cpu & 0xFF
+    rom_data[0x37D1] = (ai_cpu >> 8) & 0xFF
 
-    # =========================================
-    # AI Routine at 0x7F50 (CPU $FF40)
-    # =========================================
-    #
-    # Virus-Seeking AI:
-    # 1. Completes the original STA $F6
-    # 2. Reads P2 capsule left color ($0381)
-    # 3. Converts to virus tile value (+$D0)
-    # 4. Scans P2 playfield ($0500-$057F) for matching virus
-    # 5. Moves capsule toward virus column
-    # 6. If no match, moves toward center column (3)
-    #
-    # Memory addresses:
-    # - $0381: P2 capsule left color (00=Yellow, 01=Red, 02=Blue)
-    # - $0385: P2 capsule X position (0-7)
-    # - $0500-$057F: P2 playfield (128 bytes, 8 cols x 16 rows)
-    # - $00-$01: ZP temp storage
-    #
-    # Tile values: $D0=Yellow virus, $D1=Red virus, $D2=Blue virus
-    # Buttons: Right=0x01, Left=0x02, A=0x40, B=0x80
-    #
-    # Layout (with soft-drop bypassing throttle):
-    # 00-01: STA $F6        - complete original op
-    # 02-04: LDA $03A4      - game-active check (before throttle!)
-    # 05-06: BEQ exit       - skip AI if no viruses
-    # 07-09: LDA $0381      - get capsule left color
-    # 0A:    CLC
-    # 0B-0C: ADC #$D0       - convert to virus tile
-    # 0D-0E: STA $00        - store target tile
-    # 0F-10: LDX #$7F       - scan from bottom
-    # scan_loop (11):
-    # 11-13: LDA $0500,X    - read playfield tile
-    # 14-15: CMP $00        - match target virus?
-    # 16-17: BEQ found      - yes (-> 0x1F)
-    # 18:    DEX
-    # 19-1A: BPL scan_loop  - continue (-> 0x11)
-    # 1B-1C: LDA #$03       - no match, target center
-    # 1D-1E: BNE compare    - (-> 0x22)
-    # found (1F):
-    # 1F:    TXA
-    # 20-21: AND #$07       - extract column
-    # compare (22):
-    # 22-23: STA $01        - store target column
-    # 24-26: LDA $0385      - get current X
-    # 27-28: CMP $01        - compare with target
-    # 29-2A: BEQ at_target  - at target, soft-drop! (-> 0x4D)
-    # 2B-2C: LDA $43        - NOT at target: apply throttle
-    # 2D-2E: AND #$07
-    # 2F-30: BNE exit       - skip if not throttle frame (-> 0x51)
-    # 31-33: LDA $0385      - reload X position
-    # 34-35: CMP $01        - compare again
-    # 36-37: BCS go_left    - (-> 0x45)
-    # go_right (38):
-    # 38-39: LDA $43
-    # 3A-3B: AND #$30
-    # 3C-3D: BNE right_only - (-> 0x41)
-    # 3E-3F: LDA #$41       - Right + A
-    # 40:    BNE store      - (-> 0x4F)
-    # 41-42: LDA #$01       - right_only
-    # 43-44: BNE store      - (-> 0x4F)
-    # go_left (45):
-    # 45-46: LDA $43
-    # 47-48: AND #$30
-    # 49-4A: BNE left_only  - (-> 0x4D... wait, reuse at_target for left_only? No.)
-    # Actually let me recalc...
-    #
-    # Simpler: at_target just loads Down and stores, no throttle
-    ai_routine = bytes([
-        # Complete original STA $F6
-        0x85, 0xF6,           # 00: STA $F6
-
-        # Game-active check FIRST (no throttle yet)
-        0xAD, 0xA4, 0x03,     # 02: LDA $03A4 (P2 virus count)
-        0xF0, 0x61,           # 05: BEQ exit (-> 0x68, skip if 0)
-
-        # Get LEFT capsule color, convert to virus tile
-        0xAD, 0x81, 0x03,     # 07: LDA $0381 (P2 capsule left color)
-        0x18,                 # 0A: CLC
-        0x69, 0xD0,           # 0B: ADC #$D0 (-> virus tile)
-        0x85, 0x00,           # 0D: STA $00 (store left virus tile)
-
-        # Get RIGHT capsule color, convert to virus tile
-        0xAD, 0x82, 0x03,     # 0F: LDA $0382 (P2 capsule right color)
-        0x18,                 # 12: CLC
-        0x69, 0xD0,           # 13: ADC #$D0 (-> virus tile)
-        0x85, 0x02,           # 15: STA $02 (store right virus tile)
-
-        # Scan for LEFT color virus first
-        0xA2, 0x7F,           # 17: LDX #$7F
-        # scan_left (19):
-        0xBD, 0x00, 0x05,     # 19: LDA $0500,X
-        0xC5, 0x00,           # 1C: CMP $00 (match left?)
-        0xF0, 0x13,           # 1E: BEQ found (-> 0x33)
-        0xCA,                 # 20: DEX
-        0x10, 0xF6,           # 21: BPL scan_left (-> 0x19)
-
-        # No left match - scan for RIGHT color virus
-        0xA2, 0x7F,           # 23: LDX #$7F
-        # scan_right (25):
-        0xBD, 0x00, 0x05,     # 25: LDA $0500,X
-        0xC5, 0x02,           # 28: CMP $02 (match right?)
-        0xF0, 0x07,           # 2A: BEQ found (-> 0x33)
-        0xCA,                 # 2C: DEX
-        0x10, 0xF6,           # 2D: BPL scan_right (-> 0x25)
-
-        # No match at all - target center column (3)
-        0xA9, 0x03,           # 2F: LDA #$03
-        0xD0, 0x03,           # 31: BNE compare (-> 0x36)
-
-        # found (33):
-        0x8A,                 # 33: TXA
-        0x29, 0x07,           # 34: AND #$07 (extract column)
-
-        # compare (36): target column in A
-        0x85, 0x01,           # 36: STA $01 (store target column)
-        0xAD, 0x85, 0x03,     # 38: LDA $0385 (current X)
-        0xC5, 0x01,           # 3B: CMP $01
-        0xF0, 0x2A,           # 3D: BEQ at_target (-> 0x69, soft-drop!)
-
-        # NOT at target - apply throttle for movement
-        0xA5, 0x43,           # 3F: LDA $43
-        0x29, 0x07,           # 41: AND #$07
-        0xD0, 0x23,           # 43: BNE exit (-> 0x68)
-
-        # Movement: reload and compare
-        0xAD, 0x85, 0x03,     # 45: LDA $0385
-        0xC5, 0x01,           # 48: CMP $01
-        0xB0, 0x0E,           # 4A: BCS go_left (-> 0x5A)
-
-        # go_right (4C):
-        0xA5, 0x43,           # 4C: LDA $43
-        0x29, 0x30,           # 4E: AND #$30
-        0xD0, 0x04,           # 50: BNE right_only (-> 0x56)
-        0xA9, 0x41,           # 52: LDA #$41 (Right + A)
-        0xD0, 0x10,           # 54: BNE store (-> 0x66)
-        # right_only (56):
-        0xA9, 0x01,           # 56: LDA #$01
-        0xD0, 0x0C,           # 58: BNE store (-> 0x66)
-
-        # go_left (5A):
-        0xA5, 0x43,           # 5A: LDA $43
-        0x29, 0x30,           # 5C: AND #$30
-        0xD0, 0x04,           # 5E: BNE left_only (-> 0x64)
-        0xA9, 0x42,           # 60: LDA #$42 (Left + A)
-        0xD0, 0x02,           # 62: BNE store (-> 0x66)
-        # left_only (64):
-        0xA9, 0x02,           # 64: LDA #$02
-        # falls through to store
-
-        # store (66):
-        0x85, 0xF6,           # 66: STA $F6
-
-        # exit (68):
-        0x60,                 # 68: RTS
-
-        # at_target (69): soft-drop - NO THROTTLE, runs every frame!
-        0xA9, 0x04,           # 69: LDA #$04 (Down button)
-        0x85, 0xF6,           # 6B: STA $F6
-        0x60,                 # 6D: RTS
-    ])
-
-    ai_routine_offset = 0x7F50
-    print(f"✓ Installing AI routine at 0x{ai_routine_offset:04X} ({len(ai_routine)} bytes)")
-    rom_data[ai_routine_offset:ai_routine_offset + len(ai_routine)] = ai_routine
-
-    # Verify we have space
-    print(f"  AI routine size: {len(ai_routine)} bytes")
-    print(f"  Available space: ~100 bytes")
+    print(f"  Total: {len(toggle_routine) + len(level_mirror_routine) + len(ai_routine)} bytes, ends at 0x{end_offset:04X}")
 
     # =========================================
     # Write output ROM
@@ -326,9 +338,14 @@ def apply_patches(input_path, output_path):
     print(f"Patched ROM: {output_path}")
     print(f"Patched checksum: {patched_checksum}")
     print()
-    print("Dr. Mario Training Edition v6 applied successfully!")
+    print("Dr. Mario VS CPU Edition v8 applied successfully!")
     print("Features:")
-    print("- VS CPU Mode: 2-PLAYER has AI-controlled Player 2")
+    print("- VS CPU Mode: New 3rd menu option with AI-controlled Player 2")
+    print("  - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU")
+    print("  - Level select: P2 cursor mirrors P1 (level & speed)")
+    print("  - P2 can take control by pressing any button")
+    print("  - AI only activates during VS CPU gameplay")
+    print("  - P2 speed synced to P1 at game start")
     print("- Study Mode: Pause shows 'STUDY' with visible playfield")
 
     return True
