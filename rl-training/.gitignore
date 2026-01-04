@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Training artifacts
+models/checkpoints/*.zip
+models/*.zip
+logs/tensorboard/*
+*.mcs  # Mednafen save states
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep directory structure
+!models/.gitkeep
+!models/checkpoints/.gitkeep
+!logs/.gitkeep
+!logs/tensorboard/.gitkeep
