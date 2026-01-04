@@ -52,7 +52,7 @@ rl-training/
 2. **Install Python dependencies**:
    ```bash
    cd rl-training
-   pip install -r requirements.txt
+   uv pip install -r requirements.txt
    ```
 
 3. **Verify ROM file**:
@@ -63,7 +63,7 @@ rl-training/
 ### 1. Train an Agent
 
 ```bash
-python scripts/train.py --timesteps 1000000 --num-envs 4
+uv run scripts/train.py --timesteps 1000000 --num-envs 4
 ```
 
 Options:
@@ -76,13 +76,13 @@ Options:
 ### 2. Watch Trained Agent
 
 ```bash
-python scripts/watch.py models/drmario_ppo_final.zip --episodes 10
+uv run scripts/watch.py models/drmario_ppo_final.zip --episodes 10
 ```
 
 ### 3. Monitor Training
 
 ```bash
-tensorboard --logdir logs/tensorboard/
+uv run tensorboard --logdir logs/tensorboard/
 ```
 
 Open http://localhost:6006 in your browser.

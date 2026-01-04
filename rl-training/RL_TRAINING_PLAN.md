@@ -589,9 +589,9 @@ if __name__ == "__main__":
 - Value function loss
 
 **TensorBoard Integration:**
-```python
+```bash
 # Automatically logged by SB3
-tensorboard --logdir ./logs/tensorboard/
+uv run tensorboard --logdir ./logs/tensorboard/
 ```
 
 **Watch Trained Agent:**
