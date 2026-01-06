@@ -1,0 +1,614 @@
+#!/usr/bin/env python3
+"""
+Unit tests for Dr. Mario VS CPU patch routines.
+Uses a simple 6502 simulator to verify routine behavior.
+"""
+
+import sys
+
+class CPU6502:
+    """Minimal 6502 simulator for testing patch routines."""
+
+    def __init__(self):
+        self.a = 0
+        self.x = 0
+        self.y = 0
+        self.sp = 0xFF
+        self.pc = 0
+        self.status = 0  # NV-BDIZC
+        self.memory = bytearray(0x10000)
+        self.cycles = 0
+        self.max_cycles = 10000
+
+    def reset(self):
+        self.a = 0
+        self.x = 0
+        self.y = 0
+        self.sp = 0xFF
+        self.status = 0
+        self.cycles = 0
+        # Clear relevant memory areas
+        for i in range(0x100):
+            self.memory[i] = 0
+        for i in range(0x300, 0x400):
+            self.memory[i] = 0
+        for i in range(0x500, 0x600):
+            self.memory[i] = 0
+        for i in range(0x700, 0x800):
+            self.memory[i] = 0
+
+    def set_z(self, value):
+        if value == 0:
+            self.status |= 0x02
+        else:
+            self.status &= ~0x02
+
+    def set_n(self, value):
+        if value & 0x80:
+            self.status |= 0x80
+        else:
+            self.status &= ~0x80
+
+    def set_c(self, value):
+        if value:
+            self.status |= 0x01
+        else:
+            self.status &= ~0x01
+
+    def get_z(self):
+        return (self.status & 0x02) != 0
+
+    def get_n(self):
+        return (self.status & 0x80) != 0
+
+    def get_c(self):
+        return (self.status & 0x01) != 0
+
+    def load_routine(self, addr, code):
+        """Load routine bytes at address."""
+        for i, b in enumerate(code):
+            self.memory[addr + i] = b
+
+    def run(self, start_addr):
+        """Run until RTS or max cycles."""
+        self.pc = start_addr
+        while self.cycles < self.max_cycles:
+            opcode = self.memory[self.pc]
+
+            if opcode == 0x60:  # RTS
+                return True
+            elif opcode == 0x4C:  # JMP abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                self.pc = addr
+            elif opcode == 0x20:  # JSR abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                ret_addr = self.pc + 2
+                self.memory[0x100 + self.sp] = (ret_addr >> 8) & 0xFF
+                self.sp = (self.sp - 1) & 0xFF
+                self.memory[0x100 + self.sp] = ret_addr & 0xFF
+                self.sp = (self.sp - 1) & 0xFF
+                self.pc = addr
+            elif opcode == 0xA9:  # LDA imm
+                self.a = self.memory[self.pc + 1]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 2
+            elif opcode == 0xA5:  # LDA zp
+                addr = self.memory[self.pc + 1]
+                self.a = self.memory[addr]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 2
+            elif opcode == 0xAD:  # LDA abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                self.a = self.memory[addr]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 3
+            elif opcode == 0xBD:  # LDA abs,X
+                addr = (self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)) + self.x
+                self.a = self.memory[addr & 0xFFFF]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 3
+            elif opcode == 0x85:  # STA zp
+                addr = self.memory[self.pc + 1]
+                self.memory[addr] = self.a
+                self.pc += 2
+            elif opcode == 0x8D:  # STA abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                self.memory[addr] = self.a
+                self.pc += 3
+            elif opcode == 0xA2:  # LDX imm
+                self.x = self.memory[self.pc + 1]
+                self.set_z(self.x)
+                self.set_n(self.x)
+                self.pc += 2
+            elif opcode == 0xA0:  # LDY imm
+                self.y = self.memory[self.pc + 1]
+                self.set_z(self.y)
+                self.set_n(self.y)
+                self.pc += 2
+            elif opcode == 0xA8:  # TAY
+                self.y = self.a
+                self.set_z(self.y)
+                self.set_n(self.y)
+                self.pc += 1
+            elif opcode == 0x98:  # TYA
+                self.a = self.y
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 1
+            elif opcode == 0x8A:  # TXA
+                self.a = self.x
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 1
+            elif opcode == 0xC9:  # CMP imm
+                result = self.a - self.memory[self.pc + 1]
+                self.set_c(self.a >= self.memory[self.pc + 1])
+                self.set_z(result & 0xFF)
+                self.set_n(result & 0xFF)
+                self.pc += 2
+            elif opcode == 0xC5:  # CMP zp
+                addr = self.memory[self.pc + 1]
+                val = self.memory[addr]
+                result = self.a - val
+                self.set_c(self.a >= val)
+                self.set_z(result & 0xFF)
+                self.set_n(result & 0xFF)
+                self.pc += 2
+            elif opcode == 0xCD:  # CMP abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                val = self.memory[addr]
+                result = self.a - val
+                self.set_c(self.a >= val)
+                self.set_z(result & 0xFF)
+                self.set_n(result & 0xFF)
+                self.pc += 3
+            elif opcode == 0xE0:  # CPX imm
+                result = self.x - self.memory[self.pc + 1]
+                self.set_c(self.x >= self.memory[self.pc + 1])
+                self.set_z(result & 0xFF)
+                self.set_n(result & 0xFF)
+                self.pc += 2
+            elif opcode == 0xF0:  # BEQ
+                offset = self.memory[self.pc + 1]
+                if offset > 127:
+                    offset -= 256
+                self.pc += 2
+                if self.get_z():
+                    self.pc += offset
+            elif opcode == 0xD0:  # BNE
+                offset = self.memory[self.pc + 1]
+                if offset > 127:
+                    offset -= 256
+                self.pc += 2
+                if not self.get_z():
+                    self.pc += offset
+            elif opcode == 0xB0:  # BCS
+                offset = self.memory[self.pc + 1]
+                if offset > 127:
+                    offset -= 256
+                self.pc += 2
+                if self.get_c():
+                    self.pc += offset
+            elif opcode == 0x90:  # BCC
+                offset = self.memory[self.pc + 1]
+                if offset > 127:
+                    offset -= 256
+                self.pc += 2
+                if not self.get_c():
+                    self.pc += offset
+            elif opcode == 0x10:  # BPL
+                offset = self.memory[self.pc + 1]
+                if offset > 127:
+                    offset -= 256
+                self.pc += 2
+                if not self.get_n():
+                    self.pc += offset
+            elif opcode == 0x30:  # BMI
+                offset = self.memory[self.pc + 1]
+                if offset > 127:
+                    offset -= 256
+                self.pc += 2
+                if self.get_n():
+                    self.pc += offset
+            elif opcode == 0xE6:  # INC zp
+                addr = self.memory[self.pc + 1]
+                self.memory[addr] = (self.memory[addr] + 1) & 0xFF
+                self.set_z(self.memory[addr])
+                self.set_n(self.memory[addr])
+                self.pc += 2
+            elif opcode == 0xEE:  # INC abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                self.memory[addr] = (self.memory[addr] + 1) & 0xFF
+                self.set_z(self.memory[addr])
+                self.set_n(self.memory[addr])
+                self.pc += 3
+            elif opcode == 0xC6:  # DEC zp
+                addr = self.memory[self.pc + 1]
+                self.memory[addr] = (self.memory[addr] - 1) & 0xFF
+                self.set_z(self.memory[addr])
+                self.set_n(self.memory[addr])
+                self.pc += 2
+            elif opcode == 0xCE:  # DEC abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                self.memory[addr] = (self.memory[addr] - 1) & 0xFF
+                self.set_z(self.memory[addr])
+                self.set_n(self.memory[addr])
+                self.pc += 3
+            elif opcode == 0xE8:  # INX
+                self.x = (self.x + 1) & 0xFF
+                self.set_z(self.x)
+                self.set_n(self.x)
+                self.pc += 1
+            elif opcode == 0xCA:  # DEX
+                self.x = (self.x - 1) & 0xFF
+                self.set_z(self.x)
+                self.set_n(self.x)
+                self.pc += 1
+            elif opcode == 0x29:  # AND imm
+                self.a &= self.memory[self.pc + 1]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 2
+            elif opcode == 0x18:  # CLC
+                self.set_c(False)
+                self.pc += 1
+            elif opcode == 0x38:  # SEC
+                self.set_c(True)
+                self.pc += 1
+            elif opcode == 0x69:  # ADC imm
+                val = self.memory[self.pc + 1]
+                result = self.a + val + (1 if self.get_c() else 0)
+                self.set_c(result > 255)
+                self.a = result & 0xFF
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 2
+            elif opcode == 0xEA:  # NOP
+                self.pc += 1
+            else:
+                raise ValueError(f"Unknown opcode: ${opcode:02X} at ${self.pc:04X}")
+
+            self.cycles += 1
+
+        return False  # Hit max cycles
+
+
+def extract_routines_from_patch():
+    """Extract the compiled routines from patch_vs_cpu.py"""
+    # Import and run the patch to get the routines
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("patch", "patch_vs_cpu.py")
+    patch_module = importlib.util.module_from_spec(spec)
+
+    # We need to capture the routines, so we'll parse the file directly
+    with open("patch_vs_cpu.py", "r") as f:
+        content = f.read()
+
+    # Run patch to generate ROM, then extract routines from it
+    exec(compile(content, "patch_vs_cpu.py", "exec"), {"__name__": "__main__"})
+
+    # Read the patched ROM
+    with open("drmario_vs_cpu.nes", "rb") as f:
+        rom = f.read()
+
+    # Extract routines from ROM
+    toggle_offset = 0x7F50
+    mirror_offset = 0x7F6B
+
+    # Read routine lengths from patch output
+    toggle_len = mirror_offset - toggle_offset
+
+    # Find where routines end (before 0x7FE0)
+    end_offset = 0x7FE0
+    for i in range(0x7FD0, 0x7FE0):
+        if rom[i] == 0x60:  # RTS
+            end_offset = i + 1
+            break
+
+    toggle_routine = rom[toggle_offset:mirror_offset]
+    mirror_routine = rom[mirror_offset:end_offset]
+
+    return toggle_routine, mirror_routine
+
+
+class TestVSCPU:
+    """Test cases for VS CPU patch routines."""
+
+    def __init__(self):
+        self.cpu = CPU6502()
+        self.passed = 0
+        self.failed = 0
+        self.toggle_routine = None
+        self.mirror_routine = None
+
+    def load_routines(self):
+        """Load routines from the patched ROM."""
+        with open("drmario_vs_cpu.nes", "rb") as f:
+            rom = bytearray(f.read())
+
+        # Routine locations in ROM (from patch_vs_cpu.py)
+        toggle_offset = 0x7F50
+        mirror_offset = 0x7F6B  # toggle_offset + 27
+
+        # Mirror routine now just has 1 RTS (simplified - just loads $F6 to $5B)
+        mirror_end = mirror_offset
+        for i in range(mirror_offset, 0x7FE0):
+            if rom[i] == 0x60:  # RTS
+                mirror_end = i + 1
+                break
+
+        # AI routine starts after mirror
+        ai_offset = mirror_end
+
+        # AI routine ends at last RTS before 0x7FE0
+        ai_end = 0x7FE0
+        for i in range(0x7FDF, ai_offset, -1):
+            if rom[i] == 0x60:  # RTS
+                ai_end = i + 1
+                break
+
+        self.toggle_routine = bytes(rom[toggle_offset:mirror_offset])
+        self.mirror_routine = bytes(rom[mirror_offset:mirror_end])
+        self.ai_routine = bytes(rom[ai_offset:ai_end])
+
+        print(f"Loaded toggle routine: {len(self.toggle_routine)} bytes")
+        print(f"Loaded mirror routine: {len(self.mirror_routine)} bytes")
+        print(f"Loaded AI routine: {len(self.ai_routine)} bytes")
+
+    def assert_eq(self, name, actual, expected):
+        if actual == expected:
+            self.passed += 1
+            return True
+        else:
+            self.failed += 1
+            print(f"  FAIL: {name}: expected {expected}, got {actual}")
+            return False
+
+    def run_toggle(self, player_mode, vs_cpu_flag):
+        """Run toggle routine with given state, return (new_mode, new_flag)."""
+        self.cpu.reset()
+        self.cpu.memory[0x0727] = player_mode
+        self.cpu.memory[0x04] = vs_cpu_flag
+
+        # Load routine at $FF40 (CPU address)
+        self.cpu.load_routine(0xFF40, self.toggle_routine)
+        self.cpu.run(0xFF40)
+
+        return self.cpu.memory[0x0727], self.cpu.memory[0x04]
+
+    def run_mirror(self, player_mode, vs_cpu_flag, game_mode, capsule_y,
+                   p1_input, p1_held, p2_input, p2_held,
+                   capsule_x=3, frame=0, playfield=None):
+        """Run mirror routine, return ($5B, $5C) - the P2 processed input."""
+        self.cpu.reset()
+
+        # Set up memory state
+        self.cpu.memory[0x0727] = player_mode
+        self.cpu.memory[0x04] = vs_cpu_flag
+        self.cpu.memory[0x46] = game_mode  # Game mode (< 4 = level select, >= 4 = gameplay)
+        self.cpu.memory[0x0386] = capsule_y
+        self.cpu.memory[0x0385] = capsule_x
+        self.cpu.memory[0x43] = frame
+        self.cpu.memory[0xF5] = p1_input
+        self.cpu.memory[0xF7] = p1_held
+        self.cpu.memory[0xF6] = p2_input
+        self.cpu.memory[0xF8] = p2_held
+
+        # Set up playfield if provided
+        if playfield:
+            for i, val in enumerate(playfield):
+                self.cpu.memory[0x0480 + i] = val
+
+        # Load routine at $FF5B (CPU address)
+        self.cpu.load_routine(0xFF5B, self.mirror_routine)
+        self.cpu.run(0xFF5B)
+
+        return self.cpu.memory[0x5B], self.cpu.memory[0x5C]
+
+    def run_ai(self, vs_cpu_flag, capsule_x=3, frame=0, game_mode=0,
+               p1_input=0, p1_held=0):
+        """Run AI routine, return ($F6, $5B, $5C)."""
+        self.cpu.reset()
+
+        # Set up memory state
+        self.cpu.memory[0x04] = vs_cpu_flag
+        self.cpu.memory[0x0385] = capsule_x
+        self.cpu.memory[0x43] = frame
+        self.cpu.memory[0x46] = game_mode  # Game mode (< 4 = level select, >= 4 = gameplay)
+        self.cpu.memory[0xF5] = p1_input
+        self.cpu.memory[0xF7] = p1_held
+        self.cpu.a = 0  # Original A value (would be P1 input normally)
+
+        # Load routine at $FF7B (after mirror at $FF5B + 32 bytes)
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        return self.cpu.memory[0xF6], self.cpu.memory[0x5B], self.cpu.memory[0x5C]
+
+    # ==================== TOGGLE TESTS ====================
+
+    def test_toggle_1p_to_2p(self):
+        """1P mode -> 2P mode (press Select)."""
+        print("test_toggle_1p_to_2p...")
+        mode, flag = self.run_toggle(player_mode=1, vs_cpu_flag=0)
+        self.assert_eq("mode", mode, 2)
+        self.assert_eq("flag", flag, 0)
+
+    def test_toggle_2p_to_vscpu(self):
+        """2P mode -> VS CPU mode (press Select)."""
+        print("test_toggle_2p_to_vscpu...")
+        mode, flag = self.run_toggle(player_mode=2, vs_cpu_flag=0)
+        self.assert_eq("mode", mode, 2)
+        self.assert_eq("flag", flag, 1)
+
+    def test_toggle_vscpu_to_1p(self):
+        """VS CPU mode -> 1P mode (press Select)."""
+        print("test_toggle_vscpu_to_1p...")
+        mode, flag = self.run_toggle(player_mode=2, vs_cpu_flag=1)
+        self.assert_eq("mode", mode, 1)
+        self.assert_eq("flag", flag, 0)
+
+    # ==================== MIRROR TESTS (now just pass-through) ====================
+
+    def test_mirror_copies_f6_to_5b(self):
+        """Mirror routine now just copies $F6 to $5B (no logic)."""
+        print("test_mirror_copies_f6_to_5b...")
+        input_5b, input_5c = self.run_mirror(
+            player_mode=2, vs_cpu_flag=0,
+            game_mode=0, capsule_y=0xFF,
+            p1_input=0x01, p1_held=0x01,
+            p2_input=0x02, p2_held=0x02    # This is what's in $F6
+        )
+        self.assert_eq("$5B (from $F6)", input_5b, 0x02)
+        self.assert_eq("$5C (from $F8)", input_5c, 0x02)
+
+    # ==================== AI Tests (handles both mirroring and AI) ====================
+
+    def test_ai_mirrors_in_level_select(self):
+        """AI copies P1 input to $F6 in VS CPU mode level select."""
+        print("test_ai_mirrors_in_level_select...")
+        input_f6, _, _ = self.run_ai(
+            vs_cpu_flag=1,
+            game_mode=2,  # Mode < 4 = level select
+            capsule_x=0,
+            frame=1,
+            p1_input=0x08  # P1 pressing Up
+        )
+        # Should mirror P1 input to $F6
+        self.assert_eq("$F6 (P1 mirrored)", input_f6, 0x08)
+
+    def test_ai_not_active_without_vscpu(self):
+        """AI should not modify $F6 when not in VS CPU mode."""
+        print("test_ai_not_active_without_vscpu...")
+        input_f6, _, _ = self.run_ai(
+            vs_cpu_flag=0,  # Not VS CPU
+            game_mode=5,
+            capsule_x=0,
+            frame=1,
+            p1_input=0x08
+        )
+        # Should keep original (A=0 from test setup)
+        self.assert_eq("$F6 (original)", input_f6, 0x00)
+
+    # ==================== AI TESTS (Gameplay) ====================
+
+    def test_ai_activates_in_gameplay(self):
+        """AI should activate when in VS CPU mode during gameplay (mode >= 4)."""
+        print("test_ai_activates_in_gameplay...")
+        input_f6, _, _ = self.run_ai(
+            vs_cpu_flag=1,
+            game_mode=5,    # Mode >= 4 = gameplay
+            capsule_x=0,    # Capsule at column 0
+            frame=1         # Not a rotation frame
+        )
+        # AI targets center (col 3), capsule at 0, should move right
+        self.assert_eq("$F6 (should be Right=1)", input_f6, 0x01)
+
+    def test_ai_moves_left_toward_center(self):
+        """AI should move left when capsule is right of center."""
+        print("test_ai_moves_left_toward_center...")
+        input_f6, _, _ = self.run_ai(
+            vs_cpu_flag=1,
+            game_mode=5,
+            capsule_x=5,  # Capsule at column 5 (right of center 3)
+            frame=1
+        )
+        # AI should move left toward center
+        self.assert_eq("$F6 (should be Left=2)", input_f6, 0x02)
+
+    def test_ai_drops_when_at_center(self):
+        """AI should drop when at center column."""
+        print("test_ai_drops_when_at_center...")
+        input_f6, _, _ = self.run_ai(
+            vs_cpu_flag=1,
+            game_mode=5,
+            capsule_x=3,  # Already at center column 3
+            frame=1
+        )
+        # AI should drop (Down = 4)
+        self.assert_eq("$F6 (should be Down=4)", input_f6, 0x04)
+
+    def test_ai_rotates_periodically(self):
+        """AI should rotate on frame multiples of 32."""
+        print("test_ai_rotates_periodically...")
+        input_f6, _, _ = self.run_ai(
+            vs_cpu_flag=1,
+            game_mode=5,
+            capsule_x=0,
+            frame=32  # Should rotate on this frame
+        )
+        # AI should rotate (A button = 0x80)
+        self.assert_eq("$F6 (should be A=0x80)", input_f6, 0x80)
+
+    def test_ai_not_active_in_regular_2p(self):
+        """AI should NOT activate in regular 2P mode (just stores original input)."""
+        print("test_ai_not_active_in_regular_2p...")
+        # In non-VS CPU mode, AI should just store original input (0) and return
+        input_f6, _, _ = self.run_ai(
+            vs_cpu_flag=0,  # Regular 2P, not VS CPU
+            game_mode=5,
+            capsule_x=3,
+            frame=1
+        )
+        # Should just have the original store (A=0)
+        self.assert_eq("$F6 (should be 0 - original input)", input_f6, 0x00)
+
+    def run_all_tests(self):
+        """Run all test cases."""
+        print("=" * 60)
+        print("VS CPU Patch Unit Tests")
+        print("=" * 60)
+
+        # First rebuild the patch
+        print("\nRebuilding patch...")
+        import subprocess
+        result = subprocess.run(["python3", "patch_vs_cpu.py"],
+                                capture_output=True, text=True)
+        if result.returncode != 0:
+            print("FAILED to build patch!")
+            print(result.stderr)
+            return False
+
+        # Load routines
+        print("\nLoading routines from ROM...")
+        self.load_routines()
+
+        print("\n" + "-" * 60)
+        print("Toggle Routine Tests")
+        print("-" * 60)
+        self.test_toggle_1p_to_2p()
+        self.test_toggle_2p_to_vscpu()
+        self.test_toggle_vscpu_to_1p()
+
+        print("\n" + "-" * 60)
+        print("Mirror Tests (pass-through)")
+        print("-" * 60)
+        self.test_mirror_copies_f6_to_5b()
+
+        print("\n" + "-" * 60)
+        print("AI Tests (mirroring + gameplay)")
+        print("-" * 60)
+        self.test_ai_mirrors_in_level_select()
+        self.test_ai_not_active_without_vscpu()
+        self.test_ai_activates_in_gameplay()
+        self.test_ai_moves_left_toward_center()
+        self.test_ai_drops_when_at_center()
+        self.test_ai_rotates_periodically()
+        self.test_ai_not_active_in_regular_2p()
+
+        print("\n" + "=" * 60)
+        print(f"Results: {self.passed} passed, {self.failed} failed")
+        print("=" * 60)
+
+        return self.failed == 0
+
+
+if __name__ == "__main__":
+    tester = TestVSCPU()
+    success = tester.run_all_tests()
+    sys.exit(0 if success else 1)
