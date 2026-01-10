@@ -2,6 +2,10 @@
 
 ## VS CPU Mode Implementation
 
+### Current Version: v16 (Enhanced AI with Heuristics)
+
+**Latest:** Multi-candidate selection with row-based scoring and top row avoidance
+
 ### Working Approach (v13+)
 
 The key insight for level select mirroring + gameplay AI:
@@ -18,6 +22,41 @@ The key insight for level select mirroring + gameplay AI:
 ```
 
 The 0x10AE routine then copies $F6 to $5B normally.
+
+### AI Evolution
+
+**v15 (First Working AI):**
+- Simple greedy algorithm: scan top-to-bottom for FIRST matching virus
+- No evaluation, just move to first match and drop
+- 59 bytes
+
+**v16 (Current - Enhanced Heuristics):**
+- Multi-candidate selection: evaluates ALL matching viruses
+- Row-based scoring: prefers lower rows (score = row number, lower = better)
+- Top row avoidance: skips columns with occupied top row (partition risk)
+- Stores best candidate after scanning entire playfield
+- 107 bytes (1 byte spare before JMP table at 0x7FE0)
+
+**v16 Algorithm:**
+```
+1. Initialize: target=$00 (default center), best_score=$01 (255=unset)
+2. For each tile in P2 playfield ($0500-$057F):
+   a. If virus (0xD0-0xD2), extract color
+   b. If color matches left or right capsule:
+      - Calculate target column (col for left, col-1 for right)
+      - Check top row of target column (skip if occupied)
+      - Calculate score = row number (0-15)
+      - If score < best_score: update best_score and target
+3. Move toward target column (left/right)
+4. Drop when at target
+```
+
+**Future (v17+ if needed):**
+- Full column height counting
+- Consecutive color detection
+- Virus adjacency scoring
+- Weighted scoring system
+- Total: ~120 bytes (requires ROM reorganization)
 
 ### Failed Approaches (DO NOT USE)
 
@@ -37,16 +76,29 @@ These approaches did NOT work despite passing unit tests:
 
 ### Key Memory Addresses
 
+**AI State (v16+):**
+- `$00` - AI target column (0-7)
+- `$01` - AI best score (255=unset, lower=better)
+
+**Game State:**
 - `$04` - VS CPU flag (custom, 0=normal, 1=VS CPU)
 - `$46` - Game mode (< 4 = menu/level select, >= 4 = gameplay)
+- `$0727` - Player mode (1=1P, 2=2P)
+
+**Controller Input:**
 - `$F5/$F7` - P1 controller input (new/held)
 - `$F6/$F8` - P2 controller input (new/held)
 - `$5B/$5C` - P2 processed input (what game uses)
-- `$0385` - P2 capsule X position
-- `$0386` - P2 capsule Y position
+
+**P2 Capsule State:**
+- `$0385` - P2 capsule X position (0-7 columns)
+- `$0386` - P2 capsule Y position (0-15 rows)
+- `$0381` - P2 left capsule color (0=yellow, 1=red, 2=blue)
+- `$0382` - P2 right capsule color
+
+**Virus Counts:**
 - `$0324` - P1 virus count
 - `$03A4` - P2 virus count
-- `$0727` - Player mode (1=1P, 2=2P)
 
 ### Hook Points
 
@@ -57,15 +109,37 @@ These approaches did NOT work despite passing unit tests:
 ### ROM Layout
 
 Routines at 0x7F50, must end before 0x7FE0 (JMP table):
-- Toggle routine: ~27 bytes
-- Mirror routine: ~9 bytes (simplified pass-through)
-- AI routine: ~59 bytes
+- Toggle routine: 27 bytes (0x7F50-0x7F6A)
+- Mirror routine: 9 bytes (0x7F6B-0x7F73, simplified pass-through)
+- AI routine: 107 bytes (0x7F74-0x7FDE)
+- **Total: 143 bytes, ends at 0x7FDF (1 byte spare)**
+
+**Version History:**
+- v15: 59-byte AI (simple greedy)
+- v16: 107-byte AI (multi-candidate with heuristics)
+- v17+: ~120 bytes projected (full heuristic system)
 
 ### Testing
 
-- Unit tests: `python3 test_vs_cpu.py`
-- MCP server for headless debugging: `mednafen-mcp/mcp_server.py`
-- The unit tests run routines in isolation - they can pass even when real game behavior fails
+**Unit Tests:**
+- Run: `python3 test_vs_cpu.py`
+- v16: 30 tests passing (5 new heuristic tests added)
+- Tests cover: toggle routine, mirroring, AI targeting, movement, and heuristics
+- **Note:** Unit tests run routines in isolation - they can pass even when real game behavior fails
+
+**Integration Testing:**
+- Launch: `python3 patch_vs_cpu.py && mednafen drmario_vs_cpu.nes`
+- Select "VS CPU" mode (press Select twice from main menu)
+- MCP server for debugging: `mednafen-mcp/mcp_server.py`
+
+### Research Basis (v16)
+
+AI heuristics based on:
+- **meatfighter.com Dr. Mario AI**: Industry-standard approach with top row penalty, height management, and consecutive color detection
+- **Tetris AI research**: Height penalty, flat stack preference, downstacking strategies
+- **PuyoPuyo AI**: Tree search algorithms and tactical heuristics for chain-based puzzle games
+
+Key insight: NES constraints require cheap heuristics. v16 implements the most impactful ones first (top row avoidance, multi-candidate selection) before adding more complex scoring.
 
 ---
 
@@ -91,7 +165,20 @@ The mednafen-mcp server is designed to support **deep reinforcement learning** a
 
 ### 2. Smart AI Strategy
 
-**Scoring-based capsule placement:**
+**Current Implementation (v16):**
+- ✅ Row-based scoring: prefer lower rows (safer placements)
+- ✅ Top row avoidance: prevent partition risk
+- ✅ Multi-candidate evaluation: consider all matching viruses
+
+**Planned Enhancements (v17+):**
+- ⏳ Full column height counting
+- ⏳ Consecutive color detection (scan for 2-3 color sequences)
+- ⏳ Virus adjacency scoring (prefer viruses with adjacent matching colors)
+- ⏳ Weighted scoring system (balance multiple factors)
+
+**Future Advanced AI (MCP-based):**
+
+For RL training or complex heuristics beyond ROM constraints:
 
 1. **Enumerate all valid drop positions** (column + rotation)
 2. **Score each position** based on:
