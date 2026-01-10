@@ -111,6 +111,12 @@ class CPU6502:
                 self.set_z(self.a)
                 self.set_n(self.a)
                 self.pc += 3
+            elif opcode == 0xB9:  # LDA abs,Y
+                addr = (self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)) + self.y
+                self.a = self.memory[addr & 0xFFFF]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 3
             elif opcode == 0x85:  # STA zp
                 addr = self.memory[self.pc + 1]
                 self.memory[addr] = self.a
@@ -123,6 +129,14 @@ class CPU6502:
                 self.x = self.memory[self.pc + 1]
                 self.set_z(self.x)
                 self.set_n(self.x)
+                self.pc += 2
+            elif opcode == 0x86:  # STX zp
+                addr = self.memory[self.pc + 1]
+                self.memory[addr] = self.x
+                self.pc += 2
+            elif opcode == 0x84:  # STY zp
+                addr = self.memory[self.pc + 1]
+                self.memory[addr] = self.y
                 self.pc += 2
             elif opcode == 0xA0:  # LDY imm
                 self.y = self.memory[self.pc + 1]
@@ -169,6 +183,12 @@ class CPU6502:
             elif opcode == 0xE0:  # CPX imm
                 result = self.x - self.memory[self.pc + 1]
                 self.set_c(self.x >= self.memory[self.pc + 1])
+                self.set_z(result & 0xFF)
+                self.set_n(result & 0xFF)
+                self.pc += 2
+            elif opcode == 0xC0:  # CPY imm
+                result = self.y - self.memory[self.pc + 1]
+                self.set_c(self.y >= self.memory[self.pc + 1])
                 self.set_z(result & 0xFF)
                 self.set_n(result & 0xFF)
                 self.pc += 2
@@ -248,6 +268,16 @@ class CPU6502:
                 self.set_z(self.x)
                 self.set_n(self.x)
                 self.pc += 1
+            elif opcode == 0x88:  # DEY
+                self.y = (self.y - 1) & 0xFF
+                self.set_z(self.y)
+                self.set_n(self.y)
+                self.pc += 1
+            elif opcode == 0xC8:  # INY
+                self.y = (self.y + 1) & 0xFF
+                self.set_z(self.y)
+                self.set_n(self.y)
+                self.pc += 1
             elif opcode == 0x29:  # AND imm
                 self.a &= self.memory[self.pc + 1]
                 self.set_z(self.a)
@@ -263,6 +293,14 @@ class CPU6502:
                 val = self.memory[self.pc + 1]
                 result = self.a + val + (1 if self.get_c() else 0)
                 self.set_c(result > 255)
+                self.a = result & 0xFF
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 2
+            elif opcode == 0xE9:  # SBC imm
+                val = self.memory[self.pc + 1]
+                result = self.a - val - (0 if self.get_c() else 1)
+                self.set_c(result >= 0)
                 self.a = result & 0xFF
                 self.set_z(self.a)
                 self.set_n(self.a)
@@ -522,28 +560,102 @@ class TestVSCPU:
         self.assert_eq("$F6 (should be Left=2)", input_f6, 0x02)
 
     def test_ai_drops_when_at_center(self):
-        """AI should drop when at center column."""
+        """AI should drop when at center column (different color capsule, already vertical)."""
         print("test_ai_drops_when_at_center...")
-        input_f6, _, _ = self.run_ai(
-            vs_cpu_flag=1,
-            game_mode=5,
-            capsule_x=3,  # Already at center column 3
-            frame=1
-        )
-        # AI should drop (Down = 4)
-        self.assert_eq("$F6 (should be Down=4)", input_f6, 0x04)
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 3  # At center
+        self.cpu.memory[0x0381] = 0  # Left = yellow
+        self.cpu.memory[0x0382] = 1  # Right = red (different!)
+        self.cpu.memory[0x03A5] = 1  # Already vertical
 
-    def test_ai_rotates_periodically(self):
-        """AI should rotate on frame multiples of 32."""
-        print("test_ai_rotates_periodically...")
-        input_f6, _, _ = self.run_ai(
-            vs_cpu_flag=1,
-            game_mode=5,
-            capsule_x=0,
-            frame=32  # Should rotate on this frame
-        )
-        # AI should rotate (A button = 0x80)
-        self.assert_eq("$F6 (should be A=0x80)", input_f6, 0x80)
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # AI should drop (Down = 4)
+        self.assert_eq("$F6 (should be Down=4)", self.cpu.memory[0xF6], 0x04)
+
+    def test_ai_targets_matching_virus(self):
+        """AI should target column with matching virus."""
+        print("test_ai_targets_matching_virus...")
+        # Set up: place a virus in column 5, row 15 (offset 120+5=125)
+        # Virus color 1 (red) = tile 0xD1
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 1  # Left capsule color = 1 (red)
+        self.cpu.memory[0x0500 + 125] = 0xD1  # Red virus at row 15, col 5
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # AI should move right toward column 5
+        self.assert_eq("$F6 (should be Right=1)", self.cpu.memory[0xF6], 0x01)
+        self.assert_eq("target column", self.cpu.memory[0x00], 5)
+
+    def test_ai_targets_column_minus_one_for_right_match(self):
+        """AI should target column-1 when right capsule color matches virus."""
+        print("test_ai_targets_column_minus_one_for_right_match...")
+        # Virus at column 5, right capsule matches -> target column 4
+        # Capsule at column 4 means right half at column 5 lands on virus
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 0  # Left = yellow
+        self.cpu.memory[0x0382] = 1  # Right = red
+        self.cpu.memory[0x0500 + 125] = 0xD1  # Red virus at col 5
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Target should be column 4 (virus col 5 - 1)
+        self.assert_eq("target column", self.cpu.memory[0x00], 4)
+        # Should move right toward column 4
+        self.assert_eq("$F6 (should be Right=1)", self.cpu.memory[0xF6], 0x01)
+
+    def test_ai_drops_horizontal_for_different_colors(self):
+        """AI should drop horizontal for different-color capsules (no rotation)."""
+        print("test_ai_drops_horizontal_for_different_colors...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 4  # At target column 4 (for right match on col 5 virus)
+        self.cpu.memory[0x0381] = 0  # Left = yellow
+        self.cpu.memory[0x0382] = 1  # Right = red (different!)
+        self.cpu.memory[0x03A5] = 0  # Horizontal
+        self.cpu.memory[0x0500 + 125] = 0xD1  # Red virus at col 5
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Different colors, should just drop (no rotation)
+        self.assert_eq("$F6 (should be Down=4)", self.cpu.memory[0xF6], 0x04)
+
+    def test_ai_prefers_vertical_for_same_color(self):
+        """Same-color capsules should rotate to vertical before dropping."""
+        print("test_ai_prefers_vertical_for_same_color...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 3  # At target (center)
+        self.cpu.memory[0x0381] = 1  # Left = red
+        self.cpu.memory[0x0382] = 1  # Right = red (SAME!)
+        self.cpu.memory[0x03A5] = 0  # Horizontal - should rotate!
+        self.cpu.memory[0x0500 + 123] = 0xD1  # Red virus at col 3
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Same-color capsule should rotate to vertical
+        self.assert_eq("$F6 (should be A=0x80 for rotate)", self.cpu.memory[0xF6], 0x80)
 
     def test_ai_not_active_in_regular_2p(self):
         """AI should NOT activate in regular 2P mode (just stores original input)."""
@@ -598,7 +710,10 @@ class TestVSCPU:
         self.test_ai_activates_in_gameplay()
         self.test_ai_moves_left_toward_center()
         self.test_ai_drops_when_at_center()
-        self.test_ai_rotates_periodically()
+        self.test_ai_targets_matching_virus()
+        self.test_ai_targets_column_minus_one_for_right_match()
+        self.test_ai_drops_horizontal_for_different_colors()
+        self.test_ai_prefers_vertical_for_same_color()
         self.test_ai_not_active_in_regular_2p()
 
         print("\n" + "=" * 60)

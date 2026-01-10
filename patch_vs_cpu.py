@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Dr. Mario VS CPU Edition v12
-============================
+Dr. Mario VS CPU Edition v13 - Virus Targeting AI
+==================================================
 Features:
 1. VS CPU Mode: New 3rd menu option with AI-controlled Player 2
    - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU -> 1 PLAYER
@@ -209,90 +209,143 @@ def apply_patches(input_path, output_path):
     level_mirror_routine = bytes(mirror_code)
 
     # =========================================
-    # AI Routine - Handles BOTH mirroring and AI
+    # AI Routine - Virus-targeting AI with rotation
     # =========================================
-    # Runs at 0x37CF during controller read
-    # In VS CPU mode: always copy P1 input to $F6 first (for level select mirroring)
-    # Then if in gameplay: override $F6 with AI input
-    # The 0x10AE routine will then copy $F6 to $5B
+    # Strategy: Find first virus matching LEFT or RIGHT capsule color
+    # If right matches, rotate to vertical before dropping
+    # Memory: $00 = target column, $01 = left color, $02 = right color, $03 = rotation flag
     ai_code = []
 
-    ai_code += [0x85, 0xF6]        # STA $F6 (complete original store - P2 controller)
+    ai_code += [0x85, 0xF6]        # STA $F6 (complete original store)
 
-    # Check VS CPU mode ($04 == 1)
+    # Check VS CPU mode
     ai_code += [0xA5, 0x04]        # LDA $04
     ai_code += [0xC9, 0x01]        # CMP #$01
     ai_exit_branch = len(ai_code)
-    ai_code += [0xD0, 0x00]        # BNE exit (not VS CPU, keep P2 input)
+    ai_code += [0xD0, 0x00]        # BNE exit
 
-    # VS CPU mode: First, copy P1 input to $F6 (for level select mirroring)
-    ai_code += [0xA5, 0xF5]        # LDA $F5 (P1 input)
-    ai_code += [0x85, 0xF6]        # STA $F6 (mirror to P2 slot)
+    # Mirror P1 input for level select
+    ai_code += [0xA5, 0xF5]        # LDA $F5
+    ai_code += [0x85, 0xF6]        # STA $F6
 
-    # Now check if in gameplay using game mode ($0046)
-    # Mode >= 4 = gameplay (override with AI), Mode < 4 = level select (keep mirrored)
-    ai_code += [0xA5, 0x46]        # LDA $46 (game mode)
+    # Check gameplay mode
+    ai_code += [0xA5, 0x46]        # LDA $46
     ai_code += [0xC9, 0x04]        # CMP #$04
     ai_exit_branch2 = len(ai_code)
-    ai_code += [0x90, 0x00]        # BCC exit (mode < 4 = level select, keep mirrored input)
+    ai_code += [0x90, 0x00]        # BCC exit
 
-    # Gameplay: AI targets center column
-    ai_code += [0xA9, 0x03]        # LDA #$03 (target col = center)
-    ai_code += [0x85, 0x00]        # STA $00 (target col)
+    # === SETUP ===
+    ai_code += [0xA9, 0x03]        # LDA #$03
+    ai_code += [0x85, 0x00]        # STA $00 (target = center)
+    # No rotation flag needed - same-color check handles vertical preference
+
+    # Scan from bottom-right (offset 127)
+    ai_code += [0xA0, 0x7F]        # LDY #$7F
+
+    ai_scan_loop = len(ai_code)
+    ai_code += [0xB9, 0x00, 0x05]  # LDA $0500,Y (P2 playfield)
+
+    # Check if virus (0xD0-0xD2)
+    ai_code += [0xC9, 0xD0]        # CMP #$D0
+    ai_not_virus_branch = len(ai_code)
+    ai_code += [0x90, 0x00]        # BCC not_virus
+    ai_code += [0xC9, 0xD3]        # CMP #$D3
+    ai_not_virus_branch2 = len(ai_code)
+    ai_code += [0xB0, 0x00]        # BCS not_virus
+
+    # Found virus! Get color
+    ai_code += [0x38]              # SEC
+    ai_code += [0xE9, 0xD0]        # SBC #$D0 (A = virus color 0/1/2)
+
+    # Check left capsule match (preferred - left half lands on virus)
+    ai_code += [0xCD, 0x81, 0x03]  # CMP $0381 (direct read)
+    ai_left_match_branch = len(ai_code)
+    ai_code += [0xF0, 0x00]        # BEQ left_match
+
+    # Check right capsule match (target column-1 so right half lands on virus)
+    ai_code += [0xCD, 0x82, 0x03]  # CMP $0382 (direct read)
+    ai_not_match_branch = len(ai_code)
+    ai_code += [0xD0, 0x00]        # BNE not_match
+
+    # Right match: target = column - 1 (so right half at column lands on virus)
+    ai_code += [0x98]              # TYA
+    ai_code += [0x29, 0x07]        # AND #$07 (get column)
+    ai_code += [0x38]              # SEC
+    ai_code += [0xE9, 0x01]        # SBC #$01 (column - 1)
+    ai_code += [0x85, 0x00]        # STA $00 (target)
+    ai_right_to_move = len(ai_code)
+    ai_code += [0xB0, 0x00]        # BCS move (branch if no underflow, i.e., col >= 1)
+    # Fall through to left_match for col 0 edge case (re-saves as col 0)
+
+    # Left match: target = column (left half lands on virus)
+    ai_left_match_pos = len(ai_code)
+    ai_code += [0x98]              # TYA
+    ai_code += [0x29, 0x07]        # AND #$07
+    ai_code += [0x85, 0x00]        # STA $00 (target column)
+    ai_left_to_move = len(ai_code)
+    ai_code += [0xB0, 0x00]        # BCS move (always branches, C=1 from CMP)
+
+    # not_virus / not_match: continue scanning
+    ai_not_virus_pos = len(ai_code)
+    ai_code += [0x88]              # DEY
+    ai_code += [0x10, 0x00]        # BPL scan_loop
+    ai_scan_loop_branch = len(ai_code) - 1
+
+    # === MOVEMENT LOGIC ===
+    ai_move_pos = len(ai_code)
     ai_code += [0xAD, 0x85, 0x03]  # LDA $0385 (P2 X)
-    ai_code += [0xC5, 0x00]        # CMP $00
+    ai_code += [0xC5, 0x00]        # CMP $00 (target)
+    ai_at_target_branch = len(ai_code)
+    ai_code += [0xF0, 0x00]        # BEQ at_target
+
+    # Move toward target (using Y register for efficiency)
+    ai_code += [0xA0, 0x01]        # LDY #$01 (assume right)
+    ai_move_left_branch = len(ai_code)
+    ai_code += [0x90, 0x00]        # BCC store_move (X < target, go right)
+    ai_code += [0xC8]              # INY (Y=2 = left)
+    ai_store_move_pos = len(ai_code)
+    ai_code += [0x84, 0xF6]        # STY $F6
+    ai_code += [0x60]              # RTS (exit after movement)
+
+    # at_target: same-color capsules prefer vertical, else drop horizontal
+    ai_at_target_pos = len(ai_code)
+    ai_code += [0xAD, 0x81, 0x03]  # LDA $0381 (left color)
+    ai_code += [0xCD, 0x82, 0x03]  # CMP $0382 (same as right?)
     ai_drop_branch = len(ai_code)
-    ai_code += [0xF0, 0x00]        # BEQ drop
-
-    # Every 32 frames rotate
-    ai_code += [0xA5, 0x43]        # LDA $43
-    ai_code += [0x29, 0x1F]        # AND #$1F
-    ai_rotate_branch = len(ai_code)
-    ai_code += [0xF0, 0x00]        # BEQ rotate
-
-    # Move toward target
-    ai_code += [0xAD, 0x85, 0x03]  # LDA $0385
-    ai_code += [0xC5, 0x00]        # CMP $00
-    ai_left_branch = len(ai_code)
-    ai_code += [0xB0, 0x00]        # BCS left (current >= target)
-
-    # right
-    ai_code += [0xA9, 0x01]        # LDA #$01
-    ai_store_branch1 = len(ai_code)
-    ai_code += [0xD0, 0x00]        # BNE store (always taken)
-
-    # left
-    ai_left_pos = len(ai_code)
-    ai_code += [0xA9, 0x02]        # LDA #$02
-    ai_store_branch2 = len(ai_code)
+    ai_code += [0xD0, 0x00]        # BNE drop (different colors, drop as-is)
+    # Same color - ensure vertical orientation
+    ai_code += [0xAD, 0xA5, 0x03]  # LDA $03A5 (P2 orientation: 0=horiz)
+    ai_drop_branch2 = len(ai_code)
+    ai_code += [0xD0, 0x00]        # BNE drop (already vertical)
+    ai_code += [0xA9, 0x80]        # LDA #$80 (A button = rotate)
+    ai_store_branch = len(ai_code)
     ai_code += [0xD0, 0x00]        # BNE store
 
-    # rotate
-    ai_rotate_pos = len(ai_code)
-    ai_code += [0xA9, 0x80]        # LDA #$80 (A button)
-    ai_store_branch3 = len(ai_code)
-    ai_code += [0xD0, 0x00]        # BNE store
-
-    # drop
+    # drop: hold down
     ai_drop_pos = len(ai_code)
     ai_code += [0xA9, 0x04]        # LDA #$04 (Down)
-    # Fall through to store
 
-    # store: write AI input to $F6 (will be copied to $5B by 0x10AE)
+    # store
     ai_store_pos = len(ai_code)
-    ai_code += [0x85, 0xF6]        # STA $F6 (AI input)
+    ai_code += [0x85, 0xF6]        # STA $F6
     ai_exit_pos = len(ai_code)
     ai_code += [0x60]              # RTS
 
     # Fix branch offsets
     ai_code[ai_exit_branch + 1] = (ai_exit_pos - (ai_exit_branch + 2)) & 0xFF
     ai_code[ai_exit_branch2 + 1] = (ai_exit_pos - (ai_exit_branch2 + 2)) & 0xFF
+    ai_code[ai_not_virus_branch + 1] = (ai_not_virus_pos - (ai_not_virus_branch + 2)) & 0xFF
+    ai_code[ai_not_virus_branch2 + 1] = (ai_not_virus_pos - (ai_not_virus_branch2 + 2)) & 0xFF
+    ai_code[ai_left_match_branch + 1] = (ai_left_match_pos - (ai_left_match_branch + 2)) & 0xFF
+    ai_code[ai_not_match_branch + 1] = (ai_not_virus_pos - (ai_not_match_branch + 2)) & 0xFF
+    ai_code[ai_right_to_move + 1] = (ai_move_pos - (ai_right_to_move + 2)) & 0xFF
+    ai_code[ai_left_to_move + 1] = (ai_move_pos - (ai_left_to_move + 2)) & 0xFF
+    ai_code[ai_scan_loop_branch] = (ai_scan_loop - (ai_scan_loop_branch + 1)) & 0xFF
+    ai_code[ai_at_target_branch + 1] = (ai_at_target_pos - (ai_at_target_branch + 2)) & 0xFF
+    ai_code[ai_move_left_branch + 1] = (ai_store_move_pos - (ai_move_left_branch + 2)) & 0xFF
     ai_code[ai_drop_branch + 1] = (ai_drop_pos - (ai_drop_branch + 2)) & 0xFF
-    ai_code[ai_rotate_branch + 1] = (ai_rotate_pos - (ai_rotate_branch + 2)) & 0xFF
-    ai_code[ai_left_branch + 1] = (ai_left_pos - (ai_left_branch + 2)) & 0xFF
-    ai_code[ai_store_branch1 + 1] = (ai_store_pos - (ai_store_branch1 + 2)) & 0xFF
-    ai_code[ai_store_branch2 + 1] = (ai_store_pos - (ai_store_branch2 + 2)) & 0xFF
-    ai_code[ai_store_branch3 + 1] = (ai_store_pos - (ai_store_branch3 + 2)) & 0xFF
+    ai_code[ai_drop_branch2 + 1] = (ai_drop_pos - (ai_drop_branch2 + 2)) & 0xFF
+    ai_code[ai_store_branch + 1] = (ai_store_pos - (ai_store_branch + 2)) & 0xFF
 
     ai_routine = bytes(ai_code)
 
@@ -360,7 +413,7 @@ def apply_patches(input_path, output_path):
     print(f"Patched ROM: {output_path}")
     print(f"Patched checksum: {patched_checksum}")
     print()
-    print("Dr. Mario VS CPU Edition v12 applied successfully!")
+    print("Dr. Mario VS CPU Edition v13 (Virus Targeting AI) applied successfully!")
     print("Features:")
     print("- VS CPU Mode: New 3rd menu option with AI-controlled Player 2")
     print("  - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU")

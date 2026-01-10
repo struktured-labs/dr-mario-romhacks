@@ -66,3 +66,68 @@ Routines at 0x7F50, must end before 0x7FE0 (JMP table):
 - Unit tests: `python3 test_vs_cpu.py`
 - MCP server for headless debugging: `mednafen-mcp/mcp_server.py`
 - The unit tests run routines in isolation - they can pass even when real game behavior fails
+
+---
+
+## Latent Project Goals
+
+### 1. MCP Tooling for Deep RL Training
+
+The mednafen-mcp server is designed to support **deep reinforcement learning** agents:
+- Provides game state observation (playfield, capsule position, virus counts)
+- Allows action injection (controller input)
+- Goal: Enable RL agents to learn Dr. Mario without ROM hacking
+
+**MCP Server Status:**
+- Location: `mednafen-mcp/mcp_server.py`
+- Works when Mednafen has a display (real or Xvfb)
+- Headless with SDL dummy drivers does NOT work (frame counter stays 0)
+- Use `xvfb-run mednafen <rom>` for headless training
+
+**Design Philosophy:**
+- Mednafen MCP is the base (generic emulator control)
+- Dr. Mario specific tools are specializations
+- Future: Add other game specializations (enable/disable at will)
+
+### 2. Smart AI Strategy
+
+**Scoring-based capsule placement:**
+
+1. **Enumerate all valid drop positions** (column + rotation)
+2. **Score each position** based on:
+   - Virus matches: +points for each virus that would be cleared
+   - Consecutive bonus: 2-match < 3-match < 4-match (exponential)
+   - Chain potential: bonus if placement enables future clears
+   - Height penalty: prefer lower placements (safer)
+   - Blocking penalty: avoid blocking access to viruses
+
+3. **Pathfinding:** Navigate around obstacles to reach target column
+   - May need to rotate to fit through gaps
+   - Consider that capsule is 2 tiles wide (or 1 tall when vertical)
+
+4. **Dynamic recomputation:**
+   - Recompute scores when opponent clears (garbage may drop)
+   - Or simply recompute every N frames
+   - Balance computation cost vs responsiveness
+
+**Dr. Mario Mechanics:**
+- 4 consecutive same-color tiles clears them (horizontal OR vertical)
+- Colors: Yellow, Red, Blue
+- Capsule has 2 halves, each with a color
+- Rotation cycles through 4 orientations
+- Playfield: 8 columns x 16 rows
+
+### 3. Key Memory for AI
+
+Playfield scanning:
+- P1 playfield: `$0400-$047F` (8x16 = 128 bytes)
+- P2 playfield: `$0500-$057F`
+- Tile values: `$FF` = empty, `$D0` = yellow virus, `$D1` = red virus, `$D2` = blue virus
+- Capsule halves: `$4C-$5B` range
+
+Current capsule:
+- P2 X: `$0385`, Y: `$0386`
+- P2 left color: `$0381`, right color: `$0382`
+- Orientation: `$00A5` (0=horiz, 1=vert CCW, 2=reverse, 3=vert CW)
+
+Drop timer: `$0392` (P2) - frames until capsule drops one row
