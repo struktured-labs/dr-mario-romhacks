@@ -32,8 +32,9 @@ class CPU6502:
             self.memory[i] = 0
         for i in range(0x300, 0x400):
             self.memory[i] = 0
-        for i in range(0x500, 0x600):
-            self.memory[i] = 0
+        # Initialize playfields to $FF (empty tiles)
+        for i in range(0x400, 0x600):
+            self.memory[i] = 0xFF
         for i in range(0x700, 0x800):
             self.memory[i] = 0
 
@@ -157,6 +158,11 @@ class CPU6502:
                 self.a = self.x
                 self.set_z(self.a)
                 self.set_n(self.a)
+                self.pc += 1
+            elif opcode == 0xAA:  # TAX
+                self.x = self.a
+                self.set_z(self.x)
+                self.set_n(self.x)
                 self.pc += 1
             elif opcode == 0xC9:  # CMP imm
                 result = self.a - self.memory[self.pc + 1]
@@ -305,6 +311,21 @@ class CPU6502:
                 self.set_z(self.a)
                 self.set_n(self.a)
                 self.pc += 2
+            elif opcode == 0xED:  # SBC abs
+                addr = self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)
+                val = self.memory[addr]
+                result = self.a - val - (0 if self.get_c() else 1)
+                self.set_c(result >= 0)
+                self.a = result & 0xFF
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 3
+            elif opcode == 0x4A:  # LSR A
+                self.set_c(self.a & 1)
+                self.a >>= 1
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 1
             elif opcode == 0xEA:  # NOP
                 self.pc += 1
             else:
@@ -638,24 +659,64 @@ class TestVSCPU:
         # Different colors, should just drop (no rotation)
         self.assert_eq("$F6 (should be Down=4)", self.cpu.memory[0xF6], 0x04)
 
-    def test_ai_prefers_vertical_for_same_color(self):
-        """Same-color capsules should rotate to vertical before dropping."""
-        print("test_ai_prefers_vertical_for_same_color...")
+    def test_ai_drops_at_target(self):
+        """AI should drop when at target column."""
+        print("test_ai_drops_at_target...")
         self.cpu.reset()
         self.cpu.memory[0x04] = 1  # VS CPU mode
         self.cpu.memory[0x46] = 5  # Gameplay mode
         self.cpu.memory[0x0385] = 3  # At target (center)
         self.cpu.memory[0x0381] = 1  # Left = red
-        self.cpu.memory[0x0382] = 1  # Right = red (SAME!)
-        self.cpu.memory[0x03A5] = 0  # Horizontal - should rotate!
-        self.cpu.memory[0x0500 + 123] = 0xD1  # Red virus at col 3
+        self.cpu.memory[0x0382] = 1  # Right = red
+        self.cpu.memory[0x0500 + 27] = 0xD1  # Red virus at row 3, col 3 (clear path)
 
         ai_addr = 0xFF5B + len(self.mirror_routine)
         self.cpu.load_routine(ai_addr, self.ai_routine)
         self.cpu.run(ai_addr)
 
-        # Same-color capsule should rotate to vertical
-        self.assert_eq("$F6 (should be A=0x80 for rotate)", self.cpu.memory[0xF6], 0x80)
+        # Should drop
+        self.assert_eq("$F6 (should be Down=4)", self.cpu.memory[0xF6], 0x04)
+
+    def test_ai_finds_top_virus_first(self):
+        """AI should find best virus (v16: lowest row = best score)."""
+        print("test_ai_finds_top_virus_first...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+        self.cpu.memory[0x0382] = 0  # Right = yellow
+        # Red virus at row 10, col 5 (offset 85) - lower row, worse score
+        self.cpu.memory[0x0500 + 85] = 0xD1
+        # Red virus at row 3, col 2 (offset 26) - higher row, BETTER score
+        self.cpu.memory[0x0500 + 26] = 0xD1
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # v16: Should target the virus with BEST SCORE (row 3) at col 2
+        self.assert_eq("target column (best score)", self.cpu.memory[0x00], 2)
+
+    def test_ai_moves_to_virus_column(self):
+        """AI should move toward the virus column."""
+        print("test_ai_moves_to_virus_column...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 1  # Capsule at column 1
+        self.cpu.memory[0x0381] = 2  # Left = blue
+        self.cpu.memory[0x0382] = 0  # Right = yellow
+        # Blue virus at row 5, col 6 (offset 46)
+        self.cpu.memory[0x0500 + 46] = 0xD2
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Should target col 6 and move right
+        self.assert_eq("target column", self.cpu.memory[0x00], 6)
+        self.assert_eq("$F6 (should be Right=1)", self.cpu.memory[0xF6], 0x01)
 
     def test_ai_not_active_in_regular_2p(self):
         """AI should NOT activate in regular 2P mode (just stores original input)."""
@@ -669,6 +730,120 @@ class TestVSCPU:
         )
         # Should just have the original store (A=0)
         self.assert_eq("$F6 (should be 0 - original input)", input_f6, 0x00)
+
+    # ==================== v16 HEURISTIC TESTS ====================
+
+    def test_ai_avoids_top_partition(self):
+        """AI should skip columns with occupied top row (partition risk)."""
+        print("test_ai_avoids_top_partition...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Red virus at row 5, col 2 (offset 42) - ACCESSIBLE
+        self.cpu.memory[0x0500 + 42] = 0xD1
+        # Red virus at row 3, col 3 (offset 27) - but top row occupied!
+        self.cpu.memory[0x0500 + 27] = 0xD1
+        self.cpu.memory[0x0500 + 3] = 0x50  # Top row (row 0) of col 3 occupied
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Should target col 2 (clear top) NOT col 3 (occupied top), even though col 3 is higher
+        self.assert_eq("target column (avoid top partition)", self.cpu.memory[0x00], 2)
+
+    def test_ai_prefers_lower_viruses(self):
+        """AI should prefer viruses at lower rows (safer placement)."""
+        print("test_ai_prefers_lower_viruses...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Red virus at row 3, col 2 (offset 26) - higher row (score = 3)
+        self.cpu.memory[0x0500 + 26] = 0xD1
+        # Red virus at row 10, col 5 (offset 85) - lower row (score = 10)
+        self.cpu.memory[0x0500 + 85] = 0xD1
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Should target col 2 (row 3, score 3) NOT col 5 (row 10, score 10)
+        # Lower score = better in v16
+        self.assert_eq("target column (prefer lower row score)", self.cpu.memory[0x00], 2)
+
+    def test_ai_multi_candidate_selection(self):
+        """AI should scan all viruses and pick best candidate, not just first match."""
+        print("test_ai_multi_candidate_selection...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Red virus at row 14, col 1 (offset 113) - first in scan order but worst score
+        self.cpu.memory[0x0500 + 113] = 0xD1
+        # Red virus at row 5, col 2 (offset 42) - middle score
+        self.cpu.memory[0x0500 + 42] = 0xD1
+        # Red virus at row 2, col 6 (offset 22) - BEST score (lowest row)
+        self.cpu.memory[0x0500 + 22] = 0xD1
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Should target col 6 (row 2, best score) NOT col 1 (first match)
+        self.assert_eq("target column (best of multiple)", self.cpu.memory[0x00], 6)
+        self.assert_eq("best score in $01", self.cpu.memory[0x01], 2)
+
+    def test_ai_right_match_avoids_top_partition(self):
+        """AI should check top row of TARGET column for right matches too."""
+        print("test_ai_right_match_avoids_top_partition...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 0  # Left = yellow
+        self.cpu.memory[0x0382] = 1  # Right = red
+
+        # Red virus at row 5, col 5 (offset 45) - right match would target col 4
+        self.cpu.memory[0x0500 + 45] = 0xD1
+        self.cpu.memory[0x0500 + 4] = 0x50  # Top row of col 4 occupied!
+        # Red virus at row 8, col 7 (offset 71) - right match targets col 6, clear top
+        self.cpu.memory[0x0500 + 71] = 0xD1
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Should target col 6 (col 7 virus - 1), NOT col 4 (top occupied)
+        self.assert_eq("target column (right match avoids partition)", self.cpu.memory[0x00], 6)
+
+    def test_ai_defaults_to_center_if_no_valid_virus(self):
+        """AI should use default target (center) if no valid virus found."""
+        print("test_ai_defaults_to_center_if_no_valid_virus...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at column 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Red virus exists but top row occupied
+        self.cpu.memory[0x0500 + 42] = 0xD1  # Row 5, col 2
+        self.cpu.memory[0x0500 + 2] = 0x50   # Top row occupied
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Should use default target (col 3 = center)
+        self.assert_eq("target column (default)", self.cpu.memory[0x00], 3)
+        self.assert_eq("best score (unset)", self.cpu.memory[0x01], 0xFF)
 
     def run_all_tests(self):
         """Run all test cases."""
@@ -713,8 +888,19 @@ class TestVSCPU:
         self.test_ai_targets_matching_virus()
         self.test_ai_targets_column_minus_one_for_right_match()
         self.test_ai_drops_horizontal_for_different_colors()
-        self.test_ai_prefers_vertical_for_same_color()
+        self.test_ai_drops_at_target()
+        self.test_ai_finds_top_virus_first()
+        self.test_ai_moves_to_virus_column()
         self.test_ai_not_active_in_regular_2p()
+
+        print("\n" + "-" * 60)
+        print("v16 Heuristic Tests")
+        print("-" * 60)
+        self.test_ai_avoids_top_partition()
+        self.test_ai_prefers_lower_viruses()
+        self.test_ai_multi_candidate_selection()
+        self.test_ai_right_match_avoids_top_partition()
+        self.test_ai_defaults_to_center_if_no_valid_virus()
 
         print("\n" + "=" * 60)
         print(f"Results: {self.passed} passed, {self.failed} failed")
