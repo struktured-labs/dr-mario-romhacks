@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Dr. Mario VS CPU Edition v17 - AI with Rotation and Height Penalty
-====================================================================
+Dr. Mario VS CPU Edition v16 - Enhanced AI with Heuristics
+===========================================================
 Features:
 1. VS CPU Mode: New 3rd menu option with AI-controlled Player 2
    - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU -> 1 PLAYER
@@ -209,17 +209,15 @@ def apply_patches(input_path, output_path):
     level_mirror_routine = bytes(mirror_code)
 
     # =========================================
-    # AI Routine v17 - With Rotation Logic
-    # ======================================
+    # AI Routine v16 - Multi-Candidate with Heuristics
+    # ==================================================
     # Strategy:
     # 1. Scan ALL viruses (not just first match)
     # 2. For each matching virus:
     #    - Check top row of column (skip if occupied - partition risk)
     #    - Score based on row position (lower row = better)
     # 3. Select BEST virus (lowest row with clear top)
-    # 4. Rotate to vertical if both capsule halves same color
     # Memory: $00 = target column, $01 = best score (255 = unset)
-    # Note: Height penalty deferred to v18 due to ROM space constraints
     ai_code = []
 
     ai_code += [0x85, 0xF6]        # STA $F6 (complete original store)
@@ -260,12 +258,32 @@ def apply_patches(input_path, output_path):
     ai_code += [0xB0, 0x00]        # BCS not_virus (if >= 3, not a virus)
     # A now contains virus color (0=yellow, 1=red, 2=blue)
 
-    # Check left capsule match only (right match removed to save ROM space)
-    ai_code += [0xCD, 0x81, 0x03]  # CMP $0381 (left color)
+    # Store virus color temporarily in X
+    ai_code += [0xAA]              # TAX
+
+    # Check left capsule match
+    ai_code += [0xCD, 0x81, 0x03]  # CMP $0381 (compare color)
+    ai_left_match_branch = len(ai_code)
+    ai_code += [0xF0, 0x00]        # BEQ left_match
+
+    # Check right capsule match
+    ai_code += [0x8A]              # TXA (restore virus color)
+    ai_code += [0xCD, 0x82, 0x03]  # CMP $0382 (compare color)
     ai_not_match_branch = len(ai_code)
     ai_code += [0xD0, 0x00]        # BNE not_match
 
-    # Left match: set target column
+    # Right match: store column-1 as candidate target
+    ai_code += [0x98]              # TYA (position)
+    ai_code += [0x29, 0x07]        # AND #$07 (get column)
+    ai_code += [0xF0, 0x00]        # BEQ not_match (col 0 can't use col-1)
+    ai_right_col0_branch = len(ai_code) - 1
+    ai_code += [0xAA]              # TAX (save column in X temporarily)
+    ai_code += [0xCA]              # DEX (column - 1)
+    ai_right_eval_branch = len(ai_code)
+    ai_code += [0xD0, 0x00]        # BNE eval_candidate (always taken)
+
+    # Left match: store column as candidate target
+    ai_left_match_pos = len(ai_code)
     ai_code += [0x98]              # TYA
     ai_code += [0x29, 0x07]        # AND #$07 (column in A)
     ai_code += [0xAA]              # TAX (column in X)
@@ -303,18 +321,6 @@ def apply_patches(input_path, output_path):
     ai_scan_loop_branch = len(ai_code)
     ai_code += [0x90, 0x00]        # BCC scan_loop (continue if Y < 128)
 
-    # === ROTATION LOGIC ===
-    # If both capsule colors same → rotate (using EOR to save space)
-    ai_code += [0xAD, 0x81, 0x03]  # LDA $0381 (left color)
-    ai_code += [0x4D, 0x82, 0x03]  # EOR $0382 (right color)
-    ai_no_rotate_branch = len(ai_code)
-    ai_code += [0xD0, 0x00]        # BNE no_rotate (different if non-zero)
-    # Same - rotate
-    ai_code += [0xA9, 0x40]        # LDA #$40 (A button)
-    ai_code += [0x85, 0xF6]        # STA $F6
-    ai_code += [0x60]              # RTS
-    ai_no_rotate_pos = len(ai_code)
-
     # === MOVEMENT LOGIC ===
     ai_move_pos = len(ai_code)
     ai_code += [0xAD, 0x85, 0x03]  # LDA $0385 (P2 X)
@@ -343,11 +349,13 @@ def apply_patches(input_path, output_path):
     ai_code[ai_exit_branch + 1] = (ai_exit_pos - (ai_exit_branch + 2)) & 0xFF
     ai_code[ai_exit_branch2 + 1] = (ai_exit_pos - (ai_exit_branch2 + 2)) & 0xFF
     ai_code[ai_not_virus_branch + 1] = (ai_not_virus_pos - (ai_not_virus_branch + 2)) & 0xFF
+    ai_code[ai_left_match_branch + 1] = (ai_left_match_pos - (ai_left_match_branch + 2)) & 0xFF
     ai_code[ai_not_match_branch + 1] = (ai_not_virus_pos - (ai_not_match_branch + 2)) & 0xFF
+    ai_code[ai_right_col0_branch] = (ai_not_virus_pos - (ai_right_col0_branch + 1)) & 0xFF
+    ai_code[ai_right_eval_branch + 1] = (ai_eval_pos - (ai_right_eval_branch + 2)) & 0xFF
     ai_code[ai_top_occupied_branch + 1] = (ai_not_virus_pos - (ai_top_occupied_branch + 2)) & 0xFF
     ai_code[ai_not_better_branch + 1] = (ai_not_virus_pos - (ai_not_better_branch + 2)) & 0xFF
     ai_code[ai_scan_loop_branch + 1] = (ai_scan_loop - (ai_scan_loop_branch + 2)) & 0xFF
-    ai_code[ai_no_rotate_branch + 1] = (ai_no_rotate_pos - (ai_no_rotate_branch + 2)) & 0xFF
     ai_code[ai_at_target_branch + 1] = (ai_at_target_pos - (ai_at_target_branch + 2)) & 0xFF
     ai_code[ai_move_left_branch + 1] = (ai_store_move_pos - (ai_move_left_branch + 2)) & 0xFF
 

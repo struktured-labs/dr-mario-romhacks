@@ -4,3 +4,6 @@
 [submodule "mednafen-mcp"]
 	path = mednafen-mcp
 	url = git@github.com:struktured-labs/mednafen-mcp.git
+[submodule "mesen2"]
+	path = mesen2
+	url = https://github.com/SourMesen/Mesen2.git
