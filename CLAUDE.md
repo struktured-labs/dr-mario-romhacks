@@ -145,23 +145,53 @@ Key insight: NES constraints require cheap heuristics. v16 implements the most i
 
 ## Latent Project Goals
 
-### 1. MCP Tooling for Deep RL Training
+### 1. RL Training Infrastructure with Mesen
 
-The mednafen-mcp server is designed to support **deep reinforcement learning** agents:
-- Provides game state observation (playfield, capsule position, virus counts)
-- Allows action injection (controller input)
-- Goal: Enable RL agents to learn Dr. Mario without ROM hacking
+**Status: Phase 0 Complete** - Mesen integration operational
 
-**MCP Server Status:**
+Switched from Mednafen to **Mesen2** for superior debugger support and RL training:
+- Well-documented Lua API (memory read/write, callbacks)
+- Most accurate NES emulator (trusted DMA handling)
+- Active development, strong community support
+
+**Architecture:**
+```
+Python RL Trainer ←→ Lua Bridge (TCP socket) ←→ Mesen Core (Lua API)
+```
+
+**Components:**
+- **Mesen2**: Compiled from source as git submodule (`mesen2/`)
+- **Lua Bridge** (`rl-training-new/lua/mesen_bridge.lua`): Socket server running inside Mesen
+  - Commands: READ, WRITE, STEP, GET_STATE, QUIT
+  - Exposes NES memory and frame control via TCP port 8765
+- **Python Client** (`rl-training-new/src/mesen_interface.py`): Interface to Lua bridge
+  - `read_memory(addr, size)` - Read NES RAM
+  - `write_memory(addr, data)` - Write NES RAM (e.g., controller input)
+  - `step_frame(n)` - Advance N frames
+  - `get_game_state()` - Full Dr. Mario state (playfield, capsule, virus count)
+
+**Benefits over Mednafen:**
+- 1-2 days to implement (vs weeks of reverse engineering)
+- Well-documented API (vs undocumented network debugger)
+- Lua scripting support (vs none)
+- Better accuracy (critical for realistic RL training)
+
+**Next Steps:**
+1. Build MCP Python AI (oracle with full heuristics) - Phase 1
+2. Train PPO agent on 3090 GPU - Phase 2
+3. Distill to decision tree (~500 bytes) - Phase 3
+4. Compile to 6502 assembly - Phase 4
+5. Expand ROM and embed tree - Phase 5
+
+### 1b. Legacy: Mednafen MCP (Deprecated)
+
+**Note:** Mednafen MCP approach was abandoned in favor of Mesen.
+
+The mednafen-mcp server was designed for deep RL training but had limitations:
 - Location: `mednafen-mcp/mcp_server.py`
 - Works when Mednafen has a display (real or Xvfb)
 - Headless with SDL dummy drivers does NOT work (frame counter stays 0)
-- Use `xvfb-run mednafen <rom>` for headless training
-
-**Design Philosophy:**
-- Mednafen MCP is the base (generic emulator control)
-- Dr. Mario specific tools are specializations
-- Future: Add other game specializations (enable/disable at will)
+- No documented debugger protocol (would require reverse engineering)
 
 ### 2. Smart AI Strategy
 
