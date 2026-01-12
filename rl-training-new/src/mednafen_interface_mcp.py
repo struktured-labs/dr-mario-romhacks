@@ -53,8 +53,14 @@ class MednafenInterface:
         while time.time() - start_time < timeout:
             result = self._controller.connect()
             if result.get("success"):
+                # Force RAM discovery after connecting
+                if result.get("nes_ram_base") is None:
+                    print("Discovering NES RAM...")
+                    self._controller._discover_nes_ram()
+
                 self.connected = True
-                print(f"Connected to Mednafen (PID {result['pid']})")
+                ram_hex = hex(self._controller.nes_ram_base) if self._controller.nes_ram_base else "not found"
+                print(f"Connected to Mednafen (PID {result['pid']}), RAM at {ram_hex}")
                 return True
             time.sleep(0.5)
 
