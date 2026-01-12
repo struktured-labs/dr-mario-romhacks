@@ -1,7 +1,7 @@
 # Dr. Mario RL Training - Project Status
 
 **Last Updated**: 2026-01-11
-**Current Phase**: Phase 1 Complete ✅
+**Current Phase**: Phase 2 Setup Complete ✅ - Ready to Train!
 
 ---
 
@@ -146,35 +146,97 @@ cd rl-training-new
 
 ---
 
-## 🔄 Phase 2: RL Training (NEXT)
+## ✅ Phase 2: RL Training Setup (COMPLETE)
 
-**Status**: Not started
-**Estimated Duration**: 3-7 days
-**Goal**: Train PPO agent on 3090 GPU
+**Status**: Setup complete, ready to train!
+**Duration**: ~1 day
+**Commit**: `c6a69e3`
 
-### Plan
+### What We Built
 
-1. **Merge RL branch** from `origin/claude/rl-agents-mednafen-d84K3`
-2. **Update for Mesen** (replace mednafen_interface.py → mesen_interface.py)
-3. **Design reward function** based on Python AI insights:
-   ```python
-   reward = 0
-   reward += 10 * viruses_cleared_this_step
-   reward += 5 * height_reduced
-   reward -= 100 if game_over else 0
-   reward -= 1  # Time penalty (encourage speed)
-   ```
-4. **Install dependencies** (`stable-baselines3`, `gymnasium`, `torch`)
-5. **Train on 3090 GPU** (~1M episodes, 1-4 days)
-6. **Monitor with TensorBoard**
-7. **Save best checkpoint**
+1. **Memory Map** (`src/memory_map.py`)
+   - NES memory addresses and constants
+   - Helper functions for tile/color conversion
+   - Playfield dimensions and layout
 
-### Expected Results
+2. **Reward Function** (`src/reward_function.py`)
+   - Based on Python AI insights from Phase 1
+   - **+10 per virus cleared** (main objective)
+   - **+5 for height reduction** (encourage downstacking)
+   - **-0.5 per row of height** (discourage tall stacks)
+   - **-0.1 per frame** (encourage speed)
+   - **-100 for game over** (survival critical)
+   - **+200 for win** (all viruses cleared)
 
-- Agent clears viruses in >80% of games
-- Outperforms Python AI baseline
-- Learns pathfinding and rotation implicitly
-- Manages height without explicit penalty
+3. **State Encoder** (`src/state_encoder.py`)
+   - Converts game state → multi-channel CNN observation
+   - **12 channels**: P2 (empty, yellow, red, blue, capsule, next) + P1 (same 6)
+   - Output shape: **(12, 16, 8)** for spatial CNN
+   - Normalized float32 values (0.0-1.0)
+
+4. **Gymnasium Environment** (`src/drmario_env.py`)
+   - Wraps Mesen interface for RL training
+   - **Action space**: Discrete(9) - move, rotate, combos
+   - **Observation space**: Box(12, 16, 8) - multi-channel CNN input
+   - Handles reset, step, termination, rewards
+   - Integrates state encoder and reward calculator
+
+5. **Training Script** (`scripts/train.py`)
+   - PPO training with Stable-Baselines3
+   - **GPU support** (CUDA/CPU auto-detection)
+   - **TensorBoard logging**
+   - **Checkpoint saving** every 10K steps
+   - **Resume training** from checkpoint
+   - Configurable hyperparameters (learning rate, batch size, etc.)
+
+6. **Evaluation Script** (`scripts/watch.py`)
+   - Load trained model
+   - Play N episodes
+   - Show step-by-step progress
+   - Report win/loss statistics
+
+7. **Training Guide** (`TRAINING_GUIDE.md`)
+   - Complete setup instructions
+   - Training parameters explained
+   - TensorBoard monitoring guide
+   - Troubleshooting tips
+   - Expected performance curves
+   - Hardware requirements
+
+### Architecture
+
+```
+┌──────────────┐   Gymnasium   ┌─────────────┐   Mesen     ┌───────┐
+│  PPO Agent   │◄─────────────►│ DrMarioEnv  │◄───────────►│ Mesen │
+│ (CNN Policy) │   obs/reward  │  (wrapper)  │  read/write │  Core │
+└──────────────┘               └─────────────┘             └───────┘
+       ▲                              ▲                         ▲
+       │                              │                         │
+       └──── Learns from ─────────────┴─────── State from ─────┘
+```
+
+### Ready to Train!
+
+**Command**:
+```bash
+cd rl-training-new
+uv pip install -r requirements.txt
+python scripts/train.py --timesteps 1000000 --device cuda
+```
+
+**Monitor**:
+```bash
+tensorboard --logdir logs/tensorboard
+```
+
+**Expected Training Time**: 1-4 days on 3090 GPU for 1M timesteps
+
+### Next: Actual Training
+
+Once training completes:
+- **Win rate target**: 60-80%
+- **Avg viruses cleared**: 15-20 (out of 20)
+- **Qualitative**: Deliberate virus clearing, height management, rotation usage
 
 ---
 
@@ -251,11 +313,12 @@ cd rl-training-new
 |-------|--------|----------|-------|
 | 0: Mesen Integration | ✅ Complete | 1-2 days | Jan 11 |
 | 1: Python AI (Oracle) | ✅ Complete | 1 day | Jan 11 |
-| 2: RL Training | 🔄 Next | 3-7 days | TBD |
+| 2: RL Training Setup | ✅ Complete | 1 day | Jan 11 |
+| 2: RL Training (Actual) | 🔄 Next | 1-4 days | TBD |
 | 3: Distillation | ⏳ Pending | 1-2 days | TBD |
 | 4: Compile to ASM | ⏳ Pending | 2-3 days | TBD |
 | 5: ROM Embedding | ⏳ Pending | 2-4 days | TBD |
-| **TOTAL** | | **11-21 days** | **~2-4 weeks** |
+| **TOTAL** | | **8-17 days** | **~1-3 weeks** |
 
 ---
 
