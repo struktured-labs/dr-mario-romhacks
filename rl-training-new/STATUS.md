@@ -203,6 +203,12 @@ cd rl-training-new
    - Expected performance curves
    - Hardware requirements
 
+8. **Validation Tests** (`tests/`)
+   - **test_env_validation.py**: 5 automated tests (memory, controller, encoding, rewards, episode)
+   - **visualize_observation.py**: ASCII visualization of agent's view
+   - **README.md**: Complete troubleshooting guide with common issues
+   - **CRITICAL**: Must pass before starting 4-day training run!
+
 ### Architecture
 
 ```
@@ -215,9 +221,33 @@ cd rl-training-new
        └──── Learns from ─────────────┴─────── State from ─────┘
 ```
 
-### Ready to Train!
+### Validation Before Training!
 
-**Command**:
+**IMPORTANT**: Run validation tests FIRST to verify everything works:
+
+```bash
+cd rl-training-new
+
+# Terminal 1: Launch Mesen
+cd ..
+./run_mesen.sh drmario_vs_cpu.nes
+# In Mesen: Tools → Script Window → Load lua/mesen_bridge.lua
+# Start game, select VS CPU mode (P2), reach gameplay
+
+# Terminal 2: Run validation
+cd rl-training-new
+python tests/test_env_validation.py
+```
+
+**All 5 tests must pass:**
+1. ✅ Memory reading (game state, virus count, capsule position)
+2. ✅ Controller input (pressing RIGHT moves capsule)
+3. ✅ State encoding (12-channel observation valid)
+4. ✅ Reward calculation (virus clears, height, terminal states)
+5. ✅ Full episode (reset/step/termination works)
+
+### Start Training (After Validation Passes)
+
 ```bash
 cd rl-training-new
 uv pip install -r requirements.txt
@@ -231,7 +261,7 @@ tensorboard --logdir logs/tensorboard
 
 **Expected Training Time**: 1-4 days on 3090 GPU for 1M timesteps
 
-### Next: Actual Training
+### Training Target
 
 Once training completes:
 - **Win rate target**: 60-80%
