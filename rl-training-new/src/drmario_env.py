@@ -1,7 +1,7 @@
 """
 Dr. Mario Gymnasium Environment
 
-Wraps Mesen emulator for RL training with Stable-Baselines3.
+Wraps Mednafen emulator for RL training with Stable-Baselines3.
 """
 
 import gymnasium as gym
@@ -10,7 +10,7 @@ import numpy as np
 from typing import Optional, Tuple, Dict, Any
 import time
 
-from mesen_interface import MesenInterface
+from mednafen_interface_mcp import MednafenInterface as MesenInterface
 from memory_map import *
 from state_encoder import StateEncoder
 from reward_function import RewardCalculator

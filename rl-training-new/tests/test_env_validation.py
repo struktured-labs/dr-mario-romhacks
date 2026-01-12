@@ -19,7 +19,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from mesen_interface import MesenInterface
+from mednafen_interface_mcp import MednafenInterface as MesenInterface
 from drmario_env import DrMarioEnv
 from state_encoder import StateEncoder
 from reward_function import RewardCalculator
@@ -283,10 +283,11 @@ def main():
     print("Dr. Mario Environment Validation")
     print()
     print("IMPORTANT: Make sure before running:")
-    print("  1. Mesen is running")
-    print("  2. Lua bridge loaded (mesen_bridge.lua)")
-    print("  3. Game started in VS CPU mode (P2)")
-    print("  4. Game is in active gameplay (not paused)")
+    print("  1. Mednafen is running (use MCP launch tool or xvfb-run mednafen ROM)")
+    print("  2. Game loaded with drmario_vs_cpu.nes")
+    print("  3. Game is running (doesn't need to be in gameplay yet)")
+    print()
+    print("NOTE: Validation will connect automatically via MCP interface")
     print()
     input("Press ENTER when ready...")
 

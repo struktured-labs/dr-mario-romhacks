@@ -12,7 +12,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from mesen_interface import MesenInterface
+from mednafen_interface_mcp import MednafenInterface as MesenInterface
 from state_encoder import StateEncoder
 from memory_map import TILE_EMPTY
 
