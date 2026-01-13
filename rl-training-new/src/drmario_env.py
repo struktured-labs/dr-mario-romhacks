@@ -10,7 +10,7 @@ import numpy as np
 from typing import Optional, Tuple, Dict, Any
 import time
 
-from mednafen_interface_mcp import MednafenInterface as MesenInterface
+from mednafen_interface_http import MednafenInterface as MesenInterface
 from memory_map import *
 from state_encoder import StateEncoder
 from reward_function import RewardCalculator
@@ -56,15 +56,15 @@ class DrMarioEnv(gym.Env):
     def __init__(
         self,
         mesen_host: str = "localhost",
-        mesen_port: int = 8765,
+        mesen_port: int = 8000,
         player_id: int = 2,
         max_episode_steps: int = 10000,
         frame_skip: int = 1,
     ):
         """
         Args:
-            mesen_host: Mesen Lua bridge host
-            mesen_port: Mesen Lua bridge port
+            mesen_host: HTTP MCP server host
+            mesen_port: HTTP MCP server port (default: 8000)
             player_id: Which player this agent controls (1 or 2)
             max_episode_steps: Maximum frames per episode
             frame_skip: Number of frames to repeat each action
@@ -77,7 +77,7 @@ class DrMarioEnv(gym.Env):
         self.max_episode_steps = max_episode_steps
         self.frame_skip = frame_skip
 
-        # Initialize Mesen interface
+        # Initialize HTTP interface
         self.mesen = MesenInterface(host=mesen_host, port=mesen_port)
         self.connected = False
 
@@ -111,7 +111,7 @@ class DrMarioEnv(gym.Env):
         if self.connected:
             return True
 
-        print(f"[DrMarioEnv] Connecting to Mesen at {self.mesen_host}:{self.mesen_port}...")
+        print(f"[DrMarioEnv] Connecting to MCP server at {self.mesen_host}:{self.mesen_port}...")
         if self.mesen.connect(timeout=timeout):
             self.connected = True
             print("[DrMarioEnv] ✓ Connected!")

@@ -9,6 +9,10 @@ gymnasium>=0.29.0
 # Numerical computing
 numpy>=1.24.0
 
+# HTTP server for MCP interface
+flask>=3.0.0
+requests>=2.31.0
+
 # Monitoring and logging
 tensorboard>=2.14.0
 

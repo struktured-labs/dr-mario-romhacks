@@ -19,7 +19,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from mednafen_interface_mcp import MednafenInterface as MesenInterface
+from mednafen_interface_http import MednafenInterface as MesenInterface
 from drmario_env import DrMarioEnv
 from state_encoder import StateEncoder
 from reward_function import RewardCalculator
@@ -284,11 +284,10 @@ def main():
     print()
     print("IMPORTANT: Make sure before running:")
     print("  1. Mednafen is running (use MCP launch tool or xvfb-run mednafen ROM)")
-    print("  2. Game loaded with drmario_vs_cpu.nes")
-    print("  3. Game is running (doesn't need to be in gameplay yet)")
+    print("  2. MCP HTTP server is running (python3 mednafen_mcp_server.py)")
+    print("  3. Game loaded with drmario_vs_cpu.nes")
     print()
-    print("NOTE: Validation will connect automatically via MCP interface")
-    print()
+
     input("Press ENTER when ready...")
 
     results = {}

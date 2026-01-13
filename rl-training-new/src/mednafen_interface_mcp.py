@@ -1,13 +1,14 @@
 """
 Mednafen interface for RL training using MCP server logic.
 
-This directly uses the MednafenController from mednafen-mcp.
+This directly uses the MednafenMCP from mednafen-mcp with a singleton pattern
+to ensure all instances share the same RAM discovery.
 """
 
 import sys
 import time
 from pathlib import Path
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Optional
 
 # Import from mednafen-mcp directory
 MCP_DIR = Path(__file__).parent.parent.parent / "mednafen-mcp"
@@ -30,13 +31,51 @@ P2_CAPSULE_Y = 0x0386
 P2_VIRUS_COUNT = 0x03A4
 GAME_MODE = 0x0046
 
+# Singleton MCP controller shared by all MednafenInterface instances
+_mcp_controller: Optional[MednafenMCP] = None
+
+
+def get_mcp_controller() -> MednafenMCP:
+    """Get or create the singleton MCP controller."""
+    global _mcp_controller
+    if _mcp_controller is None:
+        _mcp_controller = MednafenMCP()
+    return _mcp_controller
+
+
+def initialize_mcp_controller(pid: int = None, nes_ram_base: int = None):
+    """
+    Initialize the singleton MCP controller with known values.
+
+    This is useful when Mednafen was launched externally (e.g., via MCP launch tool)
+    and we need to sync the controller state.
+
+    Args:
+        pid: Mednafen process ID (will auto-detect if None)
+        nes_ram_base: NES RAM base address (will auto-discover if None)
+    """
+    global _mcp_controller
+    controller = get_mcp_controller()
+
+    # Set PID
+    if pid is None:
+        pid = find_mednafen_pid()
+    controller.pid = pid
+
+    # Set or discover RAM base
+    if nes_ram_base is not None:
+        controller.nes_ram_base = nes_ram_base
+    elif controller.nes_ram_base is None:
+        # Try to discover RAM
+        controller._discover_nes_ram()
+
 
 class MednafenInterface:
     """Interface to Mednafen emulator via MCP server logic."""
 
     def __init__(self):
-        """Initialize interface."""
-        self._controller = MednafenMCP()
+        """Initialize interface using singleton MCP controller."""
+        self._controller = get_mcp_controller()
         self.connected = False
 
     def connect(self, timeout: int = 10) -> bool:

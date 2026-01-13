@@ -12,7 +12,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from mednafen_interface_mcp import MednafenInterface as MesenInterface
+from mednafen_interface_http import MednafenInterface as MesenInterface
 from state_encoder import StateEncoder
 from memory_map import TILE_EMPTY
 
@@ -73,7 +73,12 @@ def main():
     print("  3. Color channels match actual colors")
     print("  4. Capsule position is marked")
     print()
-    input("Press ENTER when Mesen is ready...")
+    print("Prerequisites:")
+    print("  1. Mednafen is running (use MCP launch or xvfb-run)")
+    print("  2. MCP HTTP server is running (python3 mednafen_mcp_server.py)")
+    print()
+
+    input("Press ENTER when ready...")
 
     # Connect
     interface = MesenInterface()
