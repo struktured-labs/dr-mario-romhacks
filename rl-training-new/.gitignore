@@ -1,0 +1,77 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs (user preference: log folders gitignored)
+logs/
+*.log
+mcp_server.log
+mcp_server.pid
+
+# Models and checkpoints
+models/
+*.zip
+*.pt
+*.pth
+*.ckpt
+
+# Temporary files (user preference: tmp folder instead of /tmp)
+tmp/
+temp/
+
+# Training data
+data/
+*.pkl
+*.npy
+
+# TensorBoard
+tensorboard/
+events.out.tfevents.*
+
+# Environment files (user preference: never push setenv.sh)
+setenv.sh
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/

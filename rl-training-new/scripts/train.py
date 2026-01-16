@@ -8,9 +8,9 @@ Usage:
     python scripts/train.py --timesteps 1000000 --device cuda
 
 Requirements:
-    - Mesen running with Dr. Mario ROM
-    - Lua bridge loaded (mesen_bridge.lua)
-    - Game started in VS CPU mode (P2)
+    - HTTP MCP server running (mednafen_mcp_server.py)
+    - Mednafen launched via /launch endpoint (Option 2)
+    - VS CPU ROM loaded and auto-navigated to gameplay
 """
 
 import argparse
@@ -33,7 +33,7 @@ def make_env():
     """Create and wrap environment"""
     env = DrMarioEnv(
         mesen_host="localhost",
-        mesen_port=8765,
+        mesen_port=8000,  # HTTP MCP server
         player_id=2,
         max_episode_steps=10000,
         frame_skip=1,
