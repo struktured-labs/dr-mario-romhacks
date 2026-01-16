@@ -2,15 +2,22 @@
 """
 HTTP server wrapper around Mednafen MCP tools.
 
-This maintains a persistent MednafenMCP instance that was initialized
-by the MCP launch tool. Python clients make HTTP requests instead of
-creating their own MCP instances.
+Option 2 Implementation: Server spawns and manages Mednafen process.
+
+Features:
+- Spawns Mednafen as child process (solves ptrace ownership)
+- Auto-navigates to VS CPU gameplay
+- Health monitoring and auto-restart
+- Full lifecycle management
 
 Usage:
     python3 mednafen_mcp_server.py
 
 Then from Python:
     import requests
+    # Launch Mednafen
+    requests.post('http://localhost:8000/launch', json={'rom_path': '/path/to/rom.nes'})
+    # Use as normal
     state = requests.get('http://localhost:8000/game_state').json()
 """
 
@@ -23,7 +30,8 @@ import logging
 # Add mednafen-mcp to path
 sys.path.insert(0, str(Path(__file__).parent.parent / "mednafen-mcp"))
 
-from mcp_server import MednafenMCP
+from mcp_server import MednafenMCP, find_mednafen_pid
+from mednafen_manager import MednafenManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -32,13 +40,20 @@ logger = logging.getLogger(__name__)
 # Create Flask app
 app = Flask(__name__)
 
-# Global MCP instance (persistent across requests)
-mcp = None
+# Global instances
+mcp = None  # MCP controller (backwards compatibility)
+manager = None  # Mednafen manager (Option 2)
 
 
 def get_mcp():
     """Get or initialize the MCP controller."""
-    global mcp
+    global mcp, manager
+
+    # If using managed Mednafen, return manager's MCP
+    if manager and manager.get_mcp():
+        return manager.get_mcp()
+
+    # Otherwise, create standalone MCP (backwards compatibility)
     if mcp is None:
         logger.info("Initializing MednafenMCP instance...")
         mcp = MednafenMCP()
@@ -215,16 +230,165 @@ def connect():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/launch', methods=['POST'])
+def launch():
+    """
+    Launch Mednafen with auto-navigation (Option 2).
+
+    Request JSON:
+        {
+            "rom_path": "/path/to/drmario.nes",  // Required
+            "headless": true,  // Optional, default true
+            "display": ":0"  // Optional, for windowed mode
+        }
+
+    Returns:
+        {
+            "success": true,
+            "pid": 12345,
+            "nes_ram_base": "0x18c6290",
+            "game_mode": 4,
+            "in_gameplay": true
+        }
+    """
+    global manager
+
+    try:
+        data = request.get_json() or {}
+        rom_path = data.get('rom_path')
+
+        if not rom_path:
+            # Try default paths
+            rom_path = "/home/struktured/projects/dr-mario-mods/drmario_vs_cpu.nes"
+            if not Path(rom_path).exists():
+                return jsonify({'error': 'ROM path required and default not found'}), 400
+
+        headless = data.get('headless', True)
+        display = data.get('display', ':0')
+
+        logger.info(f"Launching Mednafen with ROM: {rom_path}")
+        logger.info(f"  Headless: {headless}")
+
+        # Shutdown existing manager if any
+        if manager:
+            logger.info("Shutting down existing Mednafen...")
+            manager.shutdown()
+
+        # Create and launch new manager
+        manager = MednafenManager(rom_path, headless=headless, display=display)
+        result = manager.launch()
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Error launching Mednafen: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/shutdown', methods=['POST'])
+def shutdown():
+    """
+    Shutdown managed Mednafen instance.
+
+    Returns:
+        {
+            "success": true,
+            "message": "Mednafen shutdown"
+        }
+    """
+    global manager
+
+    try:
+        if manager:
+            logger.info("Shutting down Mednafen...")
+            manager.shutdown()
+            manager = None
+            return jsonify({'success': True, 'message': 'Mednafen shutdown'})
+        else:
+            return jsonify({'success': False, 'message': 'No managed Mednafen running'})
+
+    except Exception as e:
+        logger.error(f"Error during shutdown: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/status', methods=['GET'])
+def status():
+    """
+    Get status of managed Mednafen instance.
+
+    Returns:
+        {
+            "managed": true,  // Using Option 2
+            "alive": true,
+            "pid": 12345,
+            "nes_ram_base": "0x18c6290",
+            "game_mode": 4
+        }
+    """
+    global manager
+
+    try:
+        if manager:
+            mcp_instance = manager.get_mcp()
+            game_mode = None
+
+            if mcp_instance and mcp_instance.nes_ram_base:
+                try:
+                    mode_result = mcp_instance.read_nes_ram(0x46, 1)
+                    game_mode = mode_result.get('values', [0])[0] if 'values' in mode_result else None
+                except:
+                    pass
+
+            return jsonify({
+                'managed': True,
+                'alive': manager.is_alive(),
+                'pid': manager.pid,
+                'nes_ram_base': hex(manager.nes_ram_base) if manager.nes_ram_base else None,
+                'game_mode': game_mode
+            })
+        else:
+            # Check for standalone MCP
+            if mcp and mcp.pid:
+                return jsonify({
+                    'managed': False,
+                    'pid': mcp.pid,
+                    'nes_ram_base': hex(mcp.nes_ram_base) if mcp.nes_ram_base else None
+                })
+            else:
+                return jsonify({
+                    'managed': False,
+                    'connected': False
+                })
+
+    except Exception as e:
+        logger.error(f"Error getting status: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
-    logger.info("Starting Mednafen MCP HTTP Server...")
-    logger.info("Endpoints:")
-    logger.info("  GET  /health - Health check")
+    logger.info("Starting Mednafen MCP HTTP Server (Option 2)...")
+    logger.info("")
+    logger.info("Core Endpoints:")
+    logger.info("  POST /launch - Launch Mednafen with auto-navigation (Option 2)")
+    logger.info("  POST /shutdown - Shutdown managed Mednafen")
+    logger.info("  GET  /status - Get Mednafen status")
+    logger.info("")
+    logger.info("Game Endpoints:")
     logger.info("  GET  /game_state - Get full game state")
     logger.info("  POST /read_memory - Read NES RAM")
     logger.info("  POST /write_memory - Write NES RAM")
     logger.info("  GET  /playfield?player=2 - ASCII playfield")
-    logger.info("  POST /connect - Connect/reconnect to Mednafen")
+    logger.info("")
+    logger.info("Legacy Endpoints:")
+    logger.info("  GET  /health - Health check")
+    logger.info("  POST /connect - Connect to existing Mednafen")
     logger.info("")
     logger.info("Server running on http://localhost:8000")
+    logger.info("")
+    logger.info("Quick start:")
+    logger.info("  curl -X POST http://localhost:8000/launch")
+    logger.info("  curl http://localhost:8000/game_state")
+    logger.info("")
 
     app.run(host='0.0.0.0', port=8000, debug=False)

@@ -55,6 +55,7 @@ class MednafenInterface:
                 # Try to connect
                 response = self.session.post(
                     f"{self.base_url}/connect",
+                    json={},  # Empty JSON body with proper Content-Type
                     timeout=timeout
                 )
                 response.raise_for_status()
