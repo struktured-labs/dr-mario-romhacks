@@ -75,3 +75,4 @@ htmlcov/
 
 # Jupyter
 .ipynb_checkpoints/
+training.pid

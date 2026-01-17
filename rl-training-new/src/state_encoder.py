@@ -3,7 +3,7 @@ Dr. Mario State Encoder
 
 Converts raw game state into multi-channel CNN-friendly representation.
 
-Observation Space: (12, 16, 8) - 12 channels × 16 rows × 8 columns
+Observation Space: (16, 8, 12) - 16 rows × 8 columns × 12 channels (channels-last for SB3)
 
 Channels for P2 (what the agent sees):
   0: Empty tiles (1.0 = empty, 0.0 = occupied)
@@ -89,7 +89,8 @@ class StateEncoder:
         """
         self.player_id = player_id
         self.num_channels = 12
-        self.obs_shape = (self.num_channels, PLAYFIELD_HEIGHT, PLAYFIELD_WIDTH)
+        # Channels-last format for Stable-Baselines3: (H, W, C)
+        self.obs_shape = (PLAYFIELD_HEIGHT, PLAYFIELD_WIDTH, self.num_channels)
 
     def encode(self, state: Dict[str, Any]) -> np.ndarray:
         """
@@ -109,9 +110,10 @@ class StateEncoder:
                 - p1_capsule_y: int (optional)
 
         Returns:
-            Observation array of shape (12, 16, 8)
+            Observation array of shape (16, 8, 12) - channels-last
         """
-        obs = np.zeros(self.obs_shape, dtype=np.float32)
+        # Build in channels-first for easier indexing, then transpose
+        obs = np.zeros((self.num_channels, PLAYFIELD_HEIGHT, PLAYFIELD_WIDTH), dtype=np.float32)
 
         # Parse playfield into 2D grid
         playfield = np.array(state['playfield'], dtype=np.uint8).reshape(16, 8)
@@ -182,7 +184,8 @@ class StateEncoder:
             if p1_next >= 0:
                 obs[11, :, :] = p1_next / 3.0
 
-        return obs
+        # Transpose from (C, H, W) to (H, W, C) for Stable-Baselines3
+        return np.transpose(obs, (1, 2, 0))
 
     def get_observation_space(self):
         """Get Gymnasium observation space"""
@@ -244,12 +247,12 @@ if __name__ == "__main__":
     print(f"Min value: {obs.min()}")
     print(f"Max value: {obs.max()}")
 
-    # Check channels
-    print(f"\nChannel 0 (empty): {np.sum(obs[0])} empty tiles")
-    print(f"Channel 1 (yellow): {np.sum(obs[1])} yellow tiles")
-    print(f"Channel 2 (red): {np.sum(obs[2])} red tiles")
-    print(f"Channel 3 (blue): {np.sum(obs[3])} blue tiles")
-    print(f"Channel 4 (capsule): {np.sum(obs[4]):.2f} capsule markers")
-    print(f"Channel 5 (next): {np.sum(obs[5]):.2f} next capsule broadcast")
+    # Check channels (now in channels-last format)
+    print(f"\nChannel 0 (empty): {np.sum(obs[:, :, 0])} empty tiles")
+    print(f"Channel 1 (yellow): {np.sum(obs[:, :, 1])} yellow tiles")
+    print(f"Channel 2 (red): {np.sum(obs[:, :, 2])} red tiles")
+    print(f"Channel 3 (blue): {np.sum(obs[:, :, 3])} blue tiles")
+    print(f"Channel 4 (capsule): {np.sum(obs[:, :, 4]):.2f} capsule markers")
+    print(f"Channel 5 (next): {np.sum(obs[:, :, 5]):.2f} next capsule broadcast")
 
     print("\nState encoder ready!")

@@ -21,7 +21,7 @@ class DrMarioEnv(gym.Env):
     Gymnasium environment for Dr. Mario
 
     Observation Space:
-        Multi-channel spatial representation (12, 16, 8)
+        Multi-channel spatial representation (16, 8, 12) - channels-last format
         - Channels 0-5: P2 playfield (empty, yellow, red, blue, capsule, next)
         - Channels 6-11: P1 playfield (for 2-player mode)
 

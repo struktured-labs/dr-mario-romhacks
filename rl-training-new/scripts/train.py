@@ -27,6 +27,7 @@ from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
 
 from drmario_env import DrMarioEnv
+from custom_cnn import DrMarioCNN
 
 
 def make_env():
@@ -90,6 +91,13 @@ def train(args):
         print("✓ Model loaded")
     else:
         print("Creating new PPO model...")
+
+        # Define custom policy kwargs with our custom CNN
+        policy_kwargs = dict(
+            features_extractor_class=DrMarioCNN,
+            features_extractor_kwargs=dict(features_dim=256),
+        )
+
         model = PPO(
             policy="CnnPolicy",
             env=env,
@@ -103,6 +111,7 @@ def train(args):
             ent_coef=0.01,
             vf_coef=0.5,
             max_grad_norm=0.5,
+            policy_kwargs=policy_kwargs,
             verbose=1,
             device=args.device,
             tensorboard_log=str(log_dir),
