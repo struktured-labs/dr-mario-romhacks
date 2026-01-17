@@ -95,8 +95,9 @@ class MednafenManager:
 
             logger.info(f"Mednafen launched (PID {self.process.pid})")
 
-            # Wait for Mednafen to start
-            time.sleep(3)
+            # Wait for Mednafen to fully start and initialize
+            logger.info("Waiting for Mednafen initialization...")
+            time.sleep(5)
 
             # Find actual Mednafen PID (may differ from Popen PID if xvfb-run used)
             self.pid = find_mednafen_pid()
@@ -140,7 +141,7 @@ class MednafenManager:
                 "error": str(e)
             }
 
-    def _navigate_to_gameplay(self, max_attempts: int = 3) -> Dict[str, Any]:
+    def _navigate_to_gameplay(self, max_attempts: int = 5) -> Dict[str, Any]:
         """
         Auto-navigate menu to VS CPU gameplay.
 
@@ -152,6 +153,20 @@ class MednafenManager:
         """
         if not self.mcp:
             return {"error": "MCP not initialized"}
+
+        def press_button(button_code, hold_frames=10, release_frames=5):
+            """Press a button with proper timing - write to multiple addresses."""
+            for _ in range(hold_frames):
+                # Write to both controller RAM locations
+                self.mcp.write_nes_ram(0xF5, [button_code])  # P1 new input
+                self.mcp.write_nes_ram(0xF7, [button_code])  # P1 held input
+                self.mcp.write_nes_ram(0x5B, [button_code])  # Processed input
+                time.sleep(0.020)  # Slightly longer than 1 frame
+            for _ in range(release_frames):
+                self.mcp.write_nes_ram(0xF5, [0x00])
+                self.mcp.write_nes_ram(0xF7, [0x00])
+                self.mcp.write_nes_ram(0x5B, [0x00])
+                time.sleep(0.020)
 
         for attempt in range(max_attempts):
             logger.info(f"Navigation attempt {attempt + 1}/{max_attempts}")
@@ -168,47 +183,47 @@ class MednafenManager:
                     logger.info("Already in gameplay!")
                     return {"in_gameplay": True, "game_mode": current_mode}
 
-                # Navigate from title screen
-                logger.info("Pressing START to leave title screen...")
-                for _ in range(15):
-                    self.mcp.write_nes_ram(0xF5, [0x10])  # START button
-                    time.sleep(0.05)
-                    self.mcp.write_nes_ram(0xF5, [0x00])
-                    time.sleep(0.05)
+                # Step 1: Leave title screen with START
+                logger.info("Step 1: Pressing START to leave title screen...")
+                for _ in range(20):
+                    press_button(0x10)  # START
+                time.sleep(1.0)
 
-                time.sleep(0.5)
+                # Check state
+                mode_result = self.mcp.read_nes_ram(0x46, 1)
+                current_mode = mode_result.get('values', [0])[0] if 'values' in mode_result else 0
+                logger.info(f"After START: mode={current_mode}")
 
-                # Press SELECT twice to reach VS CPU mode
-                logger.info("Pressing SELECT to reach VS CPU...")
+                # Step 2: Press SELECT twice to reach VS CPU mode
+                logger.info("Step 2: Pressing SELECT to reach VS CPU...")
                 for _ in range(2):
-                    for _ in range(8):
-                        self.mcp.write_nes_ram(0xF5, [0x20])  # SELECT button
-                        time.sleep(0.05)
-                        self.mcp.write_nes_ram(0xF5, [0x00])
-                        time.sleep(0.05)
-                    time.sleep(0.3)
+                    for _ in range(10):
+                        press_button(0x20)  # SELECT
+                    time.sleep(0.5)
 
-                # Press START to enter level select
-                logger.info("Pressing START for level select...")
-                for _ in range(15):
-                    self.mcp.write_nes_ram(0xF5, [0x10])  # START
-                    time.sleep(0.05)
-                    self.mcp.write_nes_ram(0xF5, [0x00])
-                    time.sleep(0.05)
+                # Check state
+                mode_result = self.mcp.read_nes_ram(0x46, 1)
+                current_mode = mode_result.get('values', [0])[0] if 'values' in mode_result else 0
+                logger.info(f"After SELECT: mode={current_mode}")
 
-                time.sleep(0.5)
+                # Step 3: Press START to enter level select
+                logger.info("Step 3: Pressing START for level select...")
+                for _ in range(20):
+                    press_button(0x10)  # START
+                time.sleep(1.0)
 
-                # Press START to begin game
-                logger.info("Pressing START to begin game...")
-                for _ in range(15):
-                    self.mcp.write_nes_ram(0xF5, [0x10])  # START
-                    time.sleep(0.05)
-                    self.mcp.write_nes_ram(0xF5, [0x00])
-                    time.sleep(0.05)
+                # Check state
+                mode_result = self.mcp.read_nes_ram(0x46, 1)
+                current_mode = mode_result.get('values', [0])[0] if 'values' in mode_result else 0
+                logger.info(f"After level select: mode={current_mode}")
 
-                time.sleep(1.5)
+                # Step 4: Press START to begin game
+                logger.info("Step 4: Pressing START to begin game...")
+                for _ in range(20):
+                    press_button(0x10)  # START
+                time.sleep(2.0)  # Wait for virus intro
 
-                # Check if we reached gameplay
+                # Final check
                 mode_result = self.mcp.read_nes_ram(0x46, 1)
                 final_mode = mode_result.get('values', [0])[0] if 'values' in mode_result else 0
 
@@ -228,7 +243,7 @@ class MednafenManager:
                     return {"in_gameplay": True, "game_mode": final_mode}
 
                 logger.warning(f"Still in menu (mode {final_mode}), retrying...")
-                time.sleep(1)
+                time.sleep(2)
 
             except Exception as e:
                 logger.error(f"Navigation error: {e}", exc_info=True)
