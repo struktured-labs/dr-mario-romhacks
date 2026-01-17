@@ -120,9 +120,9 @@ class MednafenManager:
             else:
                 logger.warning("NES RAM not discovered yet (may need gameplay state)")
 
-            # Auto-navigate to VS CPU gameplay
-            logger.info("Auto-navigating to VS CPU gameplay...")
-            nav_result = self._navigate_to_gameplay()
+            # Inject 2P gameplay state directly (skip navigation)
+            logger.info("Injecting 2P gameplay state...")
+            nav_result = self._inject_gameplay_state(virus_level=10, speed=1)
 
             return {
                 "success": True,
@@ -140,6 +140,67 @@ class MednafenManager:
                 "success": False,
                 "error": str(e)
             }
+
+    def _inject_gameplay_state(self, virus_level: int = 10, speed: int = 1) -> Dict[str, Any]:
+        """
+        DIRECT game state injection - skip navigation entirely.
+
+        Instead of simulating button presses (which don't work),
+        directly write game state to RAM to force 2P mode at desired level.
+
+        Args:
+            virus_level: Number of viruses (0-20)
+            speed: Game speed (0=LOW, 1=MED, 2=HI)
+
+        Returns:
+            Status dict
+        """
+        if not self.mcp:
+            return {"error": "MCP not initialized"}
+
+        logger.info(f"Injecting 2P gameplay state (level={virus_level}, speed={speed})")
+
+        try:
+            # Set player mode to 2P
+            self.mcp.write_nes_ram(0x0727, [0x01])  # 2P mode
+            logger.info("  Set player mode to 2P ($0727 = 1)")
+
+            # Set virus level
+            self.mcp.write_nes_ram(0x0044, [virus_level])
+            logger.info(f"  Set virus level ($0044 = {virus_level})")
+
+            # Set speed
+            self.mcp.write_nes_ram(0x0045, [speed])
+            logger.info(f"  Set speed ($0045 = {speed})")
+
+            # Set game mode to gameplay (mode 4+)
+            self.mcp.write_nes_ram(0x0046, [0x04])
+            logger.info("  Set game mode to gameplay ($0046 = 4)")
+
+            # Initialize virus counts for both players
+            self.mcp.write_nes_ram(0x0324, [virus_level])  # P1 virus count
+            self.mcp.write_nes_ram(0x03A4, [virus_level])  # P2 virus count
+            logger.info(f"  Set virus counts (P1=$0324, P2=$03A4 = {virus_level})")
+
+            # Wait a moment for game to process
+            time.sleep(0.5)
+
+            # Verify game mode changed
+            mode_result = self.mcp.read_nes_ram(0x46, 1)
+            final_mode = mode_result.get('values', [0])[0] if 'values' in mode_result else 0
+
+            logger.info(f"Final game mode: {final_mode}")
+
+            if final_mode >= 4:
+                logger.info("✓ Successfully injected gameplay state!")
+                return {"in_gameplay": True, "game_mode": final_mode}
+            else:
+                logger.warning("Game mode injection may not have taken effect")
+                return {"in_gameplay": False, "game_mode": final_mode}
+
+        except Exception as e:
+            logger.error(f"State injection error: {e}", exc_info=True)
+            return {"in_gameplay": False, "game_mode": 0, "error": str(e)}
 
     def _navigate_to_gameplay(self, max_attempts: int = 5) -> Dict[str, Any]:
         """
