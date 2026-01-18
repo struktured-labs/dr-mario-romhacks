@@ -4,19 +4,24 @@ Dr. Mario Reward Function
 Dense reward shaping for RL training.
 
 Reward Components:
-1. **Color matches (DENSE):**
+1. **Survival bonus (DENSE): +0.1 per frame alive**
+   - Encourages agent to stay alive and explore
+   - 10 frames = +1.0, 50 frames = +5.0, etc.
+
+2. **Color matches (DENSE):**
    - 2 consecutive same-color: +0.5 (setup potential)
    - 3 consecutive same-color: +2.0 (one away from clear)
    - 4+ consecutive same-color: +10.0 (actual clear)
    - Virus bonus: +3.0 extra if match contains virus
 
-2. Virus clearing: +20 per virus cleared (main goal)
-3. Height penalty: -0.5 per row from top
-4. Game over penalty: -100 (avoid topping out)
-5. Win bonus: +200 (all viruses cleared)
+3. Virus clearing: +20 per virus cleared (main goal)
+4. Height penalty: -0.5 per row from top
+5. Game over penalty: -100 (avoid topping out)
+6. Win bonus: +200 (all viruses cleared)
 
 Philosophy:
-- DENSE rewards from color matching (every step can earn reward)
+- SURVIVAL FIRST: Agent must learn to stay alive before anything else
+- DENSE rewards from survival + color matching (every step earns reward)
 - Favor virus-containing matches over pill-only matches
 - Encourage downstacking via height penalty
 - Heavy penalty for game over
@@ -51,6 +56,9 @@ class RewardCalculator:
         self.HEIGHT_PENALTY_PER_ROW = -0.5
         self.GAME_OVER_PENALTY = -100.0
         self.WIN_BONUS = 200.0
+
+        # Survival bonus (DENSE - rewards staying alive)
+        self.SURVIVAL_BONUS = 0.1  # +0.1 per frame alive
 
         # Curriculum learning: dampen match rewards as agent improves
         self.match_reward_scale = match_reward_scale
@@ -208,7 +216,10 @@ class RewardCalculator:
             self.prev_virus_count = virus_count
             self.prev_max_height = max_height
 
-        # 1. DENSE: Color matching rewards (every step)
+        # 1. DENSE: Survival bonus (every frame alive)
+        reward += self.SURVIVAL_BONUS
+
+        # 2. DENSE: Color matching rewards (every step)
         match_reward = self._calculate_match_rewards(playfield)
         reward += match_reward
         if match_reward > 0:
