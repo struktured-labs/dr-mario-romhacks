@@ -38,7 +38,7 @@ class DrMarioEnv(gym.Env):
         8: LEFT + A (move + rotate)
     """
 
-    metadata = {'render_modes': []}
+    metadata = {'render_modes': ['rgb_array']}
 
     # Action mapping to controller bytes
     ACTIONS = [
@@ -60,6 +60,8 @@ class DrMarioEnv(gym.Env):
         player_id: int = 2,
         max_episode_steps: int = 10000,
         frame_skip: int = 1,
+        opponent_policy: str = "random",
+        render_mode: Optional[str] = None,
     ):
         """
         Args:
@@ -68,6 +70,8 @@ class DrMarioEnv(gym.Env):
             player_id: Which player this agent controls (1 or 2)
             max_episode_steps: Maximum frames per episode
             frame_skip: Number of frames to repeat each action
+            opponent_policy: Opponent AI policy ("none", "random", or path to model)
+            render_mode: Render mode ('rgb_array' for video recording, None for no rendering)
         """
         super().__init__()
 
@@ -76,6 +80,8 @@ class DrMarioEnv(gym.Env):
         self.player_id = player_id
         self.max_episode_steps = max_episode_steps
         self.frame_skip = frame_skip
+        self.opponent_policy = opponent_policy
+        self.render_mode = render_mode
 
         # Initialize HTTP interface
         self.mesen = MesenInterface(host=mesen_host, port=mesen_port)
@@ -185,9 +191,20 @@ class DrMarioEnv(gym.Env):
 
         # Write controller input and step frames
         controller_addr = P2_CONTROLLER if self.player_id == 2 else P1_CONTROLLER
+        opponent_addr = P1_CONTROLLER if self.player_id == 2 else P2_CONTROLLER
 
         for _ in range(self.frame_skip):
+            # Write agent's action
             self.mesen.write_memory(controller_addr, [controller_input])
+
+            # Write opponent's action
+            if self.opponent_policy == "random":
+                opponent_action = np.random.randint(0, len(self.ACTIONS))
+                self.mesen.write_memory(opponent_addr, [self.ACTIONS[opponent_action]])
+            elif self.opponent_policy != "none":
+                # TODO: Load and run opponent model
+                pass
+
             self.mesen.step_frame()
 
         self.current_step += self.frame_skip
@@ -246,6 +263,86 @@ class DrMarioEnv(gym.Env):
         }
 
         return obs, reward, terminated, truncated, info
+
+    def render(self) -> Optional[np.ndarray]:
+        """
+        Render the environment as RGB array for video recording.
+
+        Returns:
+            RGB array of shape (height, width, 3) or None if render_mode is None
+        """
+        if self.render_mode != 'rgb_array':
+            return None
+
+        if not self.connected or self.prev_state is None:
+            # Return black screen if not connected
+            return np.zeros((480, 640, 3), dtype=np.uint8)
+
+        # Color mapping (RGB values)
+        COLORS = {
+            TILE_EMPTY: (0, 0, 0),           # Black
+            0xD0: (255, 255, 0),             # Yellow virus
+            0xD1: (255, 0, 0),               # Red virus
+            0xD2: (0, 0, 255),               # Blue virus
+            0x40: (255, 255, 128),           # Yellow capsule
+            0x50: (255, 128, 128),           # Red capsule
+            0x60: (128, 128, 255),           # Blue capsule
+        }
+
+        # Create image (640x480, standard VGA resolution)
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+
+        # Set background color
+        img[:, :] = (20, 20, 40)  # Dark blue background
+
+        # Tile size for rendering (each playfield cell)
+        tile_size = 20
+
+        # Render P2 playfield (left side)
+        p2_playfield = np.array(self.prev_state['playfield']).reshape(16, 8)
+        x_offset_p2 = 50
+        y_offset = 80
+
+        for row in range(16):
+            for col in range(8):
+                tile = p2_playfield[row, col]
+                color = COLORS.get(tile, (128, 128, 128))  # Gray for unknown tiles
+
+                x1 = x_offset_p2 + col * tile_size
+                y1 = y_offset + row * tile_size
+                x2 = x1 + tile_size - 2  # -2 for grid lines
+                y2 = y1 + tile_size - 2
+
+                img[y1:y2, x1:x2] = color
+
+        # Render P1 playfield (right side) if available
+        if 'p1_playfield' in self.prev_state:
+            p1_playfield = np.array(self.prev_state['p1_playfield']).reshape(16, 8)
+            x_offset_p1 = 350
+
+            for row in range(16):
+                for col in range(8):
+                    tile = p1_playfield[row, col]
+                    color = COLORS.get(tile, (128, 128, 128))
+
+                    x1 = x_offset_p1 + col * tile_size
+                    y1 = y_offset + row * tile_size
+                    x2 = x1 + tile_size - 2
+                    y2 = y1 + tile_size - 2
+
+                    img[y1:y2, x1:x2] = color
+
+        # Add text labels (simple, using numpy)
+        # P2 label (left)
+        img[50:70, 50:230] = (255, 255, 255)  # White bar
+        # P1 label (right)
+        img[50:70, 350:530] = (255, 255, 255)  # White bar
+
+        # Virus count text area
+        virus_count = self.prev_state.get('virus_count', 0)
+        img[420:450, 50:230] = (100, 100, 100)  # Gray bar for stats
+
+        return img
 
     def close(self):
         """Clean up environment"""

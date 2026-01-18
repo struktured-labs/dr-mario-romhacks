@@ -25,12 +25,13 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3.common.monitor import Monitor
+from gymnasium.wrappers import RecordVideo
 
 from drmario_env import DrMarioEnv
 from custom_cnn import DrMarioCNN
 
 
-def make_env():
+def make_env(record_video=False, video_folder="logs/videos"):
     """Create and wrap environment"""
     env = DrMarioEnv(
         mesen_host="localhost",
@@ -38,20 +39,34 @@ def make_env():
         player_id=2,
         max_episode_steps=10000,
         frame_skip=1,
+        opponent_policy="random",  # Random P1 opponent!
+        render_mode='rgb_array' if record_video else None,
     )
+
+    # Add video recording wrapper
+    if record_video:
+        env = RecordVideo(
+            env,
+            video_folder=video_folder,
+            episode_trigger=lambda ep: ep % 50 == 0,  # Record every 50th episode
+            name_prefix="drmario_training"
+        )
+
     return Monitor(env)
 
 
 def train(args):
     """Train PPO agent"""
     print("="*60)
-    print("Dr. Mario PPO Training")
+    print("Dr. Mario PPO Training (P2 vs Random P1)")
     print("="*60)
     print(f"Device: {args.device}")
     print(f"Total timesteps: {args.timesteps:,}")
     print(f"Learning rate: {args.learning_rate}")
     print(f"Batch size: {args.batch_size}")
     print(f"Save every: {args.save_freq:,} steps")
+    print(f"Opponent: Random P1 (competitive training!)")
+    print(f"Video recording: {'Enabled (every 50 eps)' if args.record_video else 'Disabled'}")
     print("="*60)
     print()
 
@@ -64,7 +79,13 @@ def train(args):
 
     # Create environment
     print("Creating environment...")
-    env = DummyVecEnv([make_env])
+    video_folder = Path("logs/videos")
+    video_folder.mkdir(parents=True, exist_ok=True)
+
+    env = DummyVecEnv([lambda: make_env(
+        record_video=args.record_video,
+        video_folder=str(video_folder)
+    )])
 
     # Check CUDA availability
     if args.device == "cuda" and not torch.cuda.is_available():
@@ -214,6 +235,11 @@ def main():
         type=str,
         default=None,
         help="Path to model checkpoint to resume from",
+    )
+    parser.add_argument(
+        "--record-video",
+        action="store_true",
+        help="Record gameplay videos (every 50 episodes)",
     )
 
     args = parser.parse_args()
