@@ -122,7 +122,7 @@ class MednafenManager:
 
             # Inject 2P gameplay state directly (skip navigation)
             logger.info("Injecting 2P gameplay state...")
-            nav_result = self._inject_gameplay_state(virus_level=10, speed=1)
+            nav_result = self._inject_gameplay_state(virus_level=5, speed=1)  # Level 5 for easier learning
 
             return {
                 "success": True,
