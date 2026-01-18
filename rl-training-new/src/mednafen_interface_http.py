@@ -150,12 +150,17 @@ class MednafenInterface:
             if 'error' in full_state:
                 raise RuntimeError(f"MCP game_state failed: {full_state['error']}")
 
-            # Extract P2 state (for compatibility with existing code)
+            # Extract both players' states
+            p1 = full_state.get('player1', {})
             p2 = full_state.get('player2', {})
 
-            # Get raw playfield bytes
-            playfield_raw = p2.get('playfield', {}).get('raw', '')
-            playfield_bytes = bytes.fromhex(playfield_raw) if playfield_raw else bytes([0xFF] * 128)
+            # Get P2 playfield (primary)
+            p2_playfield_raw = p2.get('playfield', {}).get('raw', '')
+            p2_playfield_bytes = bytes.fromhex(p2_playfield_raw) if p2_playfield_raw else bytes([0xFF] * 128)
+
+            # Get P1 playfield (for rendering)
+            p1_playfield_raw = p1.get('playfield', {}).get('raw', '')
+            p1_playfield_bytes = bytes.fromhex(p1_playfield_raw) if p1_playfield_raw else bytes([0xFF] * 128)
 
             return {
                 'mode': full_state.get('game_mode', 0),
@@ -164,7 +169,9 @@ class MednafenInterface:
                 'capsule_y': p2.get('y_pos', 0),
                 'left_color': p2.get('left_color', 0),
                 'right_color': p2.get('right_color', 0),
-                'playfield': list(playfield_bytes),
+                'playfield': list(p2_playfield_bytes),
+                'p1_playfield': list(p1_playfield_bytes),
+                'p1_virus_count': p1.get('virus_count', 0),
             }
 
         except requests.exceptions.RequestException as e:

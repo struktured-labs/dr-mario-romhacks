@@ -43,16 +43,20 @@ def make_env(record_video=False, video_folder="logs/videos"):
         render_mode='rgb_array' if record_video else None,
     )
 
-    # Add video recording wrapper
+    # Monitor BEFORE video recording (so Monitor doesn't interfere with render)
+    env = Monitor(env)
+
+    # Add video recording wrapper (must be AFTER Monitor)
     if record_video:
         env = RecordVideo(
             env,
             video_folder=video_folder,
             episode_trigger=lambda ep: ep % 50 == 0,  # Record every 50th episode
-            name_prefix="drmario_training"
+            name_prefix="drmario_training",
+            fps=60  # Dr. Mario runs at 60 FPS
         )
 
-    return Monitor(env)
+    return env
 
 
 def train(args):
