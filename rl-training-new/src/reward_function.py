@@ -33,23 +33,33 @@ from memory_map import (
 class RewardCalculator:
     """Calculate dense rewards for Dr. Mario RL training"""
 
-    def __init__(self):
+    def __init__(self, match_reward_scale: float = 1.0):
+        """
+        Args:
+            match_reward_scale: Damping factor for match rewards (0.0-1.0)
+                                Start at 1.0, decay to 0.1 as agent improves
+        """
         # Match rewards (DENSE - awarded every step)
-        self.MATCH_2_REWARD = 0.5      # 2 in a row
-        self.MATCH_3_REWARD = 2.0      # 3 in a row (one away!)
-        self.MATCH_4_REWARD = 10.0     # 4+ in a row (actual clear)
-        self.VIRUS_MATCH_BONUS = 3.0   # Extra if match contains virus
+        # Base values (scaled by match_reward_scale)
+        self.MATCH_2_BASE = 0.5      # 2 in a row
+        self.MATCH_3_BASE = 2.0      # 3 in a row (one away!)
+        self.MATCH_4_BASE = 10.0     # 4+ in a row (actual clear)
+        self.VIRUS_MATCH_BONUS_BASE = 3.0   # Extra if match contains virus
 
-        # Sparse rewards (only on state change)
+        # Sparse rewards (NEVER dampened - these are the real objectives)
         self.VIRUS_CLEAR_REWARD = 20.0
         self.HEIGHT_PENALTY_PER_ROW = -0.5
         self.GAME_OVER_PENALTY = -100.0
         self.WIN_BONUS = 200.0
 
+        # Curriculum learning: dampen match rewards as agent improves
+        self.match_reward_scale = match_reward_scale
+
         # State tracking
         self.prev_virus_count = None
         self.prev_max_height = None
         self.episode_reward = 0.0
+        self.total_viruses_cleared = 0  # Lifetime tracking for curriculum
 
     def reset(self):
         """Reset state tracking for new episode"""
@@ -152,19 +162,19 @@ class RewardCalculator:
         total_reward = 0.0
 
         for length, has_virus in matches:
-            # Base reward by length
+            # Base reward by length (scaled by curriculum factor)
             if length == 2:
-                reward = self.MATCH_2_REWARD
+                reward = self.MATCH_2_BASE * self.match_reward_scale
             elif length == 3:
-                reward = self.MATCH_3_REWARD
+                reward = self.MATCH_3_BASE * self.match_reward_scale
             elif length >= 4:
-                reward = self.MATCH_4_REWARD
+                reward = self.MATCH_4_BASE * self.match_reward_scale
             else:
                 continue  # Shouldn't happen
 
-            # Virus bonus
+            # Virus bonus (also scaled)
             if has_virus:
-                reward += self.VIRUS_MATCH_BONUS
+                reward += self.VIRUS_MATCH_BONUS_BASE * self.match_reward_scale
 
             total_reward += reward
 
@@ -204,12 +214,13 @@ class RewardCalculator:
         if match_reward > 0:
             print(f"  [REWARD] Color matches: +{match_reward:.2f}")
 
-        # 2. Virus clearing reward (sparse)
+        # 2. Virus clearing reward (sparse, NEVER dampened)
         viruses_cleared = self.prev_virus_count - virus_count
         if viruses_cleared > 0:
             clear_reward = self.VIRUS_CLEAR_REWARD * viruses_cleared
             reward += clear_reward
-            print(f"  [REWARD] Cleared {viruses_cleared} viruses: +{clear_reward}")
+            self.total_viruses_cleared += viruses_cleared
+            print(f"  [REWARD] Cleared {viruses_cleared} viruses: +{clear_reward} (lifetime: {self.total_viruses_cleared})")
 
         # 3. Height penalty (encourage low stacks)
         if max_height < 16:
@@ -237,6 +248,43 @@ class RewardCalculator:
     def get_episode_reward(self) -> float:
         """Get cumulative episode reward"""
         return self.episode_reward
+
+    def update_curriculum(self, viruses_cleared_milestone: int):
+        """
+        Update match reward scaling based on agent progress.
+
+        Curriculum schedule:
+        - 0-100 viruses: scale = 1.0 (full match rewards)
+        - 100-500 viruses: scale = 0.5 (half match rewards)
+        - 500+ viruses: scale = 0.1 (minimal match rewards)
+
+        Args:
+            viruses_cleared_milestone: Total viruses cleared (e.g., from checkpoints)
+        """
+        old_scale = self.match_reward_scale
+
+        if viruses_cleared_milestone < 100:
+            self.match_reward_scale = 1.0
+        elif viruses_cleared_milestone < 500:
+            # Linear decay from 1.0 to 0.5
+            progress = (viruses_cleared_milestone - 100) / 400
+            self.match_reward_scale = 1.0 - (0.5 * progress)
+        elif viruses_cleared_milestone < 1000:
+            # Linear decay from 0.5 to 0.1
+            progress = (viruses_cleared_milestone - 500) / 500
+            self.match_reward_scale = 0.5 - (0.4 * progress)
+        else:
+            self.match_reward_scale = 0.1  # Minimum
+
+        if abs(old_scale - self.match_reward_scale) > 0.01:
+            print(f"\n[CURRICULUM] Match reward scale: {old_scale:.2f} → {self.match_reward_scale:.2f} (viruses cleared: {viruses_cleared_milestone})\n")
+
+    def get_curriculum_info(self) -> dict:
+        """Get curriculum learning state"""
+        return {
+            'match_reward_scale': self.match_reward_scale,
+            'total_viruses_cleared': self.total_viruses_cleared,
+        }
 
 
 if __name__ == "__main__":
