@@ -1,36 +1,50 @@
 """
 Dr. Mario Reward Function
 
-Designed based on Python AI (oracle) insights from Phase 1.
+Dense reward shaping for RL training.
 
 Reward Components:
-1. Virus clearing: +10 per virus cleared (main goal)
-2. Height reduction: +5 for lowering max column height
-3. Height penalty: -0.1 per frame (encourage speed)
+1. **Color matches (DENSE):**
+   - 2 consecutive same-color: +0.5 (setup potential)
+   - 3 consecutive same-color: +2.0 (one away from clear)
+   - 4+ consecutive same-color: +10.0 (actual clear)
+   - Virus bonus: +3.0 extra if match contains virus
+
+2. Virus clearing: +20 per virus cleared (main goal)
+3. Height penalty: -0.5 per row from top
 4. Game over penalty: -100 (avoid topping out)
 5. Win bonus: +200 (all viruses cleared)
 
 Philosophy:
-- Reward immediate virus clears (sparse but high value)
-- Encourage downstacking (height management)
-- Penalize time (encourage efficiency)
-- Heavy penalty for game over (survival is critical)
+- DENSE rewards from color matching (every step can earn reward)
+- Favor virus-containing matches over pill-only matches
+- Encourage downstacking via height penalty
+- Heavy penalty for game over
 """
 
-from typing import Dict, Any
+import numpy as np
+from typing import List, Tuple
+from memory_map import (
+    get_tile_color, is_virus, is_empty,
+    PLAYFIELD_WIDTH, PLAYFIELD_HEIGHT
+)
 
 
 class RewardCalculator:
-    """Calculate reward for Dr. Mario RL training"""
+    """Calculate dense rewards for Dr. Mario RL training"""
 
     def __init__(self):
-        # Reward weights
-        self.VIRUS_CLEAR_REWARD = 10.0
-        self.HEIGHT_REDUCTION_REWARD = 5.0
-        self.TIME_PENALTY = -0.1
+        # Match rewards (DENSE - awarded every step)
+        self.MATCH_2_REWARD = 0.5      # 2 in a row
+        self.MATCH_3_REWARD = 2.0      # 3 in a row (one away!)
+        self.MATCH_4_REWARD = 10.0     # 4+ in a row (actual clear)
+        self.VIRUS_MATCH_BONUS = 3.0   # Extra if match contains virus
+
+        # Sparse rewards (only on state change)
+        self.VIRUS_CLEAR_REWARD = 20.0
+        self.HEIGHT_PENALTY_PER_ROW = -0.5
         self.GAME_OVER_PENALTY = -100.0
         self.WIN_BONUS = 200.0
-        self.HEIGHT_PENALTY_PER_ROW = -0.5
 
         # State tracking
         self.prev_virus_count = None
@@ -43,10 +57,124 @@ class RewardCalculator:
         self.prev_max_height = None
         self.episode_reward = 0.0
 
+    def _find_consecutive_matches(
+        self,
+        playfield: np.ndarray
+    ) -> List[Tuple[int, bool]]:
+        """
+        Find all consecutive same-color sequences in playfield.
+
+        Args:
+            playfield: 16x8 numpy array of tile values
+
+        Returns:
+            List of (length, has_virus) tuples for each match found
+        """
+        matches = []
+
+        # Horizontal matches (row-wise)
+        for row in range(PLAYFIELD_HEIGHT):
+            col = 0
+            while col < PLAYFIELD_WIDTH:
+                tile = playfield[row, col]
+                color = get_tile_color(tile)
+
+                if color == -1:  # Empty or unknown
+                    col += 1
+                    continue
+
+                # Count consecutive same color
+                length = 1
+                has_virus = is_virus(tile)
+
+                for next_col in range(col + 1, PLAYFIELD_WIDTH):
+                    next_tile = playfield[row, next_col]
+                    next_color = get_tile_color(next_tile)
+
+                    if next_color != color:
+                        break
+
+                    length += 1
+                    if is_virus(next_tile):
+                        has_virus = True
+
+                # Record match if 2+
+                if length >= 2:
+                    matches.append((length, has_virus))
+
+                col += length
+
+        # Vertical matches (column-wise)
+        for col in range(PLAYFIELD_WIDTH):
+            row = 0
+            while row < PLAYFIELD_HEIGHT:
+                tile = playfield[row, col]
+                color = get_tile_color(tile)
+
+                if color == -1:  # Empty or unknown
+                    row += 1
+                    continue
+
+                # Count consecutive same color
+                length = 1
+                has_virus = is_virus(tile)
+
+                for next_row in range(row + 1, PLAYFIELD_HEIGHT):
+                    next_tile = playfield[next_row, col]
+                    next_color = get_tile_color(next_tile)
+
+                    if next_color != color:
+                        break
+
+                    length += 1
+                    if is_virus(next_tile):
+                        has_virus = True
+
+                # Record match if 2+
+                if length >= 2:
+                    matches.append((length, has_virus))
+
+                row += length
+
+        return matches
+
+    def _calculate_match_rewards(self, playfield: np.ndarray) -> float:
+        """
+        Calculate dense rewards from color matching.
+
+        Args:
+            playfield: 16x8 numpy array of tile values
+
+        Returns:
+            Total match reward for this state
+        """
+        matches = self._find_consecutive_matches(playfield)
+        total_reward = 0.0
+
+        for length, has_virus in matches:
+            # Base reward by length
+            if length == 2:
+                reward = self.MATCH_2_REWARD
+            elif length == 3:
+                reward = self.MATCH_3_REWARD
+            elif length >= 4:
+                reward = self.MATCH_4_REWARD
+            else:
+                continue  # Shouldn't happen
+
+            # Virus bonus
+            if has_virus:
+                reward += self.VIRUS_MATCH_BONUS
+
+            total_reward += reward
+
+        return total_reward
+
     def calculate(
         self,
+        playfield: np.ndarray,
         virus_count: int,
-        max_height: int,  # Lowest occupied row (0 = top)
+        max_height: int,
         game_over: bool,
         all_viruses_cleared: bool,
     ) -> float:
@@ -54,6 +182,7 @@ class RewardCalculator:
         Calculate reward for current step
 
         Args:
+            playfield: 16x8 numpy array of tile values
             virus_count: Current virus count
             max_height: Tallest column (lowest row number, 0=top)
             game_over: True if game ended (topped out)
@@ -69,35 +198,31 @@ class RewardCalculator:
             self.prev_virus_count = virus_count
             self.prev_max_height = max_height
 
-        # 1. Virus clearing reward (main objective)
+        # 1. DENSE: Color matching rewards (every step)
+        match_reward = self._calculate_match_rewards(playfield)
+        reward += match_reward
+        if match_reward > 0:
+            print(f"  [REWARD] Color matches: +{match_reward:.2f}")
+
+        # 2. Virus clearing reward (sparse)
         viruses_cleared = self.prev_virus_count - virus_count
         if viruses_cleared > 0:
-            reward += self.VIRUS_CLEAR_REWARD * viruses_cleared
-            print(f"  [REWARD] Cleared {viruses_cleared} viruses: +{self.VIRUS_CLEAR_REWARD * viruses_cleared}")
-
-        # 2. Height management reward
-        height_reduced = self.prev_max_height - max_height
-        if height_reduced > 0:
-            reward += self.HEIGHT_REDUCTION_REWARD * height_reduced
-            # print(f"  [REWARD] Height reduced: +{self.HEIGHT_REDUCTION_REWARD * height_reduced}")
+            clear_reward = self.VIRUS_CLEAR_REWARD * viruses_cleared
+            reward += clear_reward
+            print(f"  [REWARD] Cleared {viruses_cleared} viruses: +{clear_reward}")
 
         # 3. Height penalty (encourage low stacks)
-        # Penalize based on how high the stack is
-        if max_height < 16:  # Only if column has tiles
+        if max_height < 16:
             rows_from_top = max_height
             height_penalty = self.HEIGHT_PENALTY_PER_ROW * rows_from_top
             reward += height_penalty
-            # print(f"  [REWARD] Height penalty (row {max_height}): {height_penalty:.2f}")
 
-        # 4. Time penalty (encourage speed)
-        reward += self.TIME_PENALTY
-
-        # 5. Game over penalty
+        # 4. Game over penalty
         if game_over:
             reward += self.GAME_OVER_PENALTY
             print(f"  [REWARD] Game over: {self.GAME_OVER_PENALTY}")
 
-        # 6. Win bonus
+        # 5. Win bonus
         if all_viruses_cleared:
             reward += self.WIN_BONUS
             print(f"  [REWARD] All viruses cleared! Bonus: +{self.WIN_BONUS}")
@@ -114,96 +239,35 @@ class RewardCalculator:
         return self.episode_reward
 
 
-def calculate_reward(
-    prev_state: Dict[str, Any],
-    current_state: Dict[str, Any],
-    done: bool,
-    info: Dict[str, Any]
-) -> float:
-    """
-    Legacy interface for compatibility
-
-    Args:
-        prev_state: Previous game state
-        current_state: Current game state
-        done: Episode ended
-        info: Additional info
-
-    Returns:
-        Reward value
-    """
-    # Extract relevant features
-    prev_virus_count = prev_state.get('virus_count', 0)
-    curr_virus_count = current_state.get('virus_count', 0)
-
-    prev_max_height = prev_state.get('max_height', 16)
-    curr_max_height = current_state.get('max_height', 16)
-
-    game_over = info.get('game_over', False)
-    all_cleared = curr_virus_count == 0
-
-    # Calculate reward components
-    reward = 0.0
-
-    # Virus clearing
-    viruses_cleared = prev_virus_count - curr_virus_count
-    if viruses_cleared > 0:
-        reward += 10.0 * viruses_cleared
-
-    # Height reduction
-    height_reduced = prev_max_height - curr_max_height
-    if height_reduced > 0:
-        reward += 5.0 * height_reduced
-
-    # Height penalty
-    if curr_max_height < 16:
-        reward -= 0.5 * curr_max_height
-
-    # Time penalty
-    reward -= 0.1
-
-    # Game over
-    if game_over:
-        reward -= 100.0
-
-    # Win
-    if all_cleared:
-        reward += 200.0
-
-    return reward
-
-
 if __name__ == "__main__":
     # Test reward function
-    print("Testing reward function...")
+    print("Testing dense reward function...")
+    import numpy as np
 
     calc = RewardCalculator()
     calc.reset()
 
-    # Scenario 1: Clear 2 viruses
-    print("\nScenario 1: Clear 2 viruses")
-    r1 = calc.calculate(virus_count=18, max_height=14, game_over=False, all_viruses_cleared=False)
-    r2 = calc.calculate(virus_count=16, max_height=14, game_over=False, all_viruses_cleared=False)
-    print(f"Reward: {r2:.2f}")
+    # Create test playfield with some matches
+    playfield = np.full((16, 8), 0xFF, dtype=np.uint8)  # Empty
 
-    # Scenario 2: Reduce height
-    print("\nScenario 2: Reduce max height by 2")
-    calc.reset()
-    r1 = calc.calculate(virus_count=10, max_height=10, game_over=False, all_viruses_cleared=False)
-    r2 = calc.calculate(virus_count=10, max_height=8, game_over=False, all_viruses_cleared=False)
-    print(f"Reward: {r2:.2f}")
+    # Add virus match (3 red viruses in a row)
+    playfield[10, 0] = 0xD1  # Red virus
+    playfield[10, 1] = 0xD1  # Red virus
+    playfield[10, 2] = 0xD1  # Red virus
 
-    # Scenario 3: Game over
-    print("\nScenario 3: Game over")
-    calc.reset()
-    r = calc.calculate(virus_count=5, max_height=0, game_over=True, all_viruses_cleared=False)
-    print(f"Reward: {r:.2f}")
+    # Add pill match (2 blue pills vertical)
+    playfield[12, 5] = 0x68  # Blue pill
+    playfield[13, 5] = 0x68  # Blue pill
 
-    # Scenario 4: Win
-    print("\nScenario 4: Clear last virus and win")
-    calc.reset()
-    r1 = calc.calculate(virus_count=1, max_height=12, game_over=False, all_viruses_cleared=False)
-    r2 = calc.calculate(virus_count=0, max_height=12, game_over=False, all_viruses_cleared=True)
-    print(f"Reward: {r2:.2f}")
+    print("\nScenario 1: 3 virus match + 2 pill match")
+    r = calc.calculate(
+        playfield=playfield,
+        virus_count=10,
+        max_height=10,
+        game_over=False,
+        all_viruses_cleared=False
+    )
+    print(f"Total reward: {r:.2f}")
+    print(f"Expected: ~{calc.MATCH_3_REWARD + calc.VIRUS_MATCH_BONUS + calc.MATCH_2_REWARD:.2f}")
 
-    print("\nReward function ready!")
+    print("\nDense reward function ready!")

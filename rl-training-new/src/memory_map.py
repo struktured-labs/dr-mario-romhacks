@@ -137,13 +137,26 @@ def is_empty(tile_value: int) -> bool:
 
 
 def get_tile_color(tile_value: int) -> int:
-    """Extract color from tile value (0=Yellow, 1=Red, 2=Blue)"""
-    if is_virus(tile_value):
+    """
+    Extract color from tile value (0=Yellow, 1=Red, 2=Blue)
+
+    Returns -1 for empty tiles or unknown values.
+    """
+    if is_empty(tile_value):
+        return -1
+    elif is_virus(tile_value):
         return tile_value - TILE_VIRUS_YELLOW
     elif is_pellet(tile_value):
         return tile_value - TILE_PELLET_YELLOW
-    # Pill pieces have complex encoding, needs lookup table
-    # For now, return -1 for unknown
+    elif is_pill(tile_value):
+        # Pills encoded in ranges: 0x40-0x5B (yellow), 0x5C-0x67 (red), 0x68-0x72 (blue)
+        # Approximation based on observed ranges
+        if tile_value < 0x5C:
+            return COLOR_YELLOW
+        elif tile_value < 0x68:
+            return COLOR_RED
+        else:
+            return COLOR_BLUE
     return -1
 
 

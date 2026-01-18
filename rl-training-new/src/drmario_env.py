@@ -213,15 +213,16 @@ class DrMarioEnv(gym.Env):
         state = self.mesen.get_game_state()
 
         # Calculate max height (lowest occupied row)
-        playfield = np.array(state['playfield']).reshape(16, 8)
+        playfield = np.array(state['playfield'], dtype=np.uint8).reshape(16, 8)
         max_height = 16  # Start at bottom
         for row in range(16):
             if np.any(playfield[row, :] != TILE_EMPTY):
                 max_height = row
                 break
 
-        # Calculate reward
+        # Calculate reward (now with dense color matching!)
         reward = self.reward_calc.calculate(
+            playfield=playfield,
             virus_count=state['virus_count'],
             max_height=max_height,
             game_over=False,  # TODO: Detect game over
