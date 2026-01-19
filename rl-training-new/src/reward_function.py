@@ -53,8 +53,8 @@ class RewardCalculator:
 
         # Sparse rewards (NEVER dampened - these are the real objectives)
         self.VIRUS_CLEAR_REWARD = 20.0
-        self.HEIGHT_PENALTY_PER_ROW = -0.5
-        self.GAME_OVER_PENALTY = -100.0
+        self.HEIGHT_PENALTY_PER_ROW = -0.05  # Reduced from -0.5 (was too aggressive)
+        self.GAME_OVER_PENALTY = -10.0  # Reduced from -100 to allow learning gradient
         self.WIN_BONUS = 200.0
 
         # Survival bonus (DENSE - rewards staying alive)
