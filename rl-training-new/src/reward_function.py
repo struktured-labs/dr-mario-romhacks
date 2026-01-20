@@ -66,6 +66,7 @@ class RewardCalculator:
         # State tracking
         self.prev_virus_count = None
         self.prev_max_height = None
+        self.prev_matches = []  # Track previous matches for delta calculation
         self.episode_reward = 0.0
         self.total_viruses_cleared = 0  # Lifetime tracking for curriculum
 
@@ -73,6 +74,7 @@ class RewardCalculator:
         """Reset state tracking for new episode"""
         self.prev_virus_count = None
         self.prev_max_height = None
+        self.prev_matches = []
         self.episode_reward = 0.0
 
     def _find_consecutive_matches(
@@ -156,37 +158,57 @@ class RewardCalculator:
 
         return matches
 
-    def _calculate_match_rewards(self, playfield: np.ndarray) -> float:
+    def _calculate_match_score(self, matches: List[Tuple[int, bool]]) -> float:
         """
-        Calculate dense rewards from color matching.
+        Calculate total match score from a list of matches.
 
         Args:
-            playfield: 16x8 numpy array of tile values
+            matches: List of (length, has_virus) tuples
 
         Returns:
-            Total match reward for this state
+            Total score for all matches
         """
-        matches = self._find_consecutive_matches(playfield)
-        total_reward = 0.0
+        total_score = 0.0
 
         for length, has_virus in matches:
             # Base reward by length (scaled by curriculum factor)
             if length == 2:
-                reward = self.MATCH_2_BASE * self.match_reward_scale
+                score = self.MATCH_2_BASE * self.match_reward_scale
             elif length == 3:
-                reward = self.MATCH_3_BASE * self.match_reward_scale
+                score = self.MATCH_3_BASE * self.match_reward_scale
             elif length >= 4:
-                reward = self.MATCH_4_BASE * self.match_reward_scale
+                score = self.MATCH_4_BASE * self.match_reward_scale
             else:
                 continue  # Shouldn't happen
 
             # Virus bonus (also scaled)
             if has_virus:
-                reward += self.VIRUS_MATCH_BONUS_BASE * self.match_reward_scale
+                score += self.VIRUS_MATCH_BONUS_BASE * self.match_reward_scale
 
-            total_reward += reward
+            total_score += score
 
-        return total_reward
+        return total_score
+
+    def _calculate_match_delta_reward(self, current_matches: List[Tuple[int, bool]]) -> float:
+        """
+        Calculate reward DELTA from match changes.
+
+        Only reward NEW or IMPROVED matches created by agent's action.
+        Existing matches from previous state don't give reward.
+
+        Args:
+            current_matches: List of (length, has_virus) tuples for current state
+
+        Returns:
+            Reward delta (positive if matches improved, 0 or negative otherwise)
+        """
+        current_score = self._calculate_match_score(current_matches)
+        prev_score = self._calculate_match_score(self.prev_matches)
+
+        # Reward delta: positive if matches improved, negative if worsened
+        delta = current_score - prev_score
+
+        return delta
 
     def calculate(
         self,
@@ -219,11 +241,15 @@ class RewardCalculator:
         # 1. DENSE: Survival bonus (every frame alive)
         reward += self.SURVIVAL_BONUS
 
-        # 2. DENSE: Color matching rewards (every step)
-        match_reward = self._calculate_match_rewards(playfield)
+        # 2. DENSE: Color matching rewards (DELTA - only NEW matches!)
+        current_matches = self._find_consecutive_matches(playfield)
+        match_reward = self._calculate_match_delta_reward(current_matches)
         reward += match_reward
         if match_reward > 0:
-            print(f"  [REWARD] Color matches: +{match_reward:.2f}")
+            print(f"  [REWARD] NEW color matches: +{match_reward:.2f}")
+
+        # Update match tracking
+        self.prev_matches = current_matches
 
         # 2. Virus clearing reward (sparse, NEVER dampened)
         viruses_cleared = self.prev_virus_count - virus_count

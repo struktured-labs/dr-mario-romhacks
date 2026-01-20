@@ -120,9 +120,9 @@ class MednafenManager:
             else:
                 logger.warning("NES RAM not discovered yet (may need gameplay state)")
 
-            # Inject 2P gameplay state directly (skip navigation)
-            logger.info("Injecting 2P gameplay state...")
-            nav_result = self._inject_gameplay_state(virus_level=5, speed=1)  # Level 5 for easier learning
+            # Navigate to 2P gameplay using keyboard inputs
+            logger.info("Navigating to 2P gameplay...")
+            nav_result = self._navigate_to_gameplay_keyboard(virus_level=5, speed=1)
 
             return {
                 "success": True,
@@ -139,6 +139,129 @@ class MednafenManager:
             return {
                 "success": False,
                 "error": str(e)
+            }
+
+    def _navigate_to_gameplay_keyboard(self, virus_level: int = 5, speed: int = 1) -> Dict[str, Any]:
+        """
+        Navigate to 2P gameplay using keyboard inputs (xdotool).
+
+        This sends actual input events to Mednafen, allowing proper menu navigation
+        and game initialization with real viruses.
+
+        Args:
+            virus_level: Virus level (0-20)
+            speed: Game speed (0=LOW, 1=MED, 2=HI)
+
+        Returns:
+            Status dict
+        """
+        import subprocess
+
+        logger.info("Starting keyboard-based navigation...")
+
+        # Wait for Mednafen window to be ready
+        time.sleep(2)
+
+        # Find Mednafen window ID
+        try:
+            result = subprocess.run(
+                ["xdotool", "search", "--name", "Mednafen"],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if result.returncode != 0 or not result.stdout.strip():
+                logger.warning("Could not find Mednafen window, navigation may fail")
+                window_id = None
+            else:
+                window_id = result.stdout.strip().split('\n')[0]
+                logger.info(f"Found Mednafen window: {window_id}")
+
+                # Focus the window
+                subprocess.run(["xdotool", "windowactivate", window_id], timeout=2)
+                time.sleep(0.5)
+        except Exception as e:
+            logger.warning(f"xdotool setup failed: {e}")
+            window_id = None
+
+        def send_key(key: str, hold_ms: int = 50):
+            """Send a key press to Mednafen"""
+            if window_id:
+                subprocess.run(["xdotool", "key", "--window", window_id, key], timeout=1)
+            else:
+                subprocess.run(["xdotool", "key", key], timeout=1)
+            time.sleep(hold_ms / 1000.0)
+
+        def send_keys_with_delay(keys: list, delay_ms: int = 200):
+            """Send multiple keys with delay between"""
+            for key in keys:
+                send_key(key)
+                time.sleep(delay_ms / 1000.0)
+
+        try:
+            # Navigation sequence for Dr. Mario 2P start:
+            # 1. From title screen: Press START (Return/Enter)
+            logger.info("  Step 1: Press START at title screen")
+            send_key("Return")
+            time.sleep(1.0)
+
+            # 2. Select 2-PLAYER mode (press SELECT once, then START)
+            # SELECT cycles: 1 PLAYER → 2 PLAYER → VS CPU → 1 PLAYER...
+            logger.info("  Step 2: Select 2-PLAYER mode (SELECT once)")
+            send_key("Tab")  # Tab = SELECT in Mednafen
+            time.sleep(0.3)
+            send_key("Return")  # START to confirm
+            time.sleep(1.0)
+
+            # 3. Select virus level (starts at 0, press RIGHT to increase)
+            logger.info(f"  Step 3: Select virus level {virus_level} (RIGHT {virus_level} times)")
+            for _ in range(virus_level):
+                send_key("Right")
+                time.sleep(0.1)
+
+            # 4. Move to speed selection (press DOWN once)
+            logger.info("  Step 4: Move to speed selection (DOWN once)")
+            send_key("Down")
+            time.sleep(0.2)
+
+            # 5. Select speed (starts at LOW, press RIGHT to increase)
+            # 0=LOW (default), 1=MED (1 right), 2=HI (2 rights)
+            logger.info(f"  Step 5: Select speed {['LOW', 'MED', 'HI'][speed]} (RIGHT {speed} times)")
+            for _ in range(speed):
+                send_key("Right")
+                time.sleep(0.1)
+
+            # 6. Confirm and start game
+            logger.info("  Step 6: Starting game (START)...")
+            send_key("Return")
+            time.sleep(2.0)  # Wait for game to start and viruses to generate
+
+            # Verify we're in gameplay
+            mode_data = self.mcp.read_nes_ram(0x0046, 1)
+            game_mode = mode_data[0] if mode_data else 0
+
+            virus_data = self.mcp.read_nes_ram(0x03A4, 1)
+            virus_count = virus_data[0] if virus_data else 0
+
+            in_gameplay = game_mode >= 4
+
+            logger.info(f"  Navigation complete: mode={game_mode}, viruses={virus_count}, in_gameplay={in_gameplay}")
+
+            return {
+                "success": in_gameplay,
+                "game_mode": game_mode,
+                "virus_count": virus_count,
+                "in_gameplay": in_gameplay
+            }
+
+        except Exception as e:
+            logger.error(f"Navigation failed: {e}", exc_info=True)
+            return {
+                "success": False,
+                "error": str(e),
+                "game_mode": 0,
+                "in_gameplay": False
             }
 
     def _inject_gameplay_state(self, virus_level: int = 10, speed: int = 1) -> Dict[str, Any]:
@@ -162,8 +285,8 @@ class MednafenManager:
 
         try:
             # Set player mode to 2P
-            self.mcp.write_nes_ram(0x0727, [0x01])  # 2P mode
-            logger.info("  Set player mode to 2P ($0727 = 1)")
+            self.mcp.write_nes_ram(0x0727, [0x02])  # 2P mode (was 0x01 = 1P!)
+            logger.info("  Set player mode to 2P ($0727 = 2)")
 
             # Set virus level
             self.mcp.write_nes_ram(0x0044, [virus_level])
