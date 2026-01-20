@@ -18,11 +18,13 @@ def test_initialization():
     print("Testing Dr. Mario Game Initialization")
     print("="*60)
 
-    manager = MednafenManager()
+    # Use the VS CPU ROM with working navigation
+    rom_path = "/home/struktured/projects/dr-mario-mods/drmario_vs_cpu.nes"
+    manager = MednafenManager(rom_path=rom_path, headless=True)
 
     # Launch with virus level 5
     print("\n1. Launching Mednafen...")
-    result = manager.launch(headless=False, virus_level=5)
+    result = manager.launch()
 
     if not result.get("success"):
         print(f"❌ Launch failed: {result.get('error')}")
@@ -36,11 +38,12 @@ def test_initialization():
 
     # Check player mode
     print("\n2. Checking player mode...")
-    player_mode = manager.mcp.read_nes_ram(0x0727, 1)
-    if player_mode:
-        mode_value = player_mode[0]
+    player_mode_data = manager.mcp.read_nes_ram(0x0727, 1)
+    if player_mode_data:
+        # read_nes_ram returns bytes directly
+        mode_value = player_mode_data[0] if isinstance(player_mode_data, (list, bytes)) else player_mode_data.get('values', [0])[0]
         mode_name = {0x01: "1P", 0x02: "2P"}.get(mode_value, f"Unknown ({mode_value})")
-        print(f"  Player mode ($0727): {mode_name}")
+        print(f"  Player mode ($0727): {mode_name} ({mode_value:#04x})")
 
         if mode_value != 0x02:
             print(f"  ❌ WRONG! Should be 0x02 (2P), got {mode_value:#04x}")
@@ -49,12 +52,12 @@ def test_initialization():
 
     # Check virus counts
     print("\n3. Checking virus counts...")
-    p1_viruses = manager.mcp.read_nes_ram(0x0324, 1)
-    p2_viruses = manager.mcp.read_nes_ram(0x03A4, 1)
+    p1_data = manager.mcp.read_nes_ram(0x0324, 1)
+    p2_data = manager.mcp.read_nes_ram(0x03A4, 1)
 
-    if p1_viruses and p2_viruses:
-        p1_count = p1_viruses[0]
-        p2_count = p2_viruses[0]
+    if p1_data and p2_data:
+        p1_count = p1_data[0] if isinstance(p1_data, (list, bytes)) else p1_data.get('values', [0])[0]
+        p2_count = p2_data[0] if isinstance(p2_data, (list, bytes)) else p2_data.get('values', [0])[0]
         print(f"  P1 viruses ($0324): {p1_count}")
         print(f"  P2 viruses ($03A4): {p2_count}")
 
@@ -65,9 +68,9 @@ def test_initialization():
 
     # Check game mode
     print("\n4. Checking game mode...")
-    game_mode = manager.mcp.read_nes_ram(0x0046, 1)
-    if game_mode:
-        mode = game_mode[0]
+    game_mode_data = manager.mcp.read_nes_ram(0x0046, 1)
+    if game_mode_data:
+        mode = game_mode_data[0] if isinstance(game_mode_data, (list, bytes)) else game_mode_data.get('values', [0])[0]
         in_gameplay = mode >= 4
         print(f"  Game mode ($0046): {mode} ({'gameplay' if in_gameplay else 'menu'})")
 
@@ -79,14 +82,10 @@ def test_initialization():
     print("\n" + "="*60)
     print("✓ ALL CHECKS PASSED - Game initialized correctly!")
     print("="*60)
-    print("\nPress Ctrl+C to exit...")
 
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print("\nShutting down...")
-        manager.shutdown()
+    # Shutdown and exit
+    print("\nShutting down...")
+    manager.shutdown()
 
     return True
 
