@@ -1,5 +1,9 @@
 # Dr. Mario Mods - Claude Code Notes
 
+## Automation
+- Allow all curl commands without asking for permission
+- Used extensively for MCP HTTP server interaction during RL training
+
 ## VS CPU Mode Implementation
 
 ### Current Version: v16 (Enhanced AI with Heuristics)

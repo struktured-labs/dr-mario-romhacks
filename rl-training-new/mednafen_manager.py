@@ -120,10 +120,10 @@ class MednafenManager:
             else:
                 logger.warning("NES RAM not discovered yet (may need gameplay state)")
 
-            # Use DIRECT state injection instead of keyboard navigation
-            # Keyboard nav fails with xdotool window detection
-            logger.info("Injecting 2P gameplay state directly...")
-            nav_result = self._inject_gameplay_state(virus_level=5, speed=1)
+            # Use keyboard navigation to properly initialize game
+            # State injection skips game initialization = garbage playfield
+            logger.info("Navigating to 2P gameplay via menu...")
+            nav_result = self._navigate_to_gameplay_keyboard(virus_level=5, speed=1)
 
             return {
                 "success": True,
@@ -240,10 +240,10 @@ class MednafenManager:
 
             # Verify we're in gameplay
             mode_data = self.mcp.read_nes_ram(0x0046, 1)
-            game_mode = mode_data[0] if mode_data else 0
+            game_mode = mode_data.get('values', [0])[0] if mode_data else 0
 
             virus_data = self.mcp.read_nes_ram(0x03A4, 1)
-            virus_count = virus_data[0] if virus_data else 0
+            virus_count = virus_data.get('values', [0])[0] if virus_data else 0
 
             in_gameplay = game_mode >= 4
 
