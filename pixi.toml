@@ -1,0 +1,12 @@
+[workspace]
+authors = ["Carmelo Piccione <struktured@strukturedlabs.com>"]
+channels = ["conda-forge"]
+name = "projects"
+platforms = ["linux-64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+dotnet-runtime = "8.*"
+python = ">=3.14.2,<3.15"

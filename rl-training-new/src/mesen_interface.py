@@ -28,7 +28,7 @@ from typing import List, Optional, Dict, Any
 class MesenInterface:
     """Interface to Mesen emulator via Lua bridge"""
 
-    def __init__(self, host: str = "localhost", port: int = 8765):
+    def __init__(self, host: str = "localhost", port: int = 8766):  # Changed from 8765
         self.host = host
         self.port = port
         self.socket: Optional[socket.socket] = None

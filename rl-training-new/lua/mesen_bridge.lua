@@ -10,10 +10,10 @@
 --   QUIT                      - Close connection
 
 local socket = require("socket")
-local server = assert(socket.bind("*", 8765))
+local server = assert(socket.bind("*", 8766))  -- Changed from 8765 to avoid OBS MCP conflict
 server:settimeout(0.001)  -- Non-blocking with small timeout
 
-print("Mesen Bridge Server started on port 8765")
+print("Mesen Bridge Server started on port 8766")
 print("Waiting for connections...")
 
 local client = nil
