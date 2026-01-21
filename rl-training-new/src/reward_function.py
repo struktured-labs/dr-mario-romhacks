@@ -233,23 +233,29 @@ class RewardCalculator:
         """
         reward = 0.0
 
-        # Initialize tracking on first call
-        if self.prev_virus_count is None:
+        # Initialize tracking on first call (episode start)
+        first_call = (self.prev_virus_count is None)
+        if first_call:
             self.prev_virus_count = virus_count
             self.prev_max_height = max_height
+            # CRITICAL: Initialize prev_matches WITHOUT giving reward
+            # Otherwise first step gets rewarded for initial board state!
+            current_matches = self._find_consecutive_matches(playfield)
+            self.prev_matches = current_matches
 
         # 1. DENSE: Survival bonus (every frame alive)
         reward += self.SURVIVAL_BONUS
 
         # 2. DENSE: Color matching rewards (DELTA - only NEW matches!)
-        current_matches = self._find_consecutive_matches(playfield)
-        match_reward = self._calculate_match_delta_reward(current_matches)
-        reward += match_reward
-        if match_reward > 0:
-            print(f"  [REWARD] NEW color matches: +{match_reward:.2f}")
-
-        # Update match tracking
-        self.prev_matches = current_matches
+        # Skip on first call to avoid rewarding initial board state
+        if not first_call:
+            current_matches = self._find_consecutive_matches(playfield)
+            match_reward = self._calculate_match_delta_reward(current_matches)
+            reward += match_reward
+            if match_reward > 0:
+                print(f"  [REWARD] NEW color matches: +{match_reward:.2f}")
+            # Update match tracking
+            self.prev_matches = current_matches
 
         # 2. Virus clearing reward (sparse, NEVER dampened)
         viruses_cleared = self.prev_virus_count - virus_count
