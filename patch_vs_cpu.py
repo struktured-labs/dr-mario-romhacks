@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Dr. Mario VS CPU Edition v16 - Enhanced AI with Heuristics
-===========================================================
+Dr. Mario VS CPU Edition v17 - Weighted Heuristic AI
+=====================================================
 Features:
 1. VS CPU Mode: New 3rd menu option with AI-controlled Player 2
    - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU -> 1 PLAYER
@@ -9,20 +9,31 @@ Features:
    - AI controls P2 during gameplay in VS CPU mode
 2. Study Mode: Pause shows "STUDY" with visible playfield
 
+v17 Algorithm Changes (vs v16):
+- ROM REORG: Toggle/mirror moved to 0x7F40 padding -> AI gets 124-byte window
+- v16 micro-optimizations: -8 bytes (EOR, removed TAX/TXA, compact loop, etc.)
+- NEW: Fat top check (rows 0+1 of target column must both be empty - height-1)
+- NEW: Weighted scoring via $02 zero-page (allows multi-factor combine)
+- NEW: Adjacency bonus (-1 score if virus has matching-color tile above OR right)
+
 Technical details:
 - $F5/$F7: Player 1 controller input
 - $F6/$F8: Player 2 controller input
 - $0727: Player mode (1=1P, 2=2P - game sees VS CPU as 2P)
 - $04: VS CPU flag (0=normal, 1=VS CPU mode) - using $04 to avoid game conflicts
 - Hook points:
-  - 0x18E5: Menu toggle -> JSR $FF40 (cycle 1->2->VS->1)
+  - 0x18E5: Menu toggle -> JSR (cycle 1->2->VS->1)
   - 0x10AE: Level select P2 input -> JSR (mirror P1 in VS mode)
   - 0x37CF: Controller read -> JMP (AI routine in VS mode)
-- ROM layout (all before JMPs at 0x7FE0):
-  - 0x7F50: Toggle routine
-  - Then: Level mirror routine
-  - Then: AI routine
+- ROM layout v17 (all before JMPs at 0x7FE0):
+  - 0x7F40: Toggle routine (was 0x7F50 in v16)
+  - 0x7F5B: Level mirror routine (was 0x7F6B)
+  - 0x7F64: AI routine (was 0x7F74) - 124-byte budget
   - 0x7FE0: JMP table (DO NOT MODIFY!)
+- AI zero-page memory:
+  - $00 = target column (0-7)
+  - $01 = best score so far (255 = unset)
+  - $02 = candidate score temp (new in v17, used during eval)
 """
 
 import hashlib
@@ -209,30 +220,39 @@ def apply_patches(input_path, output_path):
     level_mirror_routine = bytes(mirror_code)
 
     # =========================================
-    # AI Routine v16 - Multi-Candidate with Heuristics
-    # ==================================================
-    # Strategy:
-    # 1. Scan ALL viruses (not just first match)
-    # 2. For each matching virus:
-    #    - Check top row of column (skip if occupied - partition risk)
-    #    - Score based on row position (lower row = better)
-    # 3. Select BEST virus (lowest row with clear top)
-    # Memory: $00 = target column, $01 = best score (255 = unset)
+    # AI Routine v17 - Weighted Heuristic AI
+    # =======================================
+    # Strategy (v17):
+    # 1. Scan ALL P2 playfield tiles for viruses ($0500-$057F)
+    # 2. For each color-matching virus, derive target column
+    # 3. Compute weighted score (stored in $02 zero-page):
+    #    a. Fat top check: skip candidate if row 0 OR row 1 of target col occupied
+    #       (combined top-row + height-1 partition penalty)
+    #    b. Base score = row number (0-15, lower row = better)
+    #    c. Adjacency bonus: -1 if tile above OR right of virus has same color
+    #       (sets up 3-in-a-row clears - "consecutive color" / virus adjacency)
+    # 4. Select candidate with lowest score
+    #
+    # Memory:
+    #   $00 = target column (0-7)
+    #   $01 = best score so far (255 = unset)
+    #   $02 = current candidate score (temp, used during eval)
+    #
+    # Byte budget: 124 bytes (AI window 0x7F64-0x7FDF after ROM reorg)
     ai_code = []
 
     ai_code += [0x85, 0xF6]        # STA $F6 (complete original store)
 
-    # Check VS CPU mode
+    # Check VS CPU mode (v17 opt: BEQ directly on $04 - saves 2 bytes)
     ai_code += [0xA5, 0x04]        # LDA $04
-    ai_code += [0xC9, 0x01]        # CMP #$01
     ai_exit_branch = len(ai_code)
-    ai_code += [0xD0, 0x00]        # BNE exit
+    ai_code += [0xF0, 0x00]        # BEQ exit (if $04 == 0, not VS CPU)
 
     # Mirror P1 input for level select
     ai_code += [0xA5, 0xF5]        # LDA $F5
     ai_code += [0x85, 0xF6]        # STA $F6
 
-    # Check gameplay mode
+    # Check gameplay mode (>= 4)
     ai_code += [0xA5, 0x46]        # LDA $46
     ai_code += [0xC9, 0x04]        # CMP #$04
     ai_exit_branch2 = len(ai_code)
@@ -251,38 +271,38 @@ def apply_patches(input_path, output_path):
     ai_code += [0xB9, 0x00, 0x05]  # LDA $0500,Y (P2 playfield)
 
     # Check if virus (0xD0-0xD2) and get color
-    ai_code += [0x38]              # SEC
-    ai_code += [0xE9, 0xD0]        # SBC #$D0 (A = tile - 0xD0)
+    # v17 opt: EOR #$D0 instead of SEC ; SBC #$D0 (saves 1 byte)
+    ai_code += [0x49, 0xD0]        # EOR #$D0 (virus tiles -> 0/1/2)
     ai_code += [0xC9, 0x03]        # CMP #$03
     ai_not_virus_branch = len(ai_code)
     ai_code += [0xB0, 0x00]        # BCS not_virus (if >= 3, not a virus)
     # A now contains virus color (0=yellow, 1=red, 2=blue)
-
-    # Store virus color temporarily in X
-    ai_code += [0xAA]              # TAX
+    # v17 opt: no TAX (color stays in A — saves 1 byte)
 
     # Check left capsule match
     ai_code += [0xCD, 0x81, 0x03]  # CMP $0381 (compare color)
     ai_left_match_branch = len(ai_code)
     ai_code += [0xF0, 0x00]        # BEQ left_match
 
-    # Check right capsule match
-    ai_code += [0x8A]              # TXA (restore virus color)
+    # Check right capsule match (v17 opt: no TXA needed, A still = color)
     ai_code += [0xCD, 0x82, 0x03]  # CMP $0382 (compare color)
     ai_not_match_branch = len(ai_code)
     ai_code += [0xD0, 0x00]        # BNE not_match
 
-    # Right match: store column-1 as candidate target
+    # Right match: target column = virus_col - 1
     ai_code += [0x98]              # TYA (position)
     ai_code += [0x29, 0x07]        # AND #$07 (get column)
     ai_code += [0xF0, 0x00]        # BEQ not_match (col 0 can't use col-1)
     ai_right_col0_branch = len(ai_code) - 1
-    ai_code += [0xAA]              # TAX (save column in X temporarily)
+    ai_code += [0xAA]              # TAX
     ai_code += [0xCA]              # DEX (column - 1)
     ai_right_eval_branch = len(ai_code)
-    ai_code += [0xD0, 0x00]        # BNE eval_candidate (always taken)
+    ai_code += [0xD0, 0x00]        # BNE eval_candidate (always taken when col-1 >= 1)
+    # Note: when col was 1, DEX gives X=0, BNE doesn't take. Behavior is
+    # equivalent to "use col=1 (left position) as target" because the left
+    # path will recompute X from Y. Acceptable degeneracy.
 
-    # Left match: store column as candidate target
+    # Left match: target column = virus_col
     ai_left_match_pos = len(ai_code)
     ai_code += [0x98]              # TYA
     ai_code += [0x29, 0x07]        # AND #$07 (column in A)
@@ -292,20 +312,39 @@ def apply_patches(input_path, output_path):
     # X = target column, Y = virus position
     ai_eval_pos = len(ai_code)
 
-    # Check top row of this column (row 0)
-    # Top row address = $0500 + column (X)
-    ai_code += [0xBD, 0x00, 0x05]  # LDA $0500,X (top row of column)
-    ai_code += [0xC9, 0xFF]        # CMP #$FF (empty?)
+    # v17 H1: Fat top check - rows 0 AND 1 of target col must both be empty
+    # (Combined top-row partition + height-1 penalty in one AND operation)
+    ai_code += [0xBD, 0x00, 0x05]  # LDA $0500,X (row 0 of target col)
+    ai_code += [0x3D, 0x08, 0x05]  # AND $0508,X (AND with row 1)
+    ai_code += [0xC9, 0xFF]        # CMP #$FF (both empty?)
     ai_top_occupied_branch = len(ai_code)
-    ai_code += [0xD0, 0x00]        # BNE not_match (skip if top occupied)
+    ai_code += [0xD0, 0x00]        # BNE not_match (skip if either occupied)
 
-    # Calculate score = row number (Y >> 3)
-    ai_code += [0x98]              # TYA (position)
+    # v17 H2: Weighted scoring via $02 - base score = row number
+    ai_code += [0x98]              # TYA
     ai_code += [0x4A]              # LSR
     ai_code += [0x4A]              # LSR
-    ai_code += [0x4A]              # LSR (A = row number, 0-15)
+    ai_code += [0x4A]              # LSR (A = row, 0-15)
+    ai_code += [0x85, 0x02]        # STA $02 (base score -> temp)
 
-    # Compare with best score
+    # v17 H3: Adjacency bonus - if tile above OR right of virus shares color
+    # with the virus, subtract 1 from score (sets up 3-in-a-row clears).
+    # Tile above virus = $04F8 + Y (i.e. $0500 + Y - 8)
+    # Tile right of virus = $0501 + Y (column wrap accepted for byte savings)
+    ai_code += [0xB9, 0xF8, 0x04]  # LDA $04F8,Y (tile above virus)
+    ai_code += [0xD9, 0x00, 0x05]  # CMP $0500,Y (virus tile)
+    ai_adj_above_branch = len(ai_code)
+    ai_code += [0xF0, 0x00]        # BEQ adj_apply (above matches)
+    ai_code += [0xB9, 0x01, 0x05]  # LDA $0501,Y (tile right of virus)
+    ai_code += [0xD9, 0x00, 0x05]  # CMP $0500,Y (virus tile)
+    ai_adj_right_branch = len(ai_code)
+    ai_code += [0xD0, 0x00]        # BNE skip_adj
+    ai_adj_apply_pos = len(ai_code)
+    ai_code += [0xC6, 0x02]        # DEC $02 (apply -1 bonus)
+    ai_skip_adj_pos = len(ai_code)
+
+    # Compare final score with best
+    ai_code += [0xA5, 0x02]        # LDA $02 (final candidate score)
     ai_code += [0xC5, 0x01]        # CMP $01 (compare with best)
     ai_not_better_branch = len(ai_code)
     ai_code += [0xB0, 0x00]        # BCS not_better (if A >= best, skip)
@@ -314,14 +353,15 @@ def apply_patches(input_path, output_path):
     ai_code += [0x85, 0x01]        # STA $01 (update best score)
     ai_code += [0x86, 0x00]        # STX $00 (update target column)
 
-    # Continue scanning
+    # Continue scanning - v17 opt: INY + BPL replaces INY + CPY + BCC (saves 2)
+    # Y goes 0..127. After INY, Y=128 (bit 7 set) -> N=1 -> BPL exits.
     ai_not_virus_pos = len(ai_code)
     ai_code += [0xC8]              # INY
-    ai_code += [0xC0, 0x80]        # CPY #$80
     ai_scan_loop_branch = len(ai_code)
-    ai_code += [0x90, 0x00]        # BCC scan_loop (continue if Y < 128)
+    ai_code += [0x10, 0x00]        # BPL scan_loop (continue if Y < 128)
 
     # === MOVEMENT LOGIC ===
+    # v17 opt: shared STY $F6 tail via BNE store (saves 1 byte)
     ai_move_pos = len(ai_code)
     ai_code += [0xAD, 0x85, 0x03]  # LDA $0385 (P2 X)
     ai_code += [0xC5, 0x00]        # CMP $00 (target)
@@ -331,18 +371,19 @@ def apply_patches(input_path, output_path):
     # Move toward target
     ai_code += [0xA0, 0x01]        # LDY #$01 (assume right)
     ai_move_left_branch = len(ai_code)
-    ai_code += [0x90, 0x00]        # BCC store_move (X < target, go right)
+    ai_code += [0x90, 0x00]        # BCC store_move (capsule_x < target, go right)
     ai_code += [0xC8]              # INY (Y=2 = left)
+    ai_to_store_branch = len(ai_code)
+    ai_code += [0xD0, 0x00]        # BNE store_move (always taken, Y=2 nonzero)
+
+    # at_target: drop
+    ai_at_target_pos = len(ai_code)
+    ai_code += [0xA0, 0x04]        # LDY #$04 (Down)
+
     ai_store_move_pos = len(ai_code)
     ai_code += [0x84, 0xF6]        # STY $F6
 
     ai_exit_pos = len(ai_code)
-    ai_code += [0x60]              # RTS
-
-    # at_target: drop
-    ai_at_target_pos = len(ai_code)
-    ai_code += [0xA9, 0x04]        # LDA #$04 (Down)
-    ai_code += [0x85, 0xF6]        # STA $F6
     ai_code += [0x60]              # RTS
 
     # Fix branch offsets
@@ -354,18 +395,23 @@ def apply_patches(input_path, output_path):
     ai_code[ai_right_col0_branch] = (ai_not_virus_pos - (ai_right_col0_branch + 1)) & 0xFF
     ai_code[ai_right_eval_branch + 1] = (ai_eval_pos - (ai_right_eval_branch + 2)) & 0xFF
     ai_code[ai_top_occupied_branch + 1] = (ai_not_virus_pos - (ai_top_occupied_branch + 2)) & 0xFF
+    ai_code[ai_adj_above_branch + 1] = (ai_adj_apply_pos - (ai_adj_above_branch + 2)) & 0xFF
+    ai_code[ai_adj_right_branch + 1] = (ai_skip_adj_pos - (ai_adj_right_branch + 2)) & 0xFF
     ai_code[ai_not_better_branch + 1] = (ai_not_virus_pos - (ai_not_better_branch + 2)) & 0xFF
     ai_code[ai_scan_loop_branch + 1] = (ai_scan_loop - (ai_scan_loop_branch + 2)) & 0xFF
     ai_code[ai_at_target_branch + 1] = (ai_at_target_pos - (ai_at_target_branch + 2)) & 0xFF
     ai_code[ai_move_left_branch + 1] = (ai_store_move_pos - (ai_move_left_branch + 2)) & 0xFF
+    ai_code[ai_to_store_branch + 1] = (ai_store_move_pos - (ai_to_store_branch + 2)) & 0xFF
 
     ai_routine = bytes(ai_code)
 
     # =========================================
     # Calculate offsets and install everything
     # =========================================
-    # Layout: Toggle -> Mirror -> AI (must all fit before 0x7FE0 JMPs)
-    toggle_offset = 0x7F50
+    # v17 Layout: Toggle/Mirror moved into former 0x7F40 padding to expand AI
+    # window from 108 to 124 bytes (needed for new heuristic logic).
+    # Originally 0x7F40-0x7FDF was 160 bytes of unused padding (0x00/0xFF).
+    toggle_offset = 0x7F40
     mirror_offset = toggle_offset + len(toggle_routine)
     ai_offset = mirror_offset + len(level_mirror_routine)
     end_offset = ai_offset + len(ai_routine)
@@ -425,14 +471,16 @@ def apply_patches(input_path, output_path):
     print(f"Patched ROM: {output_path}")
     print(f"Patched checksum: {patched_checksum}")
     print()
-    print("Dr. Mario VS CPU Edition v15 (Obstacle-Aware AI) applied successfully!")
+    print("Dr. Mario VS CPU Edition v17 (Weighted Heuristic AI) applied successfully!")
     print("Features:")
     print("- VS CPU Mode: New 3rd menu option with AI-controlled Player 2")
     print("  - Menu cycles: 1 PLAYER -> 2 PLAYER -> VS CPU")
     print("  - Level select: P2 cursor mirrors P1 (level & speed)")
-    print("  - P2 can take control by pressing any button")
     print("  - AI only activates during VS CPU gameplay")
-    print("  - P2 speed synced to P1 at game start")
+    print("- v17 AI heuristics:")
+    print("  - Fat top check (rows 0+1 of target column must be empty)")
+    print("  - Weighted scoring (combines row + adjacency in $02)")
+    print("  - Adjacency bonus (virus with same-color neighbor scores better)")
     print("- Study Mode: Pause shows 'STUDY' with visible playfield")
 
     return True

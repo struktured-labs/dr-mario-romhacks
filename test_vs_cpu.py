@@ -289,6 +289,25 @@ class CPU6502:
                 self.set_z(self.a)
                 self.set_n(self.a)
                 self.pc += 2
+            elif opcode == 0x3D:  # AND abs,X
+                addr = (self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)) + self.x
+                self.a &= self.memory[addr & 0xFFFF]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 3
+            elif opcode == 0x49:  # EOR imm
+                self.a ^= self.memory[self.pc + 1]
+                self.set_z(self.a)
+                self.set_n(self.a)
+                self.pc += 2
+            elif opcode == 0xD9:  # CMP abs,Y
+                addr = (self.memory[self.pc + 1] | (self.memory[self.pc + 2] << 8)) + self.y
+                val = self.memory[addr & 0xFFFF]
+                result = self.a - val
+                self.set_c(self.a >= val)
+                self.set_z(result & 0xFF)
+                self.set_n(result & 0xFF)
+                self.pc += 3
             elif opcode == 0x18:  # CLC
                 self.set_c(False)
                 self.pc += 1
@@ -337,7 +356,7 @@ class CPU6502:
 
 
 def extract_routines_from_patch():
-    """Extract the compiled routines from patch_vs_cpu.py"""
+    """Extract the compiled routines from patch_vs_cpu.py (v17 layout)."""
     # Import and run the patch to get the routines
     import importlib.util
     spec = importlib.util.spec_from_file_location("patch", "patch_vs_cpu.py")
@@ -354,9 +373,9 @@ def extract_routines_from_patch():
     with open("drmario_vs_cpu.nes", "rb") as f:
         rom = f.read()
 
-    # Extract routines from ROM
-    toggle_offset = 0x7F50
-    mirror_offset = 0x7F6B
+    # Extract routines from ROM (v17 layout)
+    toggle_offset = 0x7F40
+    mirror_offset = 0x7F5B  # toggle_offset + 27 (toggle len)
 
     # Read routine lengths from patch output
     toggle_len = mirror_offset - toggle_offset
@@ -385,22 +404,23 @@ class TestVSCPU:
         self.mirror_routine = None
 
     def load_routines(self):
-        """Load routines from the patched ROM."""
+        """Load routines from the patched ROM (v17 layout)."""
         with open("drmario_vs_cpu.nes", "rb") as f:
             rom = bytearray(f.read())
 
-        # Routine locations in ROM (from patch_vs_cpu.py)
-        toggle_offset = 0x7F50
-        mirror_offset = 0x7F6B  # toggle_offset + 27
+        # v17 Routine locations in ROM (from patch_vs_cpu.py)
+        # Toggle/mirror moved from 0x7F50 to 0x7F40 to expand AI window
+        toggle_offset = 0x7F40
+        mirror_offset = 0x7F5B  # toggle_offset + 27 (toggle len)
 
-        # Mirror routine now just has 1 RTS (simplified - just loads $F6 to $5B)
+        # Mirror routine: simplified pass-through (LDA $F6/STA $5B/LDA $F8/STA $5C/RTS)
         mirror_end = mirror_offset
         for i in range(mirror_offset, 0x7FE0):
             if rom[i] == 0x60:  # RTS
                 mirror_end = i + 1
                 break
 
-        # AI routine starts after mirror
+        # AI routine starts after mirror (should be 0x7F64 in v17)
         ai_offset = mirror_end
 
         # AI routine ends at last RTS before 0x7FE0
@@ -414,9 +434,11 @@ class TestVSCPU:
         self.mirror_routine = bytes(rom[mirror_offset:mirror_end])
         self.ai_routine = bytes(rom[ai_offset:ai_end])
 
-        print(f"Loaded toggle routine: {len(self.toggle_routine)} bytes")
-        print(f"Loaded mirror routine: {len(self.mirror_routine)} bytes")
-        print(f"Loaded AI routine: {len(self.ai_routine)} bytes")
+        print(f"Loaded toggle routine: {len(self.toggle_routine)} bytes (at 0x{toggle_offset:04X})")
+        print(f"Loaded mirror routine: {len(self.mirror_routine)} bytes (at 0x{mirror_offset:04X})")
+        print(f"Loaded AI routine: {len(self.ai_routine)} bytes (at 0x{ai_offset:04X})")
+        ai_budget = 0x7FE0 - ai_offset
+        print(f"AI byte budget: {ai_budget} bytes ({ai_budget - len(self.ai_routine)} bytes spare)")
 
     def assert_eq(self, name, actual, expected):
         if actual == expected:
@@ -845,6 +867,176 @@ class TestVSCPU:
         self.assert_eq("target column (default)", self.cpu.memory[0x00], 3)
         self.assert_eq("best score (unset)", self.cpu.memory[0x01], 0xFF)
 
+    # ==================== v17 HEURISTIC TESTS ====================
+
+    def test_v17_skips_column_with_row1_occupied(self):
+        """v17 fat top check: skip column if row 1 (below top) is occupied (height-1 penalty)."""
+        print("test_v17_skips_column_with_row1_occupied...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at col 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Red virus at row 5, col 2 (offset 42) - row 0 clear, but row 1 occupied
+        self.cpu.memory[0x0500 + 42] = 0xD1
+        self.cpu.memory[0x0500 + 10] = 0x50  # Row 1 of col 2 occupied
+        # Red virus at row 10, col 5 (offset 85) - both rows 0,1 clear
+        self.cpu.memory[0x0500 + 85] = 0xD1
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # v17 should skip col 2 (row 1 occupied) and pick col 5 even though col 2
+        # has lower (better) base score. v16 would have picked col 2.
+        self.assert_eq("target column (height-1 skip)", self.cpu.memory[0x00], 5)
+
+    def test_v17_vertical_adjacency_bonus(self):
+        """v17 adjacency: virus with same-color tile above gets -1 score bonus."""
+        print("test_v17_vertical_adjacency_bonus...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at col 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Two red viruses at SAME score row=5: col 2 (offset 42) and col 6 (offset 46)
+        # Without adjacency bonus, both have base score 5; first-scanned (col 2) wins.
+        # With adjacency bonus on col 6: cell above (row 4 = offset 38) gets a
+        # red virus too -> -1 bonus -> col 6 wins.
+        self.cpu.memory[0x0500 + 42] = 0xD1  # col 2 row 5
+        self.cpu.memory[0x0500 + 46] = 0xD1  # col 6 row 5
+        self.cpu.memory[0x0500 + 38] = 0xD1  # col 6 row 4 (above the col-6 virus)
+        # Note: the col 6 row-4 virus also gets evaluated. Its target is col 6
+        # too (same column), score = 4 (best of all). So it should win. Let's
+        # verify col 6 is targeted regardless of which virus drives the choice.
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Adjacency-rich column 6 should be targeted
+        self.assert_eq("target column (adj bonus)", self.cpu.memory[0x00], 6)
+
+    def test_v17_vertical_adjacency_breaks_tie(self):
+        """v17 adjacency bonus should break a tie between equal-score candidates."""
+        print("test_v17_vertical_adjacency_breaks_tie...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at col 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Red virus at col 2 row 5 (offset 42), no adjacent same-color
+        self.cpu.memory[0x0500 + 42] = 0xD1
+        # Red virus at col 5 row 6 (offset 53). Has matching-color tile above
+        # (col 5 row 5 = offset 45), giving it adjacency bonus -> score 5
+        # (6 - 1) which TIES the col-2 virus (score 5).
+        # v17 picks the first-encountered (col 2) when scores tie via BCS, so
+        # to truly demonstrate the bonus break the tie, we make col 5 base
+        # score 6 with bonus -> 5, and col 2 base 6 with no bonus -> 6.
+        self.cpu.memory[0x0500 + 42] = 0xFF  # clear earlier
+        self.cpu.memory[0x0500 + 50] = 0xD1  # col 2 row 6 (offset 50)
+        self.cpu.memory[0x0500 + 53] = 0xD1  # col 5 row 6 (offset 53)
+        self.cpu.memory[0x0500 + 45] = 0xD1  # col 5 row 5 (above col-5 virus)
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # col 5 should win because of adjacency bonus (score 5 vs col 2's 6).
+        # Note: the col 5 row 5 virus itself is also a candidate (base 5, no
+        # above-bonus since above is empty) which also targets col 5. Either
+        # way, target should be col 5.
+        self.assert_eq("target column (adjacency tie-break)", self.cpu.memory[0x00], 5)
+
+    def test_v17_horizontal_adjacency_bonus(self):
+        """v17 adjacency: virus with same-color tile to its right gets bonus."""
+        print("test_v17_horizontal_adjacency_bonus...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at col 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Red virus at col 2 row 7 (offset 58), no neighbors -> score 7
+        self.cpu.memory[0x0500 + 58] = 0xD1
+        # Red virus at col 5 row 7 (offset 61), with red tile right (col 6 row 7
+        # = offset 62) -> base 7 - 1 (h-adj) = 6
+        self.cpu.memory[0x0500 + 61] = 0xD1
+        self.cpu.memory[0x0500 + 62] = 0xD1
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # col 5 should win (score 6 vs col 2's 7); col 6 is also a candidate but
+        # has no neighbor to its right (col 7 row 7 = 0xFF) so its score is 7.
+        self.assert_eq("target column (h-adj bonus)", self.cpu.memory[0x00], 5)
+        self.assert_eq("best score (with h-adj)", self.cpu.memory[0x01], 6)
+
+    def test_v17_score_stored_in_temp(self):
+        """v17 weighted scoring: $02 zero-page is used as score accumulator."""
+        print("test_v17_score_stored_in_temp...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at col 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Place a red virus at col 4 row 3 (offset 28), no adjacent same-color
+        self.cpu.memory[0x0500 + 28] = 0xD1
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # $02 was used as a temp; after final eval, $02 contains the score
+        # of the LAST evaluated candidate that passed the fat top check.
+        # Here only one candidate, score = row = 3 (no adj bonus).
+        # Verify $02 = 3 and best score $01 = 3.
+        self.assert_eq("score temp $02 was set", self.cpu.memory[0x02], 3)
+        self.assert_eq("best score in $01", self.cpu.memory[0x01], 3)
+        self.assert_eq("target column", self.cpu.memory[0x00], 4)
+
+    def test_v17_height_penalty_skips_partition(self):
+        """v17 fat top: column with row 0 OK but row 1 occupied -> skip (avoids
+        building a tall stack that risks partitioning the playfield)."""
+        print("test_v17_height_penalty_skips_partition...")
+        self.cpu.reset()
+        self.cpu.memory[0x04] = 1  # VS CPU mode
+        self.cpu.memory[0x46] = 5  # Gameplay mode
+        self.cpu.memory[0x0385] = 0  # Capsule at col 0
+        self.cpu.memory[0x0381] = 1  # Left = red
+
+        # Only one red virus exists at col 4 row 8 (offset 68).
+        # Top row of col 4 is clear, but row 1 of col 4 is occupied.
+        # v17 should skip this and fall back to default target (col 3).
+        self.cpu.memory[0x0500 + 68] = 0xD1
+        self.cpu.memory[0x0500 + 12] = 0x50  # row 1 of col 4 occupied
+
+        ai_addr = 0xFF5B + len(self.mirror_routine)
+        self.cpu.load_routine(ai_addr, self.ai_routine)
+        self.cpu.run(ai_addr)
+
+        # Target should be center default (col 3); v16 would have picked col 4.
+        self.assert_eq("target (v17 fat top defaults)", self.cpu.memory[0x00], 3)
+        self.assert_eq("best score still unset", self.cpu.memory[0x01], 0xFF)
+
+    def test_v17_ai_fits_in_124_byte_budget(self):
+        """v17 AI routine must fit in the 124-byte window 0x7F64-0x7FDF."""
+        print("test_v17_ai_fits_in_124_byte_budget...")
+        size = len(self.ai_routine)
+        self.assert_eq("AI routine size <= 124 bytes", size <= 124, True)
+        # Also assert the toggle moved to 0x7F40 (ROM reorg required by v17)
+        with open("drmario_vs_cpu.nes", "rb") as f:
+            rom = f.read()
+        # Toggle starts with LDA $0727 = AD 27 07
+        self.assert_eq("toggle relocated to 0x7F40", rom[0x7F40], 0xAD)
+        self.assert_eq("toggle still has LDA $0727 byte 1", rom[0x7F41], 0x27)
+        self.assert_eq("toggle still has LDA $0727 byte 2", rom[0x7F42], 0x07)
+
     def run_all_tests(self):
         """Run all test cases."""
         print("=" * 60)
@@ -901,6 +1093,17 @@ class TestVSCPU:
         self.test_ai_multi_candidate_selection()
         self.test_ai_right_match_avoids_top_partition()
         self.test_ai_defaults_to_center_if_no_valid_virus()
+
+        print("\n" + "-" * 60)
+        print("v17 Heuristic Tests")
+        print("-" * 60)
+        self.test_v17_skips_column_with_row1_occupied()
+        self.test_v17_vertical_adjacency_bonus()
+        self.test_v17_vertical_adjacency_breaks_tie()
+        self.test_v17_horizontal_adjacency_bonus()
+        self.test_v17_score_stored_in_temp()
+        self.test_v17_height_penalty_skips_partition()
+        self.test_v17_ai_fits_in_124_byte_budget()
 
         print("\n" + "=" * 60)
         print(f"Results: {self.passed} passed, {self.failed} failed")
