@@ -1,11 +1,16 @@
 -- Mesen Lua Bridge: Socket server for Python RL training
 -- Provides memory read/write and frame stepping via TCP socket
 --
+-- NOTE: Prefer mesen_bridge_file.lua. This TCP variant requires Mesen to
+-- enable BOTH "Allow access to I/O and OS functions" AND "Allow network
+-- access" in Script Window Restrictions, while the file variant only needs
+-- the I/O permission. Kept here for completeness / future revival.
+--
 -- Protocol: Simple text-based commands
 -- Commands:
 --   READ <addr> <size>        - Read <size> bytes from <addr>, returns hex string
 --   WRITE <addr> <hex_data>   - Write hex bytes to <addr>
---   STEP <frames>             - Step N frames
+--   STEP <frames>             - Step N frames (no-op; emulator advances per callback)
 --   GET_STATE                 - Get full game state (playfield, capsule, etc.)
 --   QUIT                      - Close connection
 
@@ -45,7 +50,7 @@ function handle_read(addr, size)
 
     local bytes = {}
     for i = 0, size-1 do
-        local value = emu.read(addr + i, emu.memType.cpuMemory, false)
+        local value = emu.read(addr + i, emu.memType.nesMemory, false)
         table.insert(bytes, value)
     end
 
@@ -57,17 +62,19 @@ function handle_write(addr, hex_data)
     local bytes = hex_to_bytes(hex_data)
 
     for i, byte in ipairs(bytes) do
-        emu.write(addr + i - 1, byte, emu.memType.cpuMemory)
+        emu.write(addr + i - 1, byte, emu.memType.nesMemory)
     end
 
     return "OK"
 end
 
 function handle_step(frames)
-    frames = tonumber(frames) or 1
-    for i = 1, frames do
-        emu.breakExecution()
-    end
+    -- emu.breakExecution() PAUSES the emulator; it does not advance frames.
+    -- The on_frame callback runs every frame anyway, so each command we
+    -- service is implicitly separated by at least one rendered frame.
+    -- True N-frame stepping from inside a frame callback would require
+    -- emu.resume() + a wakeup mechanism; for typical RL one-command-per-
+    -- decision use the natural frame cadence is sufficient.
     return "OK"
 end
 
@@ -83,17 +90,17 @@ function handle_get_state()
     -- Read playfield (128 bytes)
     state.playfield = {}
     for addr = 0x0500, 0x057F do
-        local value = emu.read(addr, emu.memType.cpuMemory, false)
+        local value = emu.read(addr, emu.memType.nesMemory, false)
         table.insert(state.playfield, value)
     end
 
     -- Read capsule state
-    state.capsule_x = emu.read(0x0385, emu.memType.cpuMemory, false)
-    state.capsule_y = emu.read(0x0386, emu.memType.cpuMemory, false)
-    state.capsule_left_color = emu.read(0x0381, emu.memType.cpuMemory, false)
-    state.capsule_right_color = emu.read(0x0382, emu.memType.cpuMemory, false)
-    state.virus_count = emu.read(0x03A4, emu.memType.cpuMemory, false)
-    state.game_mode = emu.read(0x0046, emu.memType.cpuMemory, false)
+    state.capsule_x = emu.read(0x0385, emu.memType.nesMemory, false)
+    state.capsule_y = emu.read(0x0386, emu.memType.nesMemory, false)
+    state.capsule_left_color = emu.read(0x0381, emu.memType.nesMemory, false)
+    state.capsule_right_color = emu.read(0x0382, emu.memType.nesMemory, false)
+    state.virus_count = emu.read(0x03A4, emu.memType.nesMemory, false)
+    state.game_mode = emu.read(0x0046, emu.memType.nesMemory, false)
 
     -- Format as JSON-like string
     local result = string.format(
