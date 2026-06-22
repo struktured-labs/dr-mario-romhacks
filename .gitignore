@@ -12,3 +12,8 @@ __pycache__/
 *.sav
 *.srm
 *.state
+
+# Scratch / scratchpad (ad-hoc debug + cross-check harnesses)
+tmp/
+log/
+setenv.sh

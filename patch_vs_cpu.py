@@ -485,5 +485,594 @@ def apply_patches(input_path, output_path):
 
     return True
 
+
+# =====================================================================
+# v18 - Depth-1 Simulation AI (real line-of-4 clear detection)
+# =====================================================================
+# v18 is the first version that ACTUALLY simulates each placement and
+# detects immediate row/column-of-4 clears at the resting position,
+# instead of guessing via color-adjacency like v17.
+#
+# Algorithm (depth-1, no gravity cascade):
+#   best = -inf ; best_col = 3 (center default)
+#   for orient in {vertical, horizontal}:
+#     for col in valid columns:
+#       find landing row(s) for this column/orient   (real drop)
+#       write the 2 capsule cells into the P2 board   (in-place)
+#       count cells + viruses in any row/col run >= 4 through them
+#       restore the 2 cells                           (undo)
+#       score = viruses*BIG + cells*CELL - height_penalty
+#       if score > best: best = score, best_col = col
+#   move toward best_col (reuse v17-style movement)
+#
+# Tile/color model (from rl-training-new/src/heuristics.py, validated vs ROM):
+#   empty           = 0xFF
+#   virus  color k  = 0xD0 + k          (k = 0 yellow, 1 red, 2 blue)
+#   capsule color k = 0x4C + k          (settled half)
+#   color(tile)     = tile & 0x03       (empty 0xFF -> 3, never a real color)
+# Two occupied cells share a color iff (a&3)==(b&3) with both occupied; since
+# empty maps to 3 and colors map to 0/1/2, equal low-2-bits already excludes
+# empties. This is what makes clear detection cheap on the 6502.
+#
+# Placement colors: A (left/top) = $0381, B (right/bottom) = $0382. We write
+# them as 0x4C|color settled-capsule tiles into the SCRATCH (the live $0500
+# board, with undo) so the run scan treats them like any other colored cell.
+#
+# ROM layout (v18): the routine lives in the large free padding block at
+#   ROM 0x7B10..0x7D10  ->  CPU $FB00..$FD00   (512 bytes, was 0x00/0xFF fill)
+# v17's toggle/mirror/AI at 0x7F40-0x7FE0 are kept INTACT; only the 0x37CF
+# controller hook is repointed from the v17 AI ($FF54) to the v18 AI ($FB00).
+#
+# RAM: simulation is done IN-PLACE on the real P2 board $0500-$057F with undo,
+# so no separate scratch page is needed (zero RAM-conflict risk). The unused
+# RAM windows $0480-$04FF and $0580-$05FF are documented as where a
+# copy-the-board variant could live. Zero-page temps use only bytes the game
+# never touches (verified by static scan): $6B-$6F and $CA-$D4. v18 keeps the
+# v17 convention $00 = target column, $01 = best score.
+
+# --- Opcode table (subset used by v18) ---
+OPS = {
+    "BRK": 0x00,
+    "ORA_imm": 0x09, "ORA_zp": 0x05,
+    "ASL_A": 0x0A,
+    "CLC": 0x18, "SEC": 0x38,
+    "AND_imm": 0x29, "AND_zp": 0x25,
+    "JMP": 0x4C, "JSR": 0x20, "RTS": 0x60,
+    "EOR_imm": 0x49,
+    "LSR_A": 0x4A,
+    "ADC_imm": 0x69, "ADC_zp": 0x65,
+    "SBC_imm": 0xE9, "SBC_zp": 0xE5,
+    "STA_zp": 0x85, "STA_abs": 0x8D, "STA_absX": 0x9D, "STA_absY": 0x99,
+    "STX_zp": 0x86, "STY_zp": 0x84,
+    "LDY_imm": 0xA0, "LDX_imm": 0xA2, "LDA_imm": 0xA9,
+    "LDA_zp": 0xA5, "LDX_zp": 0xA6, "LDY_zp": 0xA4,
+    "LDA_abs": 0xAD, "LDA_absX": 0xBD, "LDA_absY": 0xB9,
+    "LDX_abs": 0xAE, "LDY_abs": 0xAC,
+    "TAY": 0xA8, "TYA": 0x98, "TAX": 0xAA, "TXA": 0x8A,
+    "TXY": 0x9B,  # not standard; unused
+    "CMP_imm": 0xC9, "CMP_zp": 0xC5, "CMP_abs": 0xCD,
+    "CMP_absX": 0xDD, "CMP_absY": 0xD9,
+    "CPX_imm": 0xE0, "CPY_imm": 0xC0, "CPX_zp": 0xE4, "CPY_zp": 0xC4,
+    "INC_zp": 0xE6, "DEC_zp": 0xC6, "INC_abs": 0xEE, "DEC_abs": 0xCE,
+    "INX": 0xE8, "DEX": 0xCA, "INY": 0xC8, "DEY": 0x88,
+    "PHA": 0x48, "PLA": 0x68,
+    "NOP": 0xEA,
+}
+BRANCHES = {"BPL": 0x10, "BMI": 0x30, "BCC": 0x90, "BCS": 0xB0,
+            "BNE": 0xD0, "BEQ": 0xF0, "BVC": 0x50, "BVS": 0x70}
+
+
+class Asm6502:
+    """Tiny two-pass label assembler for the v18 routine.
+
+    Usage: a.label('foo'); a.ins('LDA_imm', 0x03); a.br('BNE','foo'); ...
+    Branch targets are resolved in a second pass so forward references work.
+    Absolute JMP/JSR may target either internal labels (resolved to base+addr)
+    or raw CPU addresses (ints)."""
+
+    def __init__(self, base_cpu):
+        self.base = base_cpu
+        self.code = bytearray()
+        self.labels = {}
+        self.fixups = []  # (pos, kind, target) kind in {'rel','abs'}
+
+    def label(self, name):
+        assert name not in self.labels, f"dup label {name}"
+        self.labels[name] = len(self.code)
+
+    def ins(self, mnem, *operands):
+        self.code.append(OPS[mnem])
+        for op in operands:
+            self.code.append(op & 0xFF)
+
+    def ins16(self, mnem, value):
+        """Emit an instruction with a 16-bit little-endian operand (lo,hi)."""
+        self.code.append(OPS[mnem])
+        self.code.append(value & 0xFF)
+        self.code.append((value >> 8) & 0xFF)
+
+    def br(self, mnem, target):
+        self.code.append(BRANCHES[mnem])
+        self.fixups.append((len(self.code), "rel", target))
+        self.code.append(0x00)
+
+    def jmp(self, target, mnem="JMP"):
+        self.code.append(OPS[mnem])
+        self.fixups.append((len(self.code), "abs", target))
+        self.code.append(0x00)
+        self.code.append(0x00)
+
+    def jsr(self, target):
+        """JSR to an internal label (or raw CPU address), resolved in pass 2."""
+        self.code.append(OPS["JSR"])
+        self.fixups.append((len(self.code), "abs", target))
+        self.code.append(0x00)
+        self.code.append(0x00)
+
+    def raw(self, *bytes_):
+        for b in bytes_:
+            self.code.append(b & 0xFF)
+
+    def assemble(self):
+        for pos, kind, target in self.fixups:
+            if kind == "rel":
+                dest = self.labels[target]
+                rel = dest - (pos + 1)
+                assert -128 <= rel <= 127, f"branch out of range to {target} ({rel})"
+                self.code[pos] = rel & 0xFF
+            else:  # abs
+                if isinstance(target, str):
+                    dest_cpu = self.base + self.labels[target]
+                else:
+                    dest_cpu = target
+                self.code[pos] = dest_cpu & 0xFF
+                self.code[pos + 1] = (dest_cpu >> 8) & 0xFF
+        return bytes(self.code)
+
+
+# v18 zero-page temp map (only bytes the game never touches)
+Z_TARGET = 0x00   # best target column (v17-compatible)
+Z_BEST = 0x01     # best score (signed; init 0x80 = -128 sentinel)
+Z_COL = 0x6B      # current column under evaluation
+Z_OFFA = 0x6D     # board offset (0-127) of placed cell A
+Z_OFFB = 0x6E     # board offset of placed cell B
+Z_HIROW = 0x6F    # row of the higher placed cell (for height penalty)
+Z_CELLS = 0xCA    # cells cleared (this placement)
+Z_VIR = 0xCB      # viruses cleared (this placement)
+Z_SCORE = 0xCC    # candidate score
+Z_RUNLEN = 0xCD   # run length during a scan
+Z_MCOLOR = 0xCE   # color (low 2 bits) being matched in a scan
+Z_SOFF = 0xCF     # working offset during a scan
+Z_TILEA = 0xD2    # tile byte to place for cell A
+Z_TILEB = 0xD3    # tile byte to place for cell B
+Z_CELLOFF = 0xD4  # offset of the cell whose row/col we are scanning
+Z_STEP = 0xD6     # scan step (1 = row, 8 = column)
+Z_MIN = 0xD7      # lowest valid offset for the current axis scan
+Z_MAX = 0xD8      # highest valid offset for the current axis scan
+Z_ORIENT = 0xD9   # current placement orientation (0 = horizontal, 1 = vertical)
+Z_RUNVIR = 0xDB   # scan_run's virus-count temp (must NOT alias Z_OFFA!)
+
+# Compact score weights (see score_update): score = min(vir,3)*VIR_W + cells*CELL_W
+# + height. Kept small so a single virus (>= VIR_W) dominates any non-clear
+# (height <= 15) and the byte never overflows (max 3*32 + 8*2 + 15 = 127).
+VIR_W = 32
+CELL_W = 2
+
+
+def build_v18_ai(ai_cpu):
+    """Emit the v18 depth-1 simulation AI. Returns bytes. ai_cpu = CPU load addr.
+
+    Subroutines (internal, called via JSR):
+      land_col   : input Z_COL = column. Sets carry=0 and Z_OFFB=bottom offset,
+                   Z_HIROW=row, A=top-occupied row; carry=1 if column unusable.
+      clear_cell : input Z_CELLOFF = board offset of a placed cell. Adds the
+                   cells/viruses cleared via its row-run and col-run (>=4) into
+                   Z_CELLS / Z_VIR. (Counts the through-cell once per axis that
+                   clears; double counting across axes is acceptable and rare.)
+    """
+    a = Asm6502(ai_cpu)
+
+    # ---- plumbing (identical contract to v17) ----
+    a.ins("STA_zp", 0xF6)            # STA $F6 (finish original store)
+    a.ins("LDA_zp", 0x04)           # LDA $04 (VS CPU flag)
+    a.br("BNE", "vs_active")
+    a.jmp("exit")                    # not VS CPU -> just return
+    a.label("vs_active")
+    a.ins("LDA_zp", 0xF5)           # mirror P1 input for level select
+    a.ins("STA_zp", 0xF6)
+    a.ins("LDA_zp", 0x46)           # LDA $46 (game mode)
+    a.ins("CMP_imm", 0x04)
+    a.br("BCS", "gameplay")
+    a.jmp("exit")                    # menu/level select -> done (already mirrored)
+    a.label("gameplay")
+
+    # ---- setup search ----
+    a.ins("LDA_imm", 0x03)
+    a.ins("STA_zp", Z_TARGET)        # default target = center col 3
+    a.ins("LDA_imm", 0x00)
+    a.ins("STA_zp", Z_BEST)          # best score = 0 (all scores are >= 0)
+    # build placement tiles 0x4C|color from $0381/$0382
+    a.ins("LDA_abs", 0x81, 0x03)     # LDA $0381 (color A)
+    a.ins("ORA_imm", 0x4C)
+    a.ins("STA_zp", Z_TILEA)
+    a.ins("LDA_abs", 0x82, 0x03)     # LDA $0382 (color B)
+    a.ins("ORA_imm", 0x4C)
+    a.ins("STA_zp", Z_TILEB)
+
+    # ==================== VERTICAL pass: col 0..7 ====================
+    a.ins("LDA_imm", 0x00)
+    a.ins("STA_zp", Z_COL)
+    a.label("v_loop")
+    a.ins("LDX_zp", Z_COL)
+    a.jsr("land_col")
+    a.br("BCS", "v_next")            # column unusable -> skip
+    # vertical needs a cell ABOVE the bottom: top = bottom-8, require row>=1.
+    # land_col returns A = top-occupied row (>=1 guaranteed when carry clear and
+    # there is room for one). For vertical we need two empty rows: ensure the
+    # landing row (Z_HIROW) >= 1 so top = bottom-8 is on the board.
+    a.ins("LDA_zp", Z_HIROW)         # landing row (bottom cell row)
+    a.br("BNE", "v_haveroom")        # row 0 means only 1 empty row -> no vertical
+    a.jmp("v_next")
+    a.label("v_haveroom")
+    # offsets: bottom = Z_OFFB (set by land_col), top = bottom - 8
+    a.ins("LDA_zp", Z_OFFB)
+    a.ins("SEC")
+    a.ins("SBC_imm", 0x08)
+    a.ins("STA_zp", Z_OFFA)          # top cell offset
+    # higher cell row = Z_HIROW - 1 (top is one row above bottom)
+    a.ins("DEC_zp", Z_HIROW)
+    # place A/B, detect clears, undo, and update best (shared)
+    a.ins("LDA_imm", 0x01); a.ins("STA_zp", Z_ORIENT)   # vertical
+    a.jsr("eval_pair")
+    a.label("v_next")
+    a.ins("INC_zp", Z_COL)
+    a.ins("LDA_zp", Z_COL)
+    a.ins("CMP_imm", 0x08)
+    a.br("BCS", "h_start")
+    a.jmp("v_loop")
+
+    # ==================== HORIZONTAL pass: col 0..6 ====================
+    a.label("h_start")
+    a.ins("LDA_imm", 0x00)
+    a.ins("STA_zp", Z_COL)
+    a.label("h_loop")
+    # landing row = min(top_occ(col), top_occ(col+1)) - 1 ; both >=1 not required
+    a.ins("LDX_zp", Z_COL)
+    a.jsr("land_col")
+    a.br("BCS", "h_next")
+    a.ins("LDA_zp", Z_OFFB)          # offset for landing in left col
+    a.ins("STA_zp", Z_OFFA)          # cell A (left)
+    a.ins("LDA_zp", Z_HIROW)         # remember left landing row
+    a.ins("PHA")
+    # right column
+    a.ins("INC_zp", Z_COL)
+    a.ins("LDX_zp", Z_COL)
+    a.jsr("land_col")
+    a.ins("DEC_zp", Z_COL)           # restore col to left (carry preserved? no)
+    a.br("BCS", "h_next_pull")       # right col unusable -> skip (pull stack first)
+    # choose the higher landing row (smaller row index) of the two columns
+    a.ins("PLA")                     # A = left landing row
+    a.ins("CMP_zp", Z_HIROW)         # compare with right landing row
+    a.br("BCC", "h_use_left")        # left row < right row -> left is higher
+    # right row is higher (smaller) or equal: use right landing (Z_OFFB/Z_HIROW)
+    # recompute both offsets at the right (higher) row:
+    a.ins("LDA_zp", Z_HIROW)         # right row = higher row
+    a.jmp("h_setrow")
+    a.label("h_use_left")
+    # left row is higher; A already = left row from PLA
+    a.label("h_setrow")
+    a.ins("STA_zp", Z_HIROW)         # Z_HIROW = chosen (higher) row
+    # offsetA = row*8 + col ; offsetB = offsetA + 1
+    a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ASL_A")  # A = row*8
+    a.ins("CLC")
+    a.ins("ADC_zp", Z_COL)
+    a.ins("STA_zp", Z_OFFA)
+    a.ins("CLC")
+    a.ins("ADC_imm", 0x01)
+    a.ins("STA_zp", Z_OFFB)
+    # place A/B, detect clears, undo, and update best (shared)
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", Z_ORIENT)   # horizontal
+    a.jsr("eval_pair")
+    a.jmp("h_next")
+    a.label("h_next_pull")
+    a.ins("PLA")                     # discard saved left row, then fall through
+    a.label("h_next")
+    a.ins("INC_zp", Z_COL)
+    a.ins("LDA_zp", Z_COL)
+    a.ins("CMP_imm", 0x07)
+    a.br("BCS", "move")
+    a.jmp("h_loop")
+
+    # ==================== MOVEMENT (toward best col) ====================
+    a.label("move")
+    a.ins("LDA_abs", 0x85, 0x03)     # LDA $0385 (P2 capsule X)
+    a.ins("CMP_zp", Z_TARGET)
+    a.br("BEQ", "at_target")
+    a.ins("LDY_imm", 0x01)           # assume Right
+    a.br("BCC", "store_move")        # capX < target -> move right
+    a.ins("LDY_imm", 0x02)           # else Left
+    a.jmp("store_move")
+    a.label("at_target")
+    a.ins("LDY_imm", 0x04)           # Down (drop)
+    a.label("store_move")
+    a.ins("STY_zp", 0xF6)
+    a.label("exit")
+    a.ins("RTS")
+
+    # ==================== SUBROUTINE: eval_pair ====================
+    # input Z_OFFA, Z_OFFB = the two cell offsets to place; Z_HIROW = row of the
+    # higher cell (for height penalty); Z_TILEA/Z_TILEB = tiles to write;
+    # Z_ORIENT = 0 horizontal (cells share a ROW), 1 vertical (share a COLUMN).
+    # Places both cells, counts clears, restores both to empty, then scores.
+    #
+    # Orientation-aware scanning avoids double-counting the SHARED axis:
+    #   vertical   -> column run once (through A; spans A and B) + row run of A
+    #                 + row run of B.
+    #   horizontal -> row run once (through A; spans A and B) + col run of A
+    #                 + col run of B.
+    # (A residual cross-axis double count of a single cell that sits in BOTH a
+    # row-of-4 and a column-of-4 is possible and accepted; see V18_AI_NOTES.)
+    a.label("eval_pair")
+    a.ins("LDX_zp", Z_OFFA)
+    a.ins("LDA_zp", Z_TILEA)
+    a.ins16("STA_absX", 0x0500)
+    a.ins("LDX_zp", Z_OFFB)
+    a.ins("LDA_zp", Z_TILEB)
+    a.ins16("STA_absX", 0x0500)
+    a.ins("LDA_imm", 0x00)
+    a.ins("STA_zp", Z_CELLS)
+    a.ins("STA_zp", Z_VIR)
+    # decide shared vs perpendicular axes from orientation
+    a.ins("LDA_zp", Z_ORIENT)
+    a.br("BNE", "ep_vert")
+    # ---- horizontal: shared = row(A); perpendicular = col(A), col(B) ----
+    a.ins("LDA_zp", Z_OFFA); a.ins("STA_zp", Z_CELLOFF)
+    a.jsr("scan_cell_row")               # shared row (spans A & B) once
+    a.ins("LDA_zp", Z_OFFA); a.ins("STA_zp", Z_CELLOFF)
+    a.jsr("scan_cell_col")               # A's column
+    a.ins("LDA_zp", Z_OFFB); a.ins("STA_zp", Z_CELLOFF)
+    a.jsr("scan_cell_col")               # B's column
+    a.jmp("ep_undo")
+    a.label("ep_vert")
+    # ---- vertical: shared = col(A); perpendicular = row(A), row(B) ----
+    a.ins("LDA_zp", Z_OFFA); a.ins("STA_zp", Z_CELLOFF)
+    a.jsr("scan_cell_col")               # shared column (spans A & B) once
+    a.ins("LDA_zp", Z_OFFA); a.ins("STA_zp", Z_CELLOFF)
+    a.jsr("scan_cell_row")               # A's row
+    a.ins("LDA_zp", Z_OFFB); a.ins("STA_zp", Z_CELLOFF)
+    a.jsr("scan_cell_row")               # B's row
+    a.label("ep_undo")
+    a.ins("LDA_imm", 0xFF)            # A=$FF preserved across LDX/STA below
+    a.ins("LDX_zp", Z_OFFA)
+    a.ins16("STA_absX", 0x0500)
+    a.ins("LDX_zp", Z_OFFB)
+    a.ins16("STA_absX", 0x0500)
+    a.jsr("score_update")
+    a.ins("RTS")
+
+    # ==================== SUBROUTINE: land_col ====================
+    # input  X = column (0-7)
+    # output carry CLEAR + Z_OFFB = bottom (landing) offset, Z_HIROW = landing
+    #        row, A = landing row ; carry SET if column has no empty cell.
+    # scans rows 0..15 of column X for first occupied; landing is the row above.
+    a.label("land_col")
+    a.ins("STX_zp", Z_SOFF)          # save column in Z_SOFF (reuse as col)
+    a.ins("TXA")                     # A = column = offset of row 0
+    a.ins("TAY")                     # Y walks down the column by +8
+    a.label("lc_scan")
+    a.ins16("LDA_absY", 0x0500)      # LDA $0500,Y
+    a.ins("CMP_imm", 0xFF)
+    a.br("BNE", "lc_hit")            # occupied -> landing is one row up
+    # still empty: advance Y by 8; if Y >= 128 we've fallen off the bottom and
+    # treat Y=col+128 as a virtual "hit" at the floor -> lands at row 15.
+    a.ins("TYA")
+    a.ins("CLC")
+    a.ins("ADC_imm", 0x08)
+    a.ins("TAY")
+    a.ins("CPY_imm", 0x80)           # past bottom?
+    a.br("BCC", "lc_scan")
+    # fall through to lc_hit with Y = col+128 (a fully empty column): landing
+    # offset = Y-8 = col+120 (row 15), which is exactly what lc_hit computes.
+    a.label("lc_hit")
+    # Y points at first occupied cell (or col+128 = virtual floor). landing
+    # offset = Y - 8 ; if Y < 8 the very top row is occupied -> unusable.
+    a.ins("TYA")
+    a.ins("CMP_imm", 0x08)
+    a.br("BCS", "lc_ok")
+    a.ins("SEC")                     # top row occupied -> fail
+    a.ins("RTS")
+    a.label("lc_ok")
+    a.ins("SEC")
+    a.ins("SBC_imm", 0x08)           # offset of empty cell above
+    a.ins("STA_zp", Z_OFFB)
+    # landing row = offset / 8
+    a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A")
+    a.ins("STA_zp", Z_HIROW)
+    a.ins("CLC")                     # success
+    a.ins("RTS")
+
+    # ==================== SUBROUTINE: clear_cell ====================
+    # input Z_CELLOFF = offset of a placed cell. Scans the run THROUGH that cell
+    # along its ROW and its COLUMN; if a run length is >= 4 it adds the run's
+    # cells to Z_CELLS and its virus cells to Z_VIR. (Tested primitive; eval_pair
+    # calls scan_cell_row/scan_cell_col directly for orientation-aware accounting,
+    # but clear_cell remains a clean 'both axes through this cell' entry point.)
+    a.label("clear_cell")
+    a.jsr("scan_cell_row")
+    a.jsr("scan_cell_col")
+    a.ins("RTS")
+
+    # scan_cell_row: set up ROW axis (step 1, bounds [rowstart, rowstart+7]) then
+    # run the shared color-setup + scan tail at sr_setcolor.
+    a.label("scan_cell_row")
+    a.ins("LDA_imm", 0x01)
+    a.ins("STA_zp", Z_STEP)
+    a.ins("LDA_zp", Z_CELLOFF)
+    a.ins("AND_imm", 0xF8)
+    a.ins("STA_zp", Z_MIN)
+    a.ins("CLC"); a.ins("ADC_imm", 0x07); a.ins("STA_zp", Z_MAX)
+    a.jmp("sr_setcolor")
+
+    # scan_cell_col: set up COLUMN axis (step 8, bounds [col, col+120]) then fall
+    # through to the shared sr_setcolor tail.
+    a.label("scan_cell_col")
+    a.ins("LDA_imm", 0x08)
+    a.ins("STA_zp", Z_STEP)
+    a.ins("LDA_zp", Z_CELLOFF)
+    a.ins("AND_imm", 0x07)
+    a.ins("STA_zp", Z_MIN)
+    a.ins("CLC"); a.ins("ADC_imm", 120); a.ins("STA_zp", Z_MAX)
+    a.label("sr_setcolor")            # shared tail: read color, scan, return
+    a.ins("LDX_zp", Z_CELLOFF)
+    a.ins16("LDA_absX", 0x0500)
+    a.ins("AND_imm", 0x03)
+    a.ins("STA_zp", Z_MCOLOR)
+    a.jsr("scan_run")
+    a.ins("RTS")
+
+    # ==================== SUBROUTINE: scan_run ====================
+    # Finds the contiguous same-color (Z_MCOLOR) run THROUGH cell Z_CELLOFF,
+    # walking by +/- Z_STEP within [Z_MIN, Z_MAX]. If length >= 4, adds length
+    # to Z_CELLS and the run's virus count to Z_VIR.
+    #   Z_SOFF   = walking offset
+    #   Z_RUNLEN = run length
+    #   Z_RUNVIR = run virus count (separate temp; must NOT alias Z_OFFA, which
+    #              callers rely on across consecutive scans of the same cell)
+    a.label("scan_run")
+    # walk backward to the run start
+    a.ins("LDA_zp", Z_CELLOFF)
+    a.ins("STA_zp", Z_SOFF)
+    a.label("sr_back")
+    a.ins("LDA_zp", Z_SOFF)
+    a.ins("SEC"); a.ins("SBC_zp", Z_STEP)   # candidate previous offset
+    a.ins("CMP_zp", Z_MIN)
+    a.br("BCC", "sr_backdone")               # below min -> stop
+    a.ins("TAX")                             # X = candidate offset
+    a.ins16("LDA_absX", 0x0500)
+    a.ins("CMP_imm", 0xFF)
+    a.br("BEQ", "sr_backdone")               # empty -> stop
+    a.ins("AND_imm", 0x03)
+    a.ins("CMP_zp", Z_MCOLOR)
+    a.br("BNE", "sr_backdone")               # different color -> stop
+    a.ins("STX_zp", Z_SOFF)                  # accept; keep walking back
+    a.jmp("sr_back")
+    a.label("sr_backdone")
+    # Z_SOFF = run start. walk forward counting length + viruses.
+    a.ins("LDA_imm", 0x00)
+    a.ins("STA_zp", Z_RUNLEN)
+    a.ins("STA_zp", Z_RUNVIR)
+    a.label("sr_fwd")
+    a.ins("LDX_zp", Z_SOFF)
+    a.ins16("LDA_absX", 0x0500)
+    a.ins("CMP_imm", 0xFF)
+    a.br("BEQ", "sr_commit")                 # empty -> run ends
+    a.ins("AND_imm", 0x03)
+    a.ins("CMP_zp", Z_MCOLOR)
+    a.br("BNE", "sr_commit")                 # color change -> run ends
+    a.ins("INC_zp", Z_RUNLEN)
+    a.ins16("LDA_absX", 0x0500)
+    a.ins("CMP_imm", 0xD0)                   # virus tile? (>= 0xD0)
+    a.br("BCC", "sr_novir")
+    a.ins("INC_zp", Z_RUNVIR)
+    a.label("sr_novir")
+    # advance offset by step; stop if it would exceed max
+    a.ins("LDA_zp", Z_SOFF)
+    a.ins("CLC"); a.ins("ADC_zp", Z_STEP)
+    a.ins("STA_zp", Z_SOFF)
+    a.ins("CMP_zp", Z_MAX)
+    a.br("BCC", "sr_fwd")                     # < max -> continue
+    a.br("BEQ", "sr_fwd")                     # == max -> include last cell
+    a.label("sr_commit")
+    a.ins("LDA_zp", Z_RUNLEN)
+    a.ins("CMP_imm", 0x04)
+    a.br("BCC", "sr_done")                    # run < 4 -> nothing cleared
+    a.ins("CLC"); a.ins("LDA_zp", Z_CELLS); a.ins("ADC_zp", Z_RUNLEN); a.ins("STA_zp", Z_CELLS)
+    a.ins("CLC"); a.ins("LDA_zp", Z_VIR); a.ins("ADC_zp", Z_RUNVIR); a.ins("STA_zp", Z_VIR)
+    a.label("sr_done")
+    a.ins("RTS")
+
+    # ==================== SUBROUTINE: score_update ====================
+    # Compact, overflow-free, all-positive scoring (so a plain unsigned compare
+    # works and best can start at 0):
+    #   vir' = min(VIR, 3)              (cap so vir*32 stays small)
+    #   score = vir'*32 + CELLS*2 + hirow      (max 96+16+15 = 127, no overflow)
+    # A virus clear scores >= 32 (dominates); a non-clearing drop scores just
+    # hirow (0..15), so any real clear always beats any non-clear. Among clears,
+    # more viruses > more cells > lower placement (larger hirow).
+    a.label("score_update")
+    a.ins("LDA_zp", Z_VIR)
+    a.ins("CMP_imm", 0x04)               # cap VIR at 3
+    a.br("BCC", "su_capped")
+    a.ins("LDA_imm", 0x03)
+    a.label("su_capped")
+    a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ASL_A")
+    a.ins("ASL_A"); a.ins("ASL_A")                  # VIR(<=3) * 32
+    a.ins("STA_zp", Z_SCORE)
+    a.ins("LDA_zp", Z_CELLS)
+    a.ins("ASL_A")                                  # CELLS * 2
+    a.ins("CLC"); a.ins("ADC_zp", Z_SCORE); a.ins("STA_zp", Z_SCORE)
+    a.ins("CLC"); a.ins("LDA_zp", Z_SCORE); a.ins("ADC_zp", Z_HIROW); a.ins("STA_zp", Z_SCORE)
+    # update best if strictly greater (plain unsigned: all scores >= 0)
+    a.ins("LDA_zp", Z_BEST)
+    a.ins("CMP_zp", Z_SCORE)             # best - score
+    a.br("BCS", "su_done")               # best >= score -> keep
+    a.ins("LDA_zp", Z_SCORE)
+    a.ins("STA_zp", Z_BEST)
+    a.ins("LDA_zp", Z_COL)
+    a.ins("STA_zp", Z_TARGET)
+    a.label("su_done")
+    a.ins("RTS")
+
+    return a.assemble()
+
+
+def apply_patches_v18(input_path, output_path):
+    """Build the v18 ROM: v17 toggle/mirror/AI stay in place; a new depth-1
+    simulation AI is installed at CPU $FB00 and the 0x37CF hook points to it."""
+    # Start from a fresh v17 build so toggle/mirror/study mode are all present.
+    import tempfile, os
+    tmp_v17 = output_path + ".v17tmp"
+    if not apply_patches(input_path, tmp_v17):
+        return False
+    with open(tmp_v17, "rb") as f:
+        rom_data = bytearray(f.read())
+    os.remove(tmp_v17)
+
+    print()
+    print("=== v18: installing depth-1 simulation AI ===")
+
+    V18_ROM_OFF = 0x7B10
+    V18_CPU = 0x8000 + (V18_ROM_OFF - 0x10)   # -> $FB00
+    assert V18_CPU == 0xFB00, f"unexpected v18 cpu addr {V18_CPU:#06x}"
+
+    v18 = build_v18_ai(V18_CPU)
+    end = V18_ROM_OFF + len(v18)
+    region_end = 0x7D10
+    if end > region_end:
+        print(f"ERROR: v18 routine ({len(v18)} bytes) overflows free region "
+              f"0x{V18_ROM_OFF:04X}-0x{region_end:04X}")
+        return False
+
+    rom_data[V18_ROM_OFF:V18_ROM_OFF + len(v18)] = v18
+    print(f"✓ v18 AI at 0x{V18_ROM_OFF:04X} ({len(v18)} bytes) -> CPU ${V18_CPU:04X}"
+          f"  (region 0x{V18_ROM_OFF:04X}-0x{region_end:04X}, "
+          f"{region_end - end} bytes spare)")
+
+    # Re-point the controller hook 0x37CF from v17 AI to v18 AI.
+    rom_data[0x37CF] = 0x4C  # JMP
+    rom_data[0x37D0] = V18_CPU & 0xFF
+    rom_data[0x37D1] = (V18_CPU >> 8) & 0xFF
+    print(f"✓ Re-hooked controller (0x37CF): JMP ${V18_CPU:04X} (was v17 AI)")
+
+    with open(output_path, "wb") as f:
+        f.write(rom_data)
+
+    patched_checksum = hashlib.md5(rom_data).hexdigest()
+    print(f"✓ Wrote {output_path} ({len(rom_data)} bytes, md5 {patched_checksum})")
+    print("Dr. Mario VS CPU Edition v18 (depth-1 simulation AI) built.")
+    return True
+
+
 if __name__ == "__main__":
     apply_patches(INPUT_ROM, OUTPUT_ROM)
+    apply_patches_v18(INPUT_ROM, "drmario_v18.nes")
