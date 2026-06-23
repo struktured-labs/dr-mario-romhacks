@@ -229,6 +229,10 @@ class MesenInterface:
         """Load a Mesen .mss save state file (arms a one-shot exec callback)."""
         self._send_command(f"LOADSTATE {path}")
 
+    def reset(self) -> None:
+        """Soft-reset the console (like the Reset button) -- returns to title."""
+        self._send_command("RESET")
+
     def get_game_state(self) -> Dict[str, Any]:
         """Return the consolidated Dr. Mario P2 state dictionary."""
         response = self._send_command("GET_STATE")

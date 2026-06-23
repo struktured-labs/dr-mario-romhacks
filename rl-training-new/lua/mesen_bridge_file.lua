@@ -215,6 +215,13 @@ local function handle_stepmode(v)
     return "OK stepmode=" .. tostring(step_mode)
 end
 
+-- Soft reset (like the console Reset button) -> returns to title screen, so the
+-- driver can always start a fresh game regardless of the current game state.
+local function handle_reset()
+    emu.reset()
+    return "OK reset"
+end
+
 local function dispatch(cmd_line)
     local parts = {}
     for word in string.gmatch(cmd_line, "%S+") do
@@ -244,6 +251,8 @@ local function dispatch(cmd_line)
         return seq, handle_loadstate(parts[3])
     elseif cmd == "STEPMODE" and #parts >= 3 then
         return seq, handle_stepmode(parts[3])
+    elseif cmd == "RESET" then
+        return seq, handle_reset()
     elseif cmd == "PING" then
         return seq, "PONG"
     end

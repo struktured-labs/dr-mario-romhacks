@@ -127,3 +127,39 @@ addresses by correlating reads against landed cells frame-by-frame, (b) map the
 real rotation control, then the existing frame-perfect loop (`play_rom_live.py`)
 should clear and win. All the hard infrastructure (frame-perfect bridge, input
 injection, board/capsule/X decode, save-state load) is done and verified.
+
+## UPDATE 3 (2026-06-22): FULL CONTROL CRACKED — movement + rotation verified
+
+The base-rom blockers are SOLVED. Two real bugs were masking working control:
+
+1. **Nav over-pressed Start → paused the game.** The old "press Start until a
+   virus appears on the board" loop could press Start a 3rd time *after* the game
+   had begun (Start = PAUSE in-game), freezing the capsule. Fix: deterministic
+   nav — press Start exactly twice, then NEVER press Start while `mode==4`;
+   detect a frozen capsule and unpause with a single Start.
+2. **Tested during spawn-rest.** The capsule sits at **Y=15 (`$0306`) for ~20
+   frames of spawn animation and is NOT controllable** (input ignored). It only
+   becomes controllable once it starts falling (Y<=14). Testing at Y=15 always
+   looked "frozen". Fix: wait for `mode==4 AND $0306<=13` before issuing inputs.
+
+**Canonical RAM map (from `mednafen-mcp/mcp_server.py`, Data Crystal wiki) — all
+verified live on base `drmario.nes`, 1-player:**
+
+| What | Addr | Verified |
+|---|---|---|
+| Game mode | `$0046` | boot=7, menu=1, intro=8, **active play=4** |
+| Capsule X (col 0-7) | **`$0305`** | LEFT 3→2→1, RIGHT 1→2 ✓ (NOT $004B/$0090) |
+| Capsule Y (row) | **`$0306`** | 15=spawn(top), decreases as it falls |
+| **Orientation** | **`$00A5`** | **A rotates: 0→3→2→1→0** ✓ (0=horiz,1=vertCCW,2=horizRev,3=vertCW) |
+| Pill colors | `$0301`/`$0302` | low nibble = 0/1/2 |
+| P1 level / viruses | `$0316` / `$0324` | 0 / 4 at level 0 |
+| Num players | `$0727` | 1 |
+| Board | `$0400` | virus=`$Dx`, color=low nibble, empty=`$FF` |
+
+Control primitives (frame-perfect, step-mode): rotate = tap A until `$00A5`==target
+(A decrements orient mod 4); move = tap LEFT/RIGHT until `$0305`==target; drop =
+hold DOWN until board fill increases (lock). Verified working end to end.
+
+Planner action encoding (`planner.py`): `action = variant*8 + col`,
+`variant {0:H(a,b), 1:H(b,a), 2:V(a-top,b-bottom), 3:V(b-top,a-bottom)}`. Need the
+variant→`$00A5` + color-order map (geometry verify) to drive the planner live.
