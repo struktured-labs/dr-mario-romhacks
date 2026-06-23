@@ -130,6 +130,13 @@ def rotate_to(it, rd, target):
 
 
 def move_to(it, rd, target):
+    """Set the capsule column INSTANTLY via direct RAM write ($0305 is writable and
+    the capsule lands at the written column -- verified). This avoids spending
+    game-frames tapping LEFT/RIGHT, so the capsule barely falls during maneuver --
+    critical at tall stacks / high fall speed. Falls back to tapping if needed."""
+    it.write_memory(CAP_X, [target]); it.step_frame(1)
+    if rd(CAP_X) == target:
+        return True
     for _ in range(10):
         x = rd(CAP_X)
         if x == target:
@@ -161,9 +168,9 @@ def main():
         print("no bridge"); return
     rd = lambda a: it.read_memory(a, 1)[0]
     planner = GreedyPlanner(depth=2)
+    it.set_step_mode(True)  # frame-perfect from the start -> nav is deterministic at any emu speed
     if not nav(it, rd, level=level, speed=speed):
-        print("nav failed to start a game"); it.release(0); it.disconnect(); return
-    it.set_step_mode(True)
+        print("nav failed to start a game"); it.set_step_mode(False); it.release(0); it.disconnect(); return
     if not wait_falling(it, rd):
         print("never reached gameplay"); it.set_step_mode(False); it.release(0); it.disconnect(); return
     start_v = read_board(it).virus_count()
@@ -183,6 +190,8 @@ def main():
             action = planner.choose(board, cur)
             if action is None:
                 print(f"  no legal move after {pill} pills (topped out), viruses_left={vleft}"); break
+            sim = planner.simulate(board, action, cur)
+            pred_v = sim[1] if sim else 0  # viruses the planner predicts this move clears
             variant, col = action // 8, action % 8
             nes_or = VAR2NES[variant]
             rotate_to(it, rd, nes_or)
@@ -191,9 +200,12 @@ def main():
                 rotate_to(it, rd, nes_or); move_to(it, rd, col)
             locked = drop_lock(it)
             nv = read_board(it).virus_count()
-            if pill % 2 == 0 or nv != vleft:
+            actual_v = vleft - nv
+            diverge = pred_v != actual_v  # plan vs reality mismatch (control/model bug)
+            if pill % 5 == 0 or nv != vleft or diverge:
+                tag = "  <-- DIVERGE" if diverge else ""
                 print(f"  pill#{pill+1}: var{variant}->or{nes_or} col{col} "
-                      f"locked={locked} viruses {vleft}->{nv}", flush=True)
+                      f"locked={locked} viruses {vleft}->{nv} (pred -{pred_v}/act -{actual_v}){tag}", flush=True)
             if not locked:
                 print(f"  pill didn't lock (topped out) after {pill+1} pills"); break
             if not wait_falling(it, rd):
