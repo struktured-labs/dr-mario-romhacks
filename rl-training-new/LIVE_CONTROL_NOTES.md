@@ -58,3 +58,33 @@ up most clears — which is expected.)
    (level-5 medium fall is slow enough). depth-1 is fast but weak.
 3. **New-pill detection** without a Y address — use board-fill change (lock) +
    capsule X returning to spawn.
+
+## Why real-time control keeps failing — and the real fix
+
+Tried depth-1/depth-2, horizontal-only, and tracked-rotation loops. All place
+pills but clear ~1 virus then top out (~8 pills). Root causes, all from the same
+issue — **the loop is too coarse for real-time**:
+
+- Each iteration sent ~3-6 bridge commands; the emulator runs at 60 fps
+  *independently*, so the capsule fell/locked before the loop steered it to the
+  planned column → pills pile up near spawn → top out.
+- Rotation isn't a clean RAM byte; tracking it by A-press count is fragile under
+  this timing.
+- New-pill detection via "X returns to spawn" never re-triggers when the planned
+  column ≈ the spawn column (X never leaves), so the loop holds **down** and the
+  capsule drops instantly at spawn every pill (observed on screen).
+- The planner is correct (it reads the board fine) but its plan can't be executed
+  precisely in real time.
+
+**The fix is architectural, not more tuning: frame-perfect stepping.** Mesen's Lua
+exposes `emu.breakExecution`, `emu.resume`, and `emu.step`. Rework the bridge so
+the emulator advances **only** on an explicit STEP from Python (pause between
+frames). Then each game-frame: read state, decide, inject input, step one frame —
+with unlimited wall-clock to plan (depth-2/3 fine) and exact, deterministic
+placement. This also gives reliable lock/new-pill detection (compare board
+between steps). That is the clean path to a live winning CPU; the real-time
+free-running approach here is fundamentally too imprecise.
+
+Alternative quick mitigation if frame-stepping is too invasive: slow Mesen's
+emulation speed (so the ~30 Hz loop gets many real-frames of slack per game-frame)
+— less clean but may be enough to place precisely.
