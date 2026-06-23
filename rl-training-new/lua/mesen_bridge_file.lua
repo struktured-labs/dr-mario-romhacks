@@ -206,6 +206,15 @@ local function handle_loadstate(path)
     return "OK loading"
 end
 
+-- Frame-perfect stepping: when step_mode is on, the emulator advances exactly
+-- one frame per STEP and otherwise blocks in the endFrame callback, so Python
+-- gets unlimited reads/writes/planning per frame with deterministic placement.
+local step_mode = false
+local function handle_stepmode(v)
+    step_mode = (v == "1")
+    return "OK stepmode=" .. tostring(step_mode)
+end
+
 local function dispatch(cmd_line)
     local parts = {}
     for word in string.gmatch(cmd_line, "%S+") do
@@ -233,40 +242,61 @@ local function dispatch(cmd_line)
         return seq, handle_release(parts[3])
     elseif cmd == "LOADSTATE" and #parts >= 3 then
         return seq, handle_loadstate(parts[3])
+    elseif cmd == "STEPMODE" and #parts >= 3 then
+        return seq, handle_stepmode(parts[3])
     elseif cmd == "PING" then
         return seq, "PONG"
     end
     return seq, "ERROR unknown command: " .. tostring(cmd)
 end
 
+local function read_one_command()
+    local file = io.open(CMD_FILE, "r")
+    if not file then return nil end
+    local content = file:read("*all")
+    file:close()
+    os.remove(CMD_FILE)
+    if not content or content == "" then return nil end
+    return content
+end
+
+local function second_word(s)
+    local i = 0
+    for w in string.gmatch(s, "%S+") do
+        i = i + 1
+        if i == 2 then return w end
+    end
+    return nil
+end
+
 local function process_command()
     frame_count = frame_count + 1
-
-    -- Debug heartbeat every 5 seconds (300 frames @ 60 FPS)
-    if frame_count - last_debug >= 300 then
-        print(string.format("[bridge] frame=%d cmds_handled=%d", frame_count, commands_handled))
+    if frame_count - last_debug >= 600 then
+        print(string.format("[bridge] frame=%d cmds=%d stepmode=%s", frame_count, commands_handled, tostring(step_mode)))
         last_debug = frame_count
     end
 
-    -- Open command file; if absent or unreadable, nothing to do.
-    local file = io.open(CMD_FILE, "r")
-    if not file then
+    if not step_mode then
+        -- free-run: handle at most one command this frame (original behavior)
+        local content = read_one_command()
+        if content then
+            local seq, response = dispatch(content)
+            if seq then write_response(seq, response); commands_handled = commands_handled + 1 end
+        end
         return
     end
 
-    local content = file:read("*all")
-    file:close()
-    -- Delete command file so Python knows it was consumed.
-    os.remove(CMD_FILE)
-
-    if not content or content == "" then
-        return
-    end
-
-    local seq, response = dispatch(content)
-    if seq then
-        write_response(seq, response)
-        commands_handled = commands_handled + 1
+    -- step_mode: BLOCK here servicing commands (no frame advance) until a STEP
+    -- (advance exactly one frame) or STEPMODE 0 (resume free-run).
+    while true do
+        local content = read_one_command()
+        if content then
+            local cmd = second_word(content)
+            local seq, response = dispatch(content)
+            if seq then write_response(seq, response); commands_handled = commands_handled + 1 end
+            if cmd == "STEP" then return end
+            if not step_mode then return end
+        end
     end
 end
 

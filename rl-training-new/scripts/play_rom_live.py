@@ -1,16 +1,14 @@
-"""Drive the NES Dr. Mario P1 capsule with the faithful planner (live, autonomous).
+"""Drive NES Dr. Mario with the faithful depth-2 planner via FRAME-PERFECT stepping.
 
-v5: minimal-command state machine for precise real-time placement. Earlier loops
-sent ~6 bridge commands per iteration (board+X reads + press/step/release/step),
-so they only steered once every ~6 game-frames -- too coarse, pills never reached
-their target. v5 reads only X each frame and sends one input/frame (board only on
-replan), ~3x the control rate, alternating press/release for distinct inputs.
+Uses the BASE drmario.nes (no in-ROM AI hook -- the VS-CPU hook intercepts the
+controller read, so external input only works on the un-hooked base ROM). The
+bridge's step mode advances one frame per STEP and blocks between, so each pill:
+read board -> plan (depth-2, unlimited time) -> rotate -> steer X to the exact
+column one frame at a time -> drop until it locks. Deterministic placement.
 
-Phases per pill: ROTATE (A x N for color-correct orientation) -> MOVE (L/R to the
-planned column) -> DROP (hold down). Replans per pill; auto-reloads on round loss.
-
-Verified addresses (VS CPU save slot 1, level 5): board $0400, cap X $0090,
-pill $0301/$0302, next $031A/$031B; virus=$Dx, color=low nibble, empty=$FF.
+Verified live addresses (base drmario.nes, 2P level 0 via Start x3):
+  board=$0400  capsule X(col 0-7)=$004B  pill=$0301/$0302  next=$031A/$031B
+  cell: virus=$Dx, pill=$4x-8x, color=low nibble, empty=$FF; port-0 input, DOWN locks.
 """
 import sys
 from pathlib import Path
@@ -21,11 +19,9 @@ from mesen_interface_file import MesenInterface
 from drmario.faithful_game import FaithfulBoard, Pill
 from drmario.planner import GreedyPlanner
 
-BOARD, CAP_X = 0x0400, 0x0090
+BOARD, CAP_X = 0x0400, 0x004B
 PILL_L, PILL_R, NEXT_L, NEXT_R = 0x0301, 0x0302, 0x031A, 0x031B
-SPAWN = 3
-STATE = str(RELEASE / "SaveStates/drmario_vs_cpu_1.mss")
-ROT_PRESSES = {0: 0, 1: 2, 2: 1, 3: 3}   # variant -> A presses (color-correct orientation)
+ROT_PRESSES = {0: 0, 1: 2, 2: 1, 3: 3}
 
 
 def nes_color(b):
@@ -48,13 +44,23 @@ def read_board(it):
     return b
 
 
-def start_round(it):
-    it.load_state(STATE)
-    for _ in range(6): it.step_frame(1)
-    it.set_input(0, ["start"])
-    for _ in range(8): it.step_frame(1)
-    it.set_input(0, [])
-    for _ in range(16): it.step_frame(1)
+def fill_count(it):
+    return sum(1 for b in it.read_memory(BOARD, 128) if b not in (0xFF, 0x00))
+
+
+def tap(it, btn):
+    it.set_input(0, [btn]); it.step_frame(1)
+    it.set_input(0, []); it.step_frame(1)
+
+
+def nav_new_game(it):
+    """Boot/menu nav to a fresh game (free-run)."""
+    it.step_frame(40)
+    for _ in range(3):
+        it.set_input(0, ["start"])
+        for _ in range(8): it.step_frame(1)
+        it.set_input(0, [])
+        for _ in range(40): it.step_frame(1)
 
 
 def main():
@@ -63,72 +69,58 @@ def main():
         print("no bridge"); return
     rd = lambda a: it.read_memory(a, 1)[0]
     planner = GreedyPlanner(depth=2)
-    rounds_won = 0
+    nav_new_game(it)
+    it.set_step_mode(True)
+    start_v = read_board(it).virus_count()
+    print(f"=== round start: {start_v} viruses (frame-perfect, base ROM) ===", flush=True)
+    won = False
     try:
-        for attempt in range(6):
-            start_round(it)
-            start_v = read_board(it).virus_count()
-            print(f"\n=== attempt {attempt+1}: {start_v} viruses ===", flush=True)
-            phase = "plan"
-            target_col = SPAWN
-            rot_left = 0
-            press = True       # alternate press/release for distinct inputs
-            last_x = SPAWN
-            pills = 0
-            idle = 0
-            best_v = start_v
-            for step in range(2000):
-                x = rd(CAP_X)
-                # detect new pill: X back at spawn after having moved away
-                if phase == "plan" or (x in (SPAWN, SPAWN + 1) and last_x not in (SPAWN, SPAWN + 1)):
-                    board = read_board(it)
-                    vleft = board.virus_count()
-                    if vleft == 0:
-                        print(f"*** ROUND WON in {pills} pills! ***", flush=True)
-                        rounds_won += 1; break
-                    if vleft < best_v:
-                        best_v = vleft; idle = 0
-                    cur = Pill((rd(PILL_L) & 0x0F) + 1, (rd(PILL_R) & 0x0F) + 1)
-                    nxt = Pill((rd(NEXT_L) & 0x0F) + 1, (rd(NEXT_R) & 0x0F) + 1)
-                    a = planner.choose(board, cur, nxt)
-                    if a is not None:
-                        var, target_col = a // 8, a % 8
-                        rot_left = ROT_PRESSES.get(var, 0)
-                        phase = "rotate" if rot_left else "move"
-                        pills += 1
-                        if pills % 5 == 1:
-                            print(f"  pill#{pills}: col{target_col} rot{rot_left}  viruses_left={vleft}", flush=True)
-                # choose the desired action for this phase
-                want = None
-                if phase == "rotate":
-                    want = "a" if rot_left > 0 else None
-                    if rot_left == 0:
-                        phase = "move"
-                if phase == "move":
-                    if x > target_col: want = "left"
-                    elif x < target_col: want = "right"
-                    else: phase = "drop"
-                if phase == "drop":
-                    it.set_input(0, ["down"]); last_x = x; idle += 1
+        for pill in range(150):
+            board = read_board(it)
+            vleft = board.virus_count()
+            if vleft == 0:
+                print(f"*** WON! cleared all {start_v} viruses in {pill} pills ***", flush=True)
+                won = True; break
+            # color-order verified: board-left=$0302, board-right=$0301 (swapped vs naming)
+            cur = Pill((rd(PILL_R) & 0x0F) + 1, (rd(PILL_L) & 0x0F) + 1)
+            # rotation-0 horizontal only (variant 0 = a-left,b-right) -- isolate color fix
+            col, bestv = None, -1e9
+            for action, orient, c2, p in planner.enumerate_placements(board, cur):
+                if action // 8 != 0:
                     continue
-                # alternate press / release so each input registers distinctly
-                if press and want:
-                    it.set_input(0, [want]); press = False
-                else:
-                    it.set_input(0, [])
-                    if not press and want == "a":
-                        rot_left -= 1            # count a rotation per press+release cycle
-                    press = True
-                last_x = x
-                idle += 1
-                if idle > 200:
-                    print(f"  round ended after {pills} pills, best viruses_left={best_v}", flush=True)
+                sim = planner._simulate(board, orient, c2, p)
+                if sim:
+                    imm, bs = planner._move_value(sim)
+                    if imm + bs > bestv:
+                        bestv, col = imm + bs, c2
+            if col is None:
+                print(f"  no legal move after {pill} pills (topped out)"); break
+            var = 0
+            for _ in range(12):
+                x = rd(CAP_X)
+                if x == col:
                     break
+                tap(it, "left" if x > col else "right")
+            fill0 = fill_count(it)
+            it.set_input(0, ["down"])
+            locked = False
+            for _ in range(120):
+                it.step_frame(1)
+                if fill_count(it) != fill0:
+                    locked = True; break
+            it.set_input(0, [])
+            for _ in range(4): it.step_frame(1)
+            if pill % 3 == 0 or vleft <= 4:
+                print(f"  pill#{pill+1}: col{col} rot{ROT_PRESSES.get(var,0)} locked={locked} viruses_left={vleft}", flush=True)
+            if not locked:
+                print(f"  pill didn't lock after {pill+1} pills (topped out), viruses_left={vleft}", flush=True)
+                break
     except KeyboardInterrupt:
         pass
     finally:
-        it.set_input(0, []); it.release(0)
-        print(f"\ndone. rounds won={rounds_won}", flush=True)
+        it.set_input(0, []); it.set_step_mode(False); it.release(0)
+        v = read_board(it).virus_count()
+        print(f"\ndone. won={won}  viruses left={v} (started {start_v})", flush=True)
         it.disconnect()
 
 

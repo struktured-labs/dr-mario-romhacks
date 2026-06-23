@@ -195,8 +195,17 @@ class MesenInterface:
         self._send_command(f"WRITE {address:04X} {hex_data}")
 
     def step_frame(self, frames: int = 1) -> None:
-        """Advance the emulator by ``frames`` frames (cooperative, see Lua)."""
-        self._send_command(f"STEP {frames}")
+        """Advance the emulator by ``frames`` frames. In step-mode each STEP
+        advances exactly one frame (frame-perfect); send one per frame."""
+        for _ in range(max(1, frames)):
+            self._send_command("STEP")
+
+    def set_step_mode(self, on: bool) -> None:
+        """Enable/disable frame-perfect stepping. When on, the emulator advances
+        only on step_frame() and blocks between frames (unlimited reads/planning
+        per frame, deterministic placement). When off, it free-runs (gamepad
+        works normally)."""
+        self._send_command(f"STEPMODE {1 if on else 0}")
 
     # mask bits for set_input: 1=a 2=b 4=up 8=down 16=left 32=right 64=start 128=select
     BTN = {"a": 1, "b": 2, "up": 4, "down": 8, "left": 16, "right": 32, "start": 64, "select": 128}

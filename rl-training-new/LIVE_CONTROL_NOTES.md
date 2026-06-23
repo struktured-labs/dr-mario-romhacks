@@ -88,3 +88,42 @@ free-running approach here is fundamentally too imprecise.
 Alternative quick mitigation if frame-stepping is too invasive: slow Mesen's
 emulation speed (so the ~30 Hz loop gets many real-frames of slack per game-frame)
 — less clean but may be enough to place precisely.
+
+## UPDATE 2 (2026-06-22, later): frame-perfect bridge DONE + control proven
+
+**Frame-perfect stepping is implemented and verified.** New bridge commands:
+`STEPMODE 1/0` (toggle), and in step-mode the endFrame callback *blocks* until a
+`STEP` (advance exactly one frame). Verified: state is frozen between STEPs (3
+identical reads) and exactly 12 RAM bytes change per STEP. `ScriptTimeout` raised
+to 86400 in settings.json so the blocking callback isn't killed. Client:
+`set_step_mode(on)`, `step_frame(n)` sends n individual STEPs. This removes the
+real-time race entirely — unlimited reads/planning per frame, deterministic.
+
+**Live placement control PROVEN** — with frame-perfect stepping the planner steers
+the capsule to its chosen column and drops it, locking every pill (`locked=True`
+at varied columns col0..7). The earlier real-time failures were 100% the control
+rate; frame-perfect fixes placement.
+
+**The remaining wall is per-ROM RE, on the BASE rom (`drmario.nes`):**
+- The VS-CPU rom's AI **hook on the controller read intercepts input**, so
+  external `setInput` only works in *menus* there, not gameplay. Use the base
+  `drmario.nes` (no hook): confirmed port-0 DOWN locks a pill on `$0400`.
+- Base-rom verified addrs: board `$0400`, capsule **column = `$004B`** (0-7),
+  capsule sprites `$0203/$0207`. Board decode (virus `$Dx`, color = low nibble) is
+  correct (reads a clean 4-virus level-0 board).
+- **Still murky (the blockers to a winning loop):**
+  1. **Pill colors**: `$0301/$0302` (from the VS-CPU map) don't reliably match the
+     colors that actually land on the base rom — need to find the base rom's true
+     current-pill color addresses (correlate read vs landed cell over many pills).
+  2. **Rotation**: pressing A 0/1/2/3 times all landed *horizontal* — A doesn't
+     visibly rotate to vertical here; need to find the real rotate input/mechanic
+     (try B, or write orientation RAM directly) and map variant->orientation.
+  Without correct colors + rotation, the planner's setups don't align, so it
+  places pills accurately but never completes a clear (level-0: 0 cleared in ~18
+  pills despite perfect placement).
+
+**Recommended finish:** on the base rom, (a) pin the true current-pill color
+addresses by correlating reads against landed cells frame-by-frame, (b) map the
+real rotation control, then the existing frame-perfect loop (`play_rom_live.py`)
+should clear and win. All the hard infrastructure (frame-perfect bridge, input
+injection, board/capsule/X decode, save-state load) is done and verified.
