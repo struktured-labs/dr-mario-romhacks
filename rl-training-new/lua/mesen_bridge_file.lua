@@ -172,6 +172,39 @@ local function apply_input()
         emu.setInput(btns, port)
     end
 end
+local function handle_release(port_s)
+    local port = tonumber(port_s)
+    if port then held[port] = nil end  -- stop overriding -> real controller resumes
+    return "OK"
+end
+
+-- ---- Save-state load on demand ------------------------------------------
+-- emu.loadSavestate must run inside an exec memory callback (IsSaveStateAllowed),
+-- so we arm a one-shot exec callback that loads the .mss file then unregisters.
+local pending_load_path = nil
+local function do_load()
+    if pending_load_path then
+        local f = io.open(pending_load_path, "rb")
+        if f then
+            local data = f:read("*all"); f:close()
+            if data and #data > 0 then
+                local ok = emu.loadSavestate(data)
+                print("[bridge] loadSavestate(" .. pending_load_path .. ") -> " .. tostring(ok))
+            else
+                print("[bridge] loadSavestate: empty file " .. pending_load_path)
+            end
+        else
+            print("[bridge] loadSavestate: cannot open " .. pending_load_path)
+        end
+        pending_load_path = nil
+        emu.removeMemoryCallback(do_load, emu.callbackType.exec, 0x8000, 0xFFFF)
+    end
+end
+local function handle_loadstate(path)
+    pending_load_path = path
+    emu.addMemoryCallback(do_load, emu.callbackType.exec, 0x8000, 0xFFFF)
+    return "OK loading"
+end
 
 local function dispatch(cmd_line)
     local parts = {}
@@ -196,6 +229,10 @@ local function dispatch(cmd_line)
         return seq, handle_get_state()
     elseif cmd == "INPUT" and #parts >= 4 then
         return seq, handle_input(parts[3], parts[4])
+    elseif cmd == "RELEASE" and #parts >= 3 then
+        return seq, handle_release(parts[3])
+    elseif cmd == "LOADSTATE" and #parts >= 3 then
+        return seq, handle_loadstate(parts[3])
     elseif cmd == "PING" then
         return seq, "PONG"
     end

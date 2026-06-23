@@ -212,6 +212,14 @@ class MesenInterface:
             mask |= self.BTN[b]
         self._send_command(f"INPUT {port} {mask}")
 
+    def release(self, port: int) -> None:
+        """Stop overriding ``port`` -- the real controller resumes control."""
+        self._send_command(f"RELEASE {port}")
+
+    def load_state(self, path: str) -> None:
+        """Load a Mesen .mss save state file (arms a one-shot exec callback)."""
+        self._send_command(f"LOADSTATE {path}")
+
     def get_game_state(self) -> Dict[str, Any]:
         """Return the consolidated Dr. Mario P2 state dictionary."""
         response = self._send_command("GET_STATE")
