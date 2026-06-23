@@ -30,6 +30,7 @@ from drmario.planner import GreedyPlanner
 MODE, BOARD, CAP_X, CAP_Y, ORIENT = 0x0046, 0x0400, 0x0305, 0x0306, 0x00A5
 PILL_A, PILL_B, P1_VIR, LEVEL, SPEED = 0x0301, 0x0302, 0x0324, 0x0096, 0x008B
 NEXT_A, NEXT_B = 0x031A, 0x031B  # next-pill preview (verified: becomes current next lock)
+RNG_LO, RNG_HI = 0x0017, 0x0018  # RNG state; writing at level-select varies the game
 # planner variant -> NES $00A5 orientation (verified by geometry.py drop test)
 VAR2NES = {0: 0, 1: 2, 2: 3, 3: 1}
 
@@ -81,7 +82,7 @@ def tap(it, btn):
     it.set_input(0, []); it.step_frame(1)
 
 
-def nav(it, rd, level=0, speed=None, seed_frames=0):
+def nav(it, rd, level=0, speed=None, seed=None):
     """Soft-reset to title, set the virus level (and optional speed), start a game.
 
     Flow (verified): title -> Start -> level-select (mode 1) where RIGHT/LEFT change
@@ -89,16 +90,17 @@ def nav(it, rd, level=0, speed=None, seed_frames=0):
     1=MED, 2=HI) -> Start begins the game (mode 8 intro -> 4 play). Never presses
     Start once in-game (Start = pause).
 
-    ``seed_frames`` waits extra frames on the title before starting, which advances
-    the RNG so different trials get different pill sequences (a soft reset alone is
-    deterministic -> identical games)."""
+    ``seed`` (0-255) writes the RNG state ($0017/$0018) at level-select before
+    starting, which changes the virus layout AND pill sequence -- verified live.
+    A soft reset alone replays the identical game, so this is required to get
+    distinct trials / to retry for a win."""
     def start_tap():
         it.set_input(0, ["start"]); it.step_frame(8); it.set_input(0, []); it.step_frame(40)
     def tap(b, n=1):
         for _ in range(n):
             it.set_input(0, [b]); it.step_frame(3); it.set_input(0, []); it.step_frame(3)
     it.reset()
-    it.step_frame(150 + max(0, seed_frames))  # boot to title (+ RNG-advancing wait)
+    it.step_frame(150)  # boot to title
     # reach the level-select screen
     for _ in range(5):
         if rd(MODE) in (1, 4, 8):
@@ -119,6 +121,10 @@ def nav(it, rd, level=0, speed=None, seed_frames=0):
                 if cur == speed:
                     break
                 tap("right" if cur < speed else "left")
+        # inject RNG seed so each trial gets a distinct game (verified $0017/$0018)
+        if seed is not None:
+            it.write_memory(RNG_LO, [seed & 0xFF])
+            it.write_memory(RNG_HI, [(seed ^ 0x5A) & 0xFF])
     # begin the game
     for _ in range(5):
         if rd(MODE) in (4, 8):
@@ -185,11 +191,11 @@ def drop_lock(it):
     return locked
 
 
-def play_one_game(it, rd, planner, level, speed, verbose=True, seed_frames=0):
+def play_one_game(it, rd, planner, level, speed, verbose=True, seed=None):
     """Play one game from a fresh reset at ``level``/``speed`` (frame-perfect).
-    ``seed_frames`` varies the RNG so trials differ. Returns
+    ``seed`` varies the RNG so trials differ. Returns
     {won, start_v, end_v, pills, diverge}."""
-    if not nav(it, rd, level=level, speed=speed, seed_frames=seed_frames):
+    if not nav(it, rd, level=level, speed=speed, seed=seed):
         return {"won": False, "start_v": 0, "end_v": -1, "pills": 0, "diverge": 0, "err": "nav"}
     if not wait_falling(it, rd):
         return {"won": False, "start_v": 0, "end_v": -1, "pills": 0, "diverge": 0, "err": "no-gameplay"}
@@ -254,7 +260,7 @@ def main():
         for t in range(trials):
             # vary RNG per trial (soft reset alone is deterministic -> identical games)
             r = play_one_game(it, rd, planner, level, speed,
-                              verbose=(trials == 1), seed_frames=t * 17)
+                              verbose=(trials == 1), seed=(t * 37 + 11) & 0xFF)
             results.append(r)
             print(f"game {t+1}/{trials}: won={r['won']} viruses {r['start_v']}->{r['end_v']} "
                   f"pills={r['pills']} diverge={r['diverge']}", flush=True)
