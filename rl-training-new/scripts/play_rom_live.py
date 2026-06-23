@@ -22,11 +22,14 @@ sys.path.insert(0, "/home/struktured/projects/dr-mario-mods/rl-training-new/src"
 sys.path.insert(0, "/home/struktured/projects/dr_mario_rl/.claude/worktrees/faithful-sim/src")
 RELEASE = Path("/home/struktured/projects/dr-mario-mods/mesen2/bin/linux-x64/Release")
 from mesen_interface_file import MesenInterface
-from drmario.faithful_game import FaithfulBoard, Pill
+from drmario.faithful_game import (
+    FaithfulBoard, Pill, LINK_NONE, LINK_UP, LINK_DOWN, LINK_LEFT, LINK_RIGHT,
+)
 from drmario.planner import GreedyPlanner
 
 MODE, BOARD, CAP_X, CAP_Y, ORIENT = 0x0046, 0x0400, 0x0305, 0x0306, 0x00A5
 PILL_A, PILL_B, P1_VIR, LEVEL, SPEED = 0x0301, 0x0302, 0x0324, 0x0096, 0x008B
+NEXT_A, NEXT_B = 0x031A, 0x031B  # next-pill preview (verified: becomes current next lock)
 # planner variant -> NES $00A5 orientation (verified by geometry.py drop test)
 VAR2NES = {0: 0, 1: 2, 2: 3, 3: 1}
 
@@ -41,6 +44,23 @@ def nes_color(b):
     return 0, False
 
 
+def nes_link(b):
+    """Decode the capsule connection from a board tile (verified live):
+    0x4x=top half (links down), 0x5x=bottom (links up), 0x6x=left (links right),
+    0x7x=right (links left), else single/virus/empty. Correct links are essential
+    so the planner's cascade gravity matches the ROM (pairs fall rigidly)."""
+    hi = b & 0xF0
+    if hi == 0x40:
+        return LINK_DOWN
+    if hi == 0x50:
+        return LINK_UP
+    if hi == 0x60:
+        return LINK_RIGHT
+    if hi == 0x70:
+        return LINK_LEFT
+    return LINK_NONE
+
+
 def read_board(it):
     pf = it.read_memory(BOARD, 128)
     b = FaithfulBoard(16, 8)
@@ -48,6 +68,7 @@ def read_board(it):
         c, v = nes_color(byte)
         b.color[i // 8, i % 8] = c
         b.is_virus[i // 8, i % 8] = v
+        b.link[i // 8, i % 8] = nes_link(byte) if not v else LINK_NONE
     return b
 
 
@@ -60,20 +81,24 @@ def tap(it, btn):
     it.set_input(0, []); it.step_frame(1)
 
 
-def nav(it, rd, level=0, speed=None):
+def nav(it, rd, level=0, speed=None, seed_frames=0):
     """Soft-reset to title, set the virus level (and optional speed), start a game.
 
     Flow (verified): title -> Start -> level-select (mode 1) where RIGHT/LEFT change
     the virus level ($0096) and, on the speed row, the speed cursor ($008B; 0=LOW,
     1=MED, 2=HI) -> Start begins the game (mode 8 intro -> 4 play). Never presses
-    Start once in-game (Start = pause)."""
+    Start once in-game (Start = pause).
+
+    ``seed_frames`` waits extra frames on the title before starting, which advances
+    the RNG so different trials get different pill sequences (a soft reset alone is
+    deterministic -> identical games)."""
     def start_tap():
         it.set_input(0, ["start"]); it.step_frame(8); it.set_input(0, []); it.step_frame(40)
     def tap(b, n=1):
         for _ in range(n):
             it.set_input(0, [b]); it.step_frame(3); it.set_input(0, []); it.step_frame(3)
     it.reset()
-    it.step_frame(150)  # boot: logo -> title
+    it.step_frame(150 + max(0, seed_frames))  # boot to title (+ RNG-advancing wait)
     # reach the level-select screen
     for _ in range(5):
         if rd(MODE) in (1, 4, 8):
@@ -160,69 +185,86 @@ def drop_lock(it):
     return locked
 
 
+def play_one_game(it, rd, planner, level, speed, verbose=True, seed_frames=0):
+    """Play one game from a fresh reset at ``level``/``speed`` (frame-perfect).
+    ``seed_frames`` varies the RNG so trials differ. Returns
+    {won, start_v, end_v, pills, diverge}."""
+    if not nav(it, rd, level=level, speed=speed, seed_frames=seed_frames):
+        return {"won": False, "start_v": 0, "end_v": -1, "pills": 0, "diverge": 0, "err": "nav"}
+    if not wait_falling(it, rd):
+        return {"won": False, "start_v": 0, "end_v": -1, "pills": 0, "diverge": 0, "err": "no-gameplay"}
+    start_v = read_board(it).virus_count()
+    if verbose:
+        spd = {0: "LOW", 1: "MED", 2: "HI"}.get(rd(SPEED), "?")
+        print(f"=== level {rd(LEVEL)} start: {start_v} viruses, speed={spd} ===", flush=True)
+    won, diverge_ct, vleft, pill = False, 0, start_v, 0
+    for pill in range(300):
+        board = read_board(it)
+        vleft = board.virus_count()
+        if vleft == 0:
+            won = True; break
+        cur = Pill((rd(PILL_A) & 0x0F) + 1, (rd(PILL_B) & 0x0F) + 1)
+        nxt = Pill((rd(NEXT_A) & 0x0F) + 1, (rd(NEXT_B) & 0x0F) + 1)
+        action = planner.choose(board, cur, nxt)  # exact 2-ply (real next pill)
+        if action is None:
+            if verbose:
+                print(f"  no legal move (topped out), viruses_left={vleft}", flush=True)
+            break
+        sim = planner.simulate(board, action, cur)
+        pred_v = sim[1] if sim else 0
+        variant, col = action // 8, action % 8
+        nes_or = VAR2NES[variant]
+        rotate_to(it, rd, nes_or)
+        move_to(it, rd, col)
+        if rd(ORIENT) != nes_or:  # drifted (rare wall-kick) -- correct once
+            rotate_to(it, rd, nes_or); move_to(it, rd, col)
+        locked = drop_lock(it)
+        nv = read_board(it).virus_count()
+        if pred_v != (vleft - nv):
+            diverge_ct += 1
+        if verbose and (pill % 5 == 0 or nv != vleft or pred_v != (vleft - nv)):
+            tag = "  <-- DIVERGE" if pred_v != (vleft - nv) else ""
+            print(f"  pill#{pill+1}: var{variant}->or{nes_or} col{col} "
+                  f"viruses {vleft}->{nv} (pred -{pred_v}/act -{vleft-nv}){tag}", flush=True)
+        if nv == 0:  # cleared the level THIS drop -- win before the game advances levels
+            won = True; vleft = 0; break
+        if not locked:
+            if verbose:
+                print(f"  pill didn't lock (topped out) after {pill+1}", flush=True)
+            break
+        if not wait_falling(it, rd):
+            if read_board(it).virus_count() == 0:
+                won = True; vleft = 0
+            break
+    return {"won": won, "start_v": start_v, "end_v": vleft, "pills": pill + 1, "diverge": diverge_ct}
+
+
 def main():
     level = int(sys.argv[1]) if len(sys.argv) > 1 else 0
     speed = int(sys.argv[2]) if len(sys.argv) > 2 else None  # 0=LOW 1=MED 2=HI
+    trials = int(sys.argv[3]) if len(sys.argv) > 3 else 1
     it = MesenInterface(work_dir=RELEASE)
     if not it.connect(timeout=8):
         print("no bridge"); return
     rd = lambda a: it.read_memory(a, 1)[0]
     planner = GreedyPlanner(depth=2)
-    it.set_step_mode(True)  # frame-perfect from the start -> nav is deterministic at any emu speed
-    if not nav(it, rd, level=level, speed=speed):
-        print("nav failed to start a game"); it.set_step_mode(False); it.release(0); it.disconnect(); return
-    if not wait_falling(it, rd):
-        print("never reached gameplay"); it.set_step_mode(False); it.release(0); it.disconnect(); return
-    start_v = read_board(it).virus_count()
-    spd = {0: "LOW", 1: "MED", 2: "HI"}.get(rd(SPEED), "?")
-    print(f"=== level {rd(LEVEL)} start: {start_v} viruses, speed={spd} (base ROM, frame-perfect) ===", flush=True)
-    won = False
+    it.set_step_mode(True)  # frame-perfect -> nav + play deterministic at any emu speed
+    results = []
     try:
-        for pill in range(250):
-            board = read_board(it)
-            vleft = board.virus_count()
-            if vleft == 0:
-                print(f"*** WON! cleared all {start_v} viruses in {pill} pills ***", flush=True)
-                won = True; break
-            a = (rd(PILL_A) & 0x0F) + 1
-            b = (rd(PILL_B) & 0x0F) + 1
-            cur = Pill(a, b)
-            action = planner.choose(board, cur)
-            if action is None:
-                print(f"  no legal move after {pill} pills (topped out), viruses_left={vleft}"); break
-            sim = planner.simulate(board, action, cur)
-            pred_v = sim[1] if sim else 0  # viruses the planner predicts this move clears
-            variant, col = action // 8, action % 8
-            nes_or = VAR2NES[variant]
-            rotate_to(it, rd, nes_or)
-            move_to(it, rd, col)
-            if rd(ORIENT) != nes_or:  # drifted (rare wall-kick) -- correct once
-                rotate_to(it, rd, nes_or); move_to(it, rd, col)
-            locked = drop_lock(it)
-            nv = read_board(it).virus_count()
-            actual_v = vleft - nv
-            diverge = pred_v != actual_v  # plan vs reality mismatch (control/model bug)
-            if pill % 5 == 0 or nv != vleft or diverge:
-                tag = "  <-- DIVERGE" if diverge else ""
-                print(f"  pill#{pill+1}: var{variant}->or{nes_or} col{col} "
-                      f"locked={locked} viruses {vleft}->{nv} (pred -{pred_v}/act -{actual_v}){tag}", flush=True)
-            if not locked:
-                print(f"  pill didn't lock (topped out) after {pill+1} pills"); break
-            if not wait_falling(it, rd):
-                nv = read_board(it).virus_count()
-                if nv == 0:
-                    print(f"*** WON! cleared all {start_v} viruses in {pill+1} pills ***", flush=True)
-                    won = True
-                else:
-                    print(f"  no next capsule (game over?) viruses_left={nv}")
-                break
+        for t in range(trials):
+            # vary RNG per trial (soft reset alone is deterministic -> identical games)
+            r = play_one_game(it, rd, planner, level, speed,
+                              verbose=(trials == 1), seed_frames=t * 17)
+            results.append(r)
+            print(f"game {t+1}/{trials}: won={r['won']} viruses {r['start_v']}->{r['end_v']} "
+                  f"pills={r['pills']} diverge={r['diverge']}", flush=True)
     except KeyboardInterrupt:
         pass
     finally:
-        it.set_input(0, []); it.set_step_mode(False); it.release(0)
-        v = read_board(it).virus_count()
-        print(f"\ndone. won={won}  viruses left={v} (started {start_v})", flush=True)
-        it.disconnect()
+        it.set_input(0, []); it.set_step_mode(False); it.release(0); it.disconnect()
+    wins = sum(1 for r in results if r["won"])
+    if results:
+        print(f"\n=== WIN RATE: {wins}/{len(results)} at level {level} speed={speed} ===", flush=True)
 
 
 if __name__ == "__main__":
