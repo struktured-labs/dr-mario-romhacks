@@ -659,8 +659,12 @@ VIR_W = 32
 CELL_W = 2
 
 
-def build_v18_ai(ai_cpu, with_rotation=False):
+def build_v18_ai(ai_cpu, with_rotation=False, color_swap=False):
     """Emit the v18 depth-1 simulation AI. Returns bytes. ai_cpu = CPU load addr.
+
+    color_swap: after the normal V/H search, re-evaluate the SINGLE chosen column
+    in the swapped color order (1 extra eval) so the matching color goes where a
+    virus is; swap_eval is emitted at $CF00 by apply_patches_v18.
 
     with_rotation: if True (the "v28" build), (a) save the best-scoring
     placement's orientation into Z_BORIENT ($DA), and (b) replace the inline
@@ -811,7 +815,10 @@ def build_v18_ai(ai_cpu, with_rotation=False):
         # Search is callable from the $FF54 wrapper: return after it has set
         # Z_TARGET ($00) and Z_BORIENT ($DA). The wrapper does orient+move.
         a.label("search_done")
-        a.ins("RTS")
+        if color_swap:
+            a.jmp(0xCF00)            # re-eval chosen column swapped, then RTS (in swap_eval)
+        else:
+            a.ins("RTS")
         a.label("exit")
         a.ins("RTS")
     else:
@@ -855,6 +862,8 @@ def build_v18_ai(ai_cpu, with_rotation=False):
     a.ins("STA_zp", Z_VIR)
     # decide shared vs perpendicular axes from orientation
     a.ins("LDA_zp", Z_ORIENT)
+    if color_swap:
+        a.ins("AND_imm", 0x01)       # parity: swapped variants use orient 2/3
     a.br("BNE", "ep_vert")
     # ---- horizontal: shared = row(A); perpendicular = col(A), col(B) ----
     a.ins("LDA_zp", Z_OFFA); a.ins("STA_zp", Z_CELLOFF)
@@ -928,10 +937,11 @@ def build_v18_ai(ai_cpu, with_rotation=False):
     # cells to Z_CELLS and its virus cells to Z_VIR. (Tested primitive; eval_pair
     # calls scan_cell_row/scan_cell_col directly for orientation-aware accounting,
     # but clear_cell remains a clean 'both axes through this cell' entry point.)
-    a.label("clear_cell")
-    a.jsr("scan_cell_row")
-    a.jsr("scan_cell_col")
-    a.ins("RTS")
+    if not color_swap:                   # dead routine (never called); drop it to
+        a.label("clear_cell")            # free 7 bytes for color_swap's geometry saves
+        a.jsr("scan_cell_row")
+        a.jsr("scan_cell_col")
+        a.ins("RTS")
 
     # scan_cell_row: set up ROW axis (step 1, bounds [rowstart, rowstart+7]) then
     # run the shared color-setup + scan tail at sr_setcolor.
@@ -1063,6 +1073,9 @@ def build_v18_ai(ai_cpu, with_rotation=False):
     if with_rotation:
         a.ins("LDA_zp", Z_ORIENT)    # remember the winning placement's orientation
         a.ins("STA_zp", 0xDA)        # Z_BORIENT (0 = horizontal, 1 = vertical)
+    if color_swap:
+        a.ins("LDA_zp", Z_OFFA); a.ins("STA_zp", 0xD0)   # stash best geometry for swap_eval
+        a.ins("LDA_zp", Z_OFFB); a.ins("STA_zp", 0xD1)
     a.label("su_done")
     a.ins("RTS")
 
@@ -1132,7 +1145,8 @@ def _emit_rotation_wrapper(rom_data, search_entry, rotate_exec=True):
     return RELOC_CPU + len(reloc), RELOC_OFF + len(reloc)
 
 
-def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=True):
+def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=True,
+                      color_swap=False):
     """Build the v18 ROM: v17 toggle/mirror/AI stay in place; a new depth-1
     simulation AI is installed at CPU $FB00 and the 0x37CF hook points to it.
 
@@ -1155,7 +1169,8 @@ def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=
     V18_CPU = 0x8000 + (V18_ROM_OFF - 0x10)   # -> $FB00
     assert V18_CPU == 0xFB00, f"unexpected v18 cpu addr {V18_CPU:#06x}"
 
-    v18, v18_labels = build_v18_ai(V18_CPU, with_rotation=with_rotation)
+    v18, v18_labels = build_v18_ai(V18_CPU, with_rotation=with_rotation,
+                                   color_swap=color_swap)
     end = V18_ROM_OFF + len(v18)
     region_end = 0x7D10
     if end > region_end:
@@ -1176,6 +1191,28 @@ def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=
 
     if with_rotation:
         _emit_rotation_wrapper(rom_data, v18_labels["search_entry"], rotate_exec)
+        if color_swap:
+            # swap_eval at $CF00 (file 0x4F10, a free 0xFF run): re-eval the chosen
+            # column in the swapped color order (orient = Z_BORIENT+2), then RTS to
+            # the rotation wrapper. score_update keeps it only if it scores higher,
+            # and the wrapper rotates to orient 2/3 (matching color order).
+            SWAP_CPU, SWAP_OFF = 0xCF00, 0x4F10
+            ep = v18_labels["eval_pair"]
+            s = Asm6502(SWAP_CPU)
+            s.ins("LDA_zp", Z_BEST); s.br("BNE", "go"); s.ins("RTS"); s.label("go")  # guard
+            s.ins("LDA_zp", 0xD0); s.ins("STA_zp", Z_OFFA)   # restore best geometry
+            s.ins("LDA_zp", 0xD1); s.ins("STA_zp", Z_OFFB)
+            s.ins("LDA_zp", Z_OFFA)
+            s.ins("LSR_A"); s.ins("LSR_A"); s.ins("LSR_A"); s.ins("STA_zp", Z_HIROW)
+            s.ins("LDA_zp", 0x00); s.ins("STA_zp", Z_COL)    # Z_TARGET -> Z_COL (score_update reads)
+            s.ins("LDA_zp", 0xDA); s.ins("CLC"); s.ins("ADC_imm", 0x02); s.ins("STA_zp", Z_ORIENT)
+            s.ins("LDX_zp", Z_OFFA); s.ins("LDA_zp", Z_OFFB)  # swap which color goes where
+            s.ins("STA_zp", Z_OFFA); s.ins("STX_zp", Z_OFFB)
+            s.jsr(ep); s.ins("RTS")
+            sb = s.assemble()
+            assert SWAP_OFF + len(sb) <= 0x4F40, "swap_eval overflows $CF00 run"
+            rom_data[SWAP_OFF:SWAP_OFF + len(sb)] = sb
+            print(f"✓ swap_eval at 0x{SWAP_OFF:04X} (CPU $CF00, {len(sb)} bytes) — color-swap")
 
     with open(output_path, "wb") as f:
         f.write(rom_data)
@@ -2200,6 +2237,7 @@ if __name__ == "__main__":
     apply_patches_v18(INPUT_ROM, "drmario_v18.nes")
     apply_patches_v18(INPUT_ROM, "drmario_v28.nes", with_rotation=True)
     apply_patches_v18(INPUT_ROM, "drmario_v28h.nes", with_rotation=True, rotate_exec=False)
+    apply_patches_v18(INPUT_ROM, "drmario_v28cs.nes", with_rotation=True, color_swap=True)
     apply_patches_v19(INPUT_ROM, "drmario_v19.nes")
     apply_patches_v19(INPUT_ROM, "drmario_v29.nes", with_rotation=True)
     apply_patches_v20(INPUT_ROM, "drmario_v20.nes")
