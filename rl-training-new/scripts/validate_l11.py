@@ -34,16 +34,13 @@ def main():
     tap("select"); tap("select"); tap("start", 8, 60)
     for _ in range(25): tap("left", 4, 6)
     for _ in range(11): tap("right", 5, 9)
+    seed = int(os.environ.get("DRM_SEED", "0"))   # vary virus layout: write BEFORE the start
+    if seed:
+        w(0x0017, [seed & 0xFF]); w(0x0018, [(seed >> 8) & 0xFF])
     tap("start", 8, 120)
     for _ in range(200):
         if r(0x46) == 4: break
         it.step_frame(8)
-    # RNG variation: Dr. Mario's PRNG lives at $0017/$0018. Writing a seed right
-    # at play start (before the virus intro) varies the virus layout + pill
-    # sequence so repeated runs are independent games, not a deterministic replay.
-    seed = int(os.environ.get("DRM_SEED", "0"))
-    if seed:
-        w(0x0017, [seed & 0xFF]); w(0x0018, [(seed >> 8) & 0xFF])
     def keep_p1_alive():
         # Clear ALL capsule tiles ($40-$7F) across P1's whole board so stacked
         # pieces can never top P1 out; preserve viruses ($Dx) so P1 can't win.

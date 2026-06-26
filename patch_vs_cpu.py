@@ -659,7 +659,7 @@ VIR_W = 32
 CELL_W = 2
 
 
-def build_v18_ai(ai_cpu, with_rotation=False, color_swap=False):
+def build_v18_ai(ai_cpu, with_rotation=False, color_swap=False, burial_cpu=None):
     """Emit the v18 depth-1 simulation AI. Returns bytes. ai_cpu = CPU load addr.
 
     color_swap: after the normal V/H search, re-evaluate the SINGLE chosen column
@@ -882,6 +882,8 @@ def build_v18_ai(ai_cpu, with_rotation=False, color_swap=False):
     a.ins("LDA_zp", Z_OFFB); a.ins("STA_zp", Z_CELLOFF)
     a.jsr("scan_cell_row")               # B's row
     a.label("ep_undo")
+    if burial_cpu is not None:
+        a.jsr(burial_cpu)            # TEST: no-op burial to isolate JSR/placement
     a.ins("LDA_imm", 0xFF)            # A=$FF preserved across LDX/STA below
     a.ins("LDX_zp", Z_OFFA)
     a.ins16("STA_absX", 0x0500)
@@ -937,7 +939,7 @@ def build_v18_ai(ai_cpu, with_rotation=False, color_swap=False):
     # cells to Z_CELLS and its virus cells to Z_VIR. (Tested primitive; eval_pair
     # calls scan_cell_row/scan_cell_col directly for orientation-aware accounting,
     # but clear_cell remains a clean 'both axes through this cell' entry point.)
-    if not color_swap:                   # dead routine (never called); drop it to
+    if not (color_swap or burial_cpu is not None):   # dead routine; drop for space
         a.label("clear_cell")            # free 7 bytes for color_swap's geometry saves
         a.jsr("scan_cell_row")
         a.jsr("scan_cell_col")
@@ -1057,11 +1059,16 @@ def build_v18_ai(ai_cpu, with_rotation=False, color_swap=False):
     a.label("su_capped")
     a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ASL_A")
     a.ins("ASL_A"); a.ins("ASL_A")                  # VIR(<=3) * 32
-    a.ins("STA_zp", Z_SCORE)
+    a.ins("STA_zp", Z_SCORE)                        # Z_SCORE = vir*32 (kept apart)
     a.ins("LDA_zp", Z_CELLS)
     a.ins("ASL_A")                                  # CELLS * 2
-    a.ins("CLC"); a.ins("ADC_zp", Z_SCORE); a.ins("STA_zp", Z_SCORE)
-    a.ins("CLC"); a.ins("LDA_zp", Z_SCORE); a.ins("ADC_zp", Z_HIROW); a.ins("STA_zp", Z_SCORE)
+    a.ins("CLC"); a.ins("ADC_zp", Z_HIROW)          # + hirow (SHAPE part)
+    if burial_cpu is not None:
+        a.ins("SEC"); a.ins("SBC_zp", 0xDC)         # shape - Z_BURIED; vir*32 stays whole
+        a.br("BCS", "su_noflo")
+        a.ins("LDA_imm", 0x00)
+        a.label("su_noflo")
+    a.ins("CLC"); a.ins("ADC_zp", Z_SCORE); a.ins("STA_zp", Z_SCORE)   # + vir*32 -> final
     # update best if strictly greater (plain unsigned: all scores >= 0)
     a.ins("LDA_zp", Z_BEST)
     a.ins("CMP_zp", Z_SCORE)             # best - score
@@ -1145,8 +1152,30 @@ def _emit_rotation_wrapper(rom_data, search_entry, rotate_exec=True):
     return RELOC_CPU + len(reloc), RELOC_OFF + len(reloc)
 
 
+def _build_marginal_burial(cpu):
+    """Buried_pen: viruses just below each candidate cell (capped 5 deep to stay in
+    the NMI cycle budget) -> Z_BURIED ($DC)."""
+    a = Asm6502(cpu)
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xDC)
+    a.ins("LDX_zp", 0x6D); a.jsr("bp_col")
+    a.ins("LDX_zp", 0x6E); a.jsr("bp_col")
+    a.ins("RTS")
+    a.label("bp_col"); a.ins("LDY_imm", 0x05)        # cap: 5 cells deep
+    a.label("bp_loop")
+    a.ins("INX"); a.ins("INX"); a.ins("INX"); a.ins("INX")  # +4
+    a.ins("INX"); a.ins("INX"); a.ins("INX"); a.ins("INX")  # +8 (next row, no A math)
+    a.ins("CPX_imm", 0x80); a.br("BCS", "bp_ret")
+    a.ins16("LDA_absX", 0x0500)
+    a.ins("CMP_imm", 0xD0); a.br("BCC", "bp_skip")
+    a.ins("CMP_imm", 0xE0); a.br("BCS", "bp_skip")
+    a.ins("INC_zp", 0xDC)
+    a.label("bp_skip"); a.ins("DEY"); a.br("BNE", "bp_loop")
+    a.label("bp_ret"); a.ins("RTS")
+    return a.assemble()
+
+
 def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=True,
-                      color_swap=False):
+                      color_swap=False, buried_pen=False):
     """Build the v18 ROM: v17 toggle/mirror/AI stay in place; a new depth-1
     simulation AI is installed at CPU $FB00 and the 0x37CF hook points to it.
 
@@ -1169,8 +1198,13 @@ def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=
     V18_CPU = 0x8000 + (V18_ROM_OFF - 0x10)   # -> $FB00
     assert V18_CPU == 0xFB00, f"unexpected v18 cpu addr {V18_CPU:#06x}"
 
+    burial_cpu = None
+    if buried_pen and with_rotation:
+        wrapper_len = len(_build_rotation_wrapper(0xFF54, 0x0000, rotate_exec))
+        burial_cpu = 0xFF54 + wrapper_len
+        BURIAL_OFF = 0x7F64 + wrapper_len
     v18, v18_labels = build_v18_ai(V18_CPU, with_rotation=with_rotation,
-                                   color_swap=color_swap)
+                                   color_swap=color_swap, burial_cpu=burial_cpu)
     end = V18_ROM_OFF + len(v18)
     region_end = 0x7D10
     if end > region_end:
@@ -1191,6 +1225,10 @@ def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=
 
     if with_rotation:
         _emit_rotation_wrapper(rom_data, v18_labels["search_entry"], rotate_exec)
+        if burial_cpu is not None:
+            mb = _build_marginal_burial(burial_cpu)
+            rom_data[BURIAL_OFF:BURIAL_OFF+len(mb)] = mb
+            print(f"✓ TEST real burial (no score use) at 0x{BURIAL_OFF:04X} ({len(mb)}B)")
         if color_swap:
             # swap_eval at $CF00 (file 0x4F10, a free 0xFF run): re-eval the chosen
             # column in the swapped color order (orient = Z_BORIENT+2), then RTS to
@@ -2238,6 +2276,7 @@ if __name__ == "__main__":
     apply_patches_v18(INPUT_ROM, "drmario_v28.nes", with_rotation=True)
     apply_patches_v18(INPUT_ROM, "drmario_v28h.nes", with_rotation=True, rotate_exec=False)
     apply_patches_v18(INPUT_ROM, "drmario_v28cs.nes", with_rotation=True, color_swap=True)
+    apply_patches_v18(INPUT_ROM, "drmario_v28bt.nes", with_rotation=True, buried_pen=True)
     apply_patches_v19(INPUT_ROM, "drmario_v19.nes")
     apply_patches_v19(INPUT_ROM, "drmario_v29.nes", with_rotation=True)
     apply_patches_v20(INPUT_ROM, "drmario_v20.nes")
