@@ -1016,7 +1016,16 @@ def build_v18_ai(ai_cpu, with_rotation=False):
     a.label("sr_commit")
     a.ins("LDA_zp", Z_RUNLEN)
     a.ins("CMP_imm", 0x04)
-    a.br("BCC", "sr_done")                    # run < 4 -> nothing cleared
+    a.br("BCS", "sr_clear")                   # run >= 4 -> clear accounting
+    # run < 4: SETUP bonus — a sub-4 run that contains a same-color virus is one
+    # short of clearing it; count it as +1 "near-clear" cell so the existing
+    # cells*2 term rewards BUILDING toward clears (the AI otherwise stalls once
+    # the easy clears are gone). Reuses Z_CELLS to avoid a separate score term.
+    a.ins("LDA_zp", Z_RUNVIR)
+    a.br("BEQ", "sr_done")                    # sub-4 run, no virus -> nothing
+    a.ins("INC_zp", Z_CELLS)                  # +1 near-clear cell
+    a.br("BNE", "sr_done")                    # always taken (cells>=1 after INC)
+    a.label("sr_clear")
     a.ins("CLC"); a.ins("LDA_zp", Z_CELLS); a.ins("ADC_zp", Z_RUNLEN); a.ins("STA_zp", Z_CELLS)
     a.ins("CLC"); a.ins("LDA_zp", Z_VIR); a.ins("ADC_zp", Z_RUNVIR); a.ins("STA_zp", Z_VIR)
     a.label("sr_done")
@@ -1081,16 +1090,19 @@ def _build_rotation_wrapper(wrapper_cpu, search_entry, rotate_exec=True):
     w.jsr(search_entry)                          # y > lastY -> new pill -> re-search
     # Snapshot the chosen column from Z_TARGET($00, burial-safe) into $DE. The
     # game clobbers $00 between polls, so the move below reads $DE instead.
-    w.ins("LDA_zp", 0x00); w.ins("STA_zp", 0xDE)
+    w.ins("LDA_zp", 0x00); w.ins("STA_zp", 0xDD)
     w.label("reuse")
     # Update last-y AFTER any search, so burial's mid-search scratch of $DF is
     # overwritten with the true current y.
     w.ins("LDA_abs", 0x86, 0x03); w.ins("STA_zp", 0xDF)
-    # --- orient: rotate (edge-triggered A) until parity matches Z_BORIENT ---
+    # --- orient: rotate (edge-triggered A=CCW, one orient step 0->3->2->1->0 per
+    #     frame) until $03A5 == Z_BORIENT EXACTLY (full 0-3 orientation, not just
+    #     H/V parity). This matches the precise color arrangement the search
+    #     chose, fixing vertical placements whose colors were flipped, and
+    #     enabling color-swap variants (orient 0/2 = H two color orders, 1/3 = V).
     if rotate_exec:
-        w.ins("LDA_abs", 0xA5, 0x03)                 # P2 orientation $03A5
-        w.raw(0x29, 0x01)                            # AND #$01 (orientation parity)
-        w.ins("CMP_zp", 0xDA)                        # vs Z_BORIENT
+        w.ins("LDA_abs", 0xA5, 0x03)                 # P2 orientation $03A5 (0-3)
+        w.ins("CMP_zp", 0xDA)                        # vs Z_BORIENT (full 0-3)
         w.br("BEQ", "mv")
         w.ins("LDA_imm", 0x00); w.ins("STA_zp", 0xF8)  # clear P2 prev -> rising edge
         w.ins("LDA_imm", 0x80); w.ins("STA_zp", 0xF6)  # $80 = A = rotate CCW
@@ -1098,7 +1110,7 @@ def _build_rotation_wrapper(wrapper_cpu, search_entry, rotate_exec=True):
     # --- move: nudge toward target column, drop when aligned ---
     w.label("mv")
     w.ins("LDA_abs", 0x85, 0x03)                 # P2 capsule X $0385
-    w.ins("CMP_zp", 0xDE)                        # vs cached target ($DE)
+    w.ins("CMP_zp", 0xDD)                        # vs cached target ($DD, burial-safe)
     w.br("BEQ", "dn")
     w.ins("LDY_imm", 0x01); w.br("BCC", "st")    # capX<target -> Right
     w.ins("LDY_imm", 0x02); w.jmp("st")          # else Left

@@ -4,7 +4,7 @@ board while keeping idle-P1 alive (blank P1's top rows so it can't top out, but
 leave P1's viruses so P1 can't win either). Tracks P2's real virus count
 (tiles with high nibble $D in $0500-$057F) until win / topout / timeout.
 """
-import sys, collections
+import sys, os, collections
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from mesen_interface_file import MesenInterface
@@ -38,6 +38,12 @@ def main():
     for _ in range(200):
         if r(0x46) == 4: break
         it.step_frame(8)
+    # RNG variation: Dr. Mario's PRNG lives at $0017/$0018. Writing a seed right
+    # at play start (before the virus intro) varies the virus layout + pill
+    # sequence so repeated runs are independent games, not a deterministic replay.
+    seed = int(os.environ.get("DRM_SEED", "0"))
+    if seed:
+        w(0x0017, [seed & 0xFF]); w(0x0018, [(seed >> 8) & 0xFF])
     # wait for the virus intro to finish placing all viruses on BOTH boards
     for _ in range(60):
         it.step_frame(16)
