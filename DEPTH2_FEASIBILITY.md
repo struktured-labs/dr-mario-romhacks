@@ -69,6 +69,8 @@ and cycle-countable offline, no Mesen. (nes_py can't run drmario — MMC1 unsupp
 |---|---|---|---|---|
 | `score_board_shape` (max_height, holes, top_risk) | test_shape_eval.py | 97 | 600/600 boards | ~5310 cyc (2.4 frames) |
 | `find_clears` (mark+clear all >=4 runs, count cells/viruses) | test_clear_detect.py | 217 | 800/800 boards | ~25k cyc (11.8 frames) full-board |
+| `apply_gravity` (column-compact, viruses fixed) | test_gravity.py | 98 | 800/800 boards | ~5.9k cyc (2.9 frames) |
+| **`resolve`** (find_clears→gravity loop, cascades) | test_resolve.py | 347 | **500/500 vs Python AND 500/500 vs faithful engine** | ~32k avg / 114k max cyc |
 
 **find_clears full-board is ~25k cyc** — too slow to run per placement. The port
 must use a **targeted scan** (only the placed cells' row + 2 columns, ~3 lines vs
