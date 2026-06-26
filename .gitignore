@@ -17,3 +17,7 @@ __pycache__/
 tmp/
 log/
 setenv.sh
+
+# transient emulator/run logs
+*.log
+mesen*.log
