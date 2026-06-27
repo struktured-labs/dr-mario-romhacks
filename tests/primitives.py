@@ -43,11 +43,33 @@ def emit_resolve(a):
     a.jmp("rs_loop")
 
 
+def emit_resolve_targeted(a):
+    """Like resolve but the FIRST pass scans only the 2 placed cells' lines
+    (cheap); if nothing clears we return immediately. After any clear the board
+    can cascade anywhere, so subsequent passes use the full find_clears."""
+    a.label("resolve_targeted")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", RV_CELLS); a.ins("STA_zp", RV_VIR)
+    a.jsr("find_clears_targeted")
+    a.ins("LDA_zp", PASS_CELLS); a.br("BNE", "rt_more")
+    a.ins("RTS")                         # common path: no clear, done cheap
+    a.label("rt_more")
+    a.ins("CLC"); a.ins("ADC_zp", RV_CELLS); a.ins("STA_zp", RV_CELLS)
+    a.ins("LDA_zp", PASS_VIR); a.ins("CLC"); a.ins("ADC_zp", RV_VIR); a.ins("STA_zp", RV_VIR)
+    a.jsr("gravity")
+    a.label("rt_loop")
+    a.jsr("find_clears")
+    a.ins("LDA_zp", PASS_CELLS); a.br("BNE", "rt_loopmore")
+    a.ins("RTS")
+    a.label("rt_loopmore")
+    a.ins("CLC"); a.ins("ADC_zp", RV_CELLS); a.ins("STA_zp", RV_CELLS)
+    a.ins("LDA_zp", PASS_VIR); a.ins("CLC"); a.ins("ADC_zp", RV_VIR); a.ins("STA_zp", RV_VIR)
+    a.jsr("gravity")
+    a.jmp("rt_loop")
+
+
 def emit_find_clears(a):
     a.label("find_clears")
-    a.ins("LDA_imm", 0); a.ins("LDX_imm", 127)
-    a.label("fc_mkclr"); a.ins16("STA_absX", MARK); a.ins("DEX"); a.br("BPL", "fc_mkclr")
-    a.ins("STA_zp", PASS_CELLS); a.ins("STA_zp", PASS_VIR)
+    a.jsr("fc_clearmark")
     a.ins("LDA_imm", 0); a.ins("STA_zp", _ROW)
     a.label("fc_hrow")
     a.ins("LDA_zp", _ROW); a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ASL_A"); a.ins("STA_zp", _OFF)
@@ -60,6 +82,16 @@ def emit_find_clears(a):
     a.ins("LDA_imm", 8); a.ins("STA_zp", _STEP); a.ins("LDA_imm", ROWS); a.ins("STA_zp", _CNT)
     a.jsr("fc_scan")
     a.ins("INC_zp", _COL); a.ins("LDA_zp", _COL); a.ins("CMP_imm", COLS); a.br("BNE", "fc_vcol")
+    a.jmp("fc_apply")               # tail-call apply (ends in RTS)
+
+    # fc_clearmark: zero the 128-byte MARK buffer and PASS counters
+    a.label("fc_clearmark")
+    a.ins("LDA_imm", 0); a.ins("LDX_imm", 127)
+    a.label("fc_mkclr"); a.ins16("STA_absX", MARK); a.ins("DEX"); a.br("BPL", "fc_mkclr")
+    a.ins("STA_zp", PASS_CELLS); a.ins("STA_zp", PASS_VIR); a.ins("RTS")
+
+    # fc_apply: clear every marked board cell, count cells/viruses into PASS_*
+    a.label("fc_apply")
     a.ins("LDX_imm", 127)
     a.label("fc_ap")
     a.ins16("LDA_absX", MARK); a.br("BEQ", "fc_apnext")
@@ -71,6 +103,30 @@ def emit_find_clears(a):
     a.label("fc_apnext")
     a.ins("DEX"); a.br("BPL", "fc_ap")
     a.ins("RTS")
+
+    # ---- targeted first pass: scan only the 2 placed cells' rows+cols ----
+    # inputs Z_OFFA=$6D, Z_OFFB=$6E. Correct because the pre-placement board has
+    # no >=4 runs, so any new run must pass through a placed cell.
+    a.label("find_clears_targeted")
+    a.jsr("fc_clearmark")
+    # row A
+    a.ins("LDA_zp", 0x6D); a.ins("AND_imm", 0xF8); a.ins("STA_zp", _OFF)
+    a.ins("LDA_imm", 1); a.ins("STA_zp", _STEP); a.ins("LDA_imm", COLS); a.ins("STA_zp", _CNT)
+    a.jsr("fc_scan")
+    # col A
+    a.ins("LDA_zp", 0x6D); a.ins("AND_imm", 0x07); a.ins("STA_zp", _OFF)
+    a.ins("LDA_imm", 8); a.ins("STA_zp", _STEP); a.ins("LDA_imm", ROWS); a.ins("STA_zp", _CNT)
+    a.jsr("fc_scan")
+    # row B
+    a.ins("LDA_zp", 0x6E); a.ins("AND_imm", 0xF8); a.ins("STA_zp", _OFF)
+    a.ins("LDA_imm", 1); a.ins("STA_zp", _STEP); a.ins("LDA_imm", COLS); a.ins("STA_zp", _CNT)
+    a.jsr("fc_scan")
+    # col B
+    a.ins("LDA_zp", 0x6E); a.ins("AND_imm", 0x07); a.ins("STA_zp", _OFF)
+    a.ins("LDA_imm", 8); a.ins("STA_zp", _STEP); a.ins("LDA_imm", ROWS); a.ins("STA_zp", _CNT)
+    a.jsr("fc_scan")
+    a.jmp("fc_apply")
+
     # fc_scan: walk _CNT cells from _OFF step _STEP, mark runs >=4
     a.label("fc_scan")
     a.ins("LDY_imm", 0); a.ins("LDA_imm", 0); a.ins("STA_zp", _RUN)
@@ -163,4 +219,5 @@ def emit_shape(a):
 
 
 def emit_all(a):
-    emit_resolve(a); emit_find_clears(a); emit_gravity(a); emit_shape(a)
+    emit_resolve(a); emit_resolve_targeted(a)
+    emit_find_clears(a); emit_gravity(a); emit_shape(a)

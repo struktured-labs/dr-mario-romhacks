@@ -110,11 +110,33 @@ cyc/frame), where even one full-board eval is 2.4 frames. So depth-2 fits only v
   loop trivially (~0.1 s); borderline vblank-only (must spread across the pill's
   fall via the existing per-pill cache framework).
 
+## Search-driver integration (in progress)
+
+Shared primitives now live in `tests/primitives.py` (single source of truth,
+`emit_*` labeled subroutines). Built on top and validated:
+
+| unit | file | validation | cost |
+|---|---|---|---|
+| `eval_placement_deep` (backup→place→resolve→shape→restore) | test_kernel.py | **4500/4500** placements match Python + 4500/4500 board restored | ~35k cyc avg (full) |
+| `resolve_targeted` (scan only placed cells' lines first pass) | primitives.py | matches full resolve **4500/4500** on resolved boards | **~17k cyc avg (2×)** |
+
+`resolve_targeted` exploits the invariant that a real mid-game board is always
+run-free (the game resolves after every pill), so the only new run is through a
+placed cell — scan 4 lines, and on the common no-clear case (~95% of placements)
+return immediately. Remaining per-placement cost is dominated by board
+backup/restore (~3.5k) + full-board shape (~5.3k), both incrementalizable.
+
+**The second ply is now the cost frontier**: even cheap clear-only, ~30×30 ≈ 900
+next-pill clear-detections/pill (~2k each) ≈ 2M cyc. The likely fix is to
+approximate the next-pill value with a single per-first-ply *clear-readiness*
+scan (planner's `readiness` term) instead of 30 simulations — needs a Python
+experiment to confirm it preserves ~40%.
+
 ## Status / next steps
 
 - ✅ Quality solved: portable (cheap+capped-buried) = 53%; cheap-2nd-ply = 40%.
-- ✅ Eval primitive built + validated + cycle-counted (py65 harness reusable).
-- ✅ Budget quantified: viable recipe ≈ 174k cyc/pill.
+- ✅ Board-sim + per-placement kernel + targeted resolve built, validated, cycle-counted.
+- ✅ Budget quantified: first ply ~520k cyc/pill; second ply is the frontier.
 - Next: (1) build + validate **incremental shape eval** (B) on py65 — the keystone;
   (2) build the **6502 resolve board-sim** (find-4→clear→column-compact gravity),
   validate cell-for-cell vs `faithful_game.resolve`; (3) wire the resumable depth-2
