@@ -132,11 +132,41 @@ approximate the next-pill value with a single per-first-ply *clear-readiness*
 scan (planner's `readiness` term) instead of 30 simulations — needs a Python
 experiment to confirm it preserves ~40%.
 
+## 7. Main-loop execution: the injection point (FOUND)
+
+The gating budget question — can the AI compute outside the ~2273-cyc vblank NMI?
+— has a concrete answer. The game's `wait_for_vblank` is a busy-spin:
+
+```
+$B660: STA $33        ; clear frame-ready flag
+$B662: LDA $33        ; spin:
+$B664: BEQ $B662      ;   idle until the NMI sets $33
+```
+
+This spin runs **every frame during gameplay**, eats **most of the frame**
+(~25k of ~29830 cyc) idling, and runs with the **full main-loop budget** (not the
+vblank window). Patch the 4-byte spin to a trampoline that runs ONE bounded search
+slice (e.g. one placement eval, ~17k cyc) then falls through to check `$33` — the
+search resumes on the next frame's spin. That is the resumable depth-2 state
+machine, driven by the spin, at ~25k cyc/frame. This is a DIFFERENT mechanism than
+the prior failed "offload to a (nonexistent) main-loop AI call" — here we ADD a
+hook at the spin itself. Budget then: ~520k–2M cyc/pill ÷ ~25k/frame ≈ 20–80 frames,
+spread across the pill's fall. Feasible.
+
+Code size: the search (~600B primitives + enumeration + scoring + state machine,
+~1.2KB) exceeds the ~392B fragmented free space in the fixed bank → **Path B (MMC1
+PRG expansion, add a 16KB bank)**; the small trampoline lives in existing free ROM
+and bank-switches in/out per slice.
+
 ## Status / next steps
 
 - ✅ Quality solved: portable (cheap+capped-buried) = 53%; cheap-2nd-ply = 40%.
 - ✅ Board-sim + per-placement kernel + targeted resolve built, validated, cycle-counted.
 - ✅ Budget quantified: first ply ~520k cyc/pill; second ply is the frontier.
+- ✅ Main-loop execution path FOUND: patch the $B662 vblank-wait spin (full-frame budget).
+- ⏭ Next: (1) PRG-expand (Path B) + spin-trampoline + bank switch; (2) port v18's
+  enumeration to drive the kernel + multi-term score + best-tracking; (3) make it
+  resumable (one slice per spin entry); (4) measure on L11 via measure_l11.sh.
 - Next: (1) build + validate **incremental shape eval** (B) on py65 — the keystone;
   (2) build the **6502 resolve board-sim** (find-4→clear→column-compact gravity),
   validate cell-for-cell vs `faithful_game.resolve`; (3) wire the resumable depth-2
