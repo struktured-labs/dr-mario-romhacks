@@ -164,9 +164,20 @@ and bank-switches in/out per slice.
 - ✅ Board-sim + per-placement kernel + targeted resolve built, validated, cycle-counted.
 - ✅ Budget quantified: first ply ~520k cyc/pill; second ply is the frontier.
 - ✅ Main-loop execution path FOUND: patch the $B662 vblank-wait spin (full-frame budget).
-- ⏭ Next: (1) PRG-expand (Path B) + spin-trampoline + bank switch; (2) port v18's
-  enumeration to drive the kernel + multi-term score + best-tracking; (3) make it
-  resumable (one slice per spin entry); (4) measure on L11 via measure_l11.sh.
+- ✅ PRG expansion done (`expand_prg.py`, 2→4 MMC1 banks) — boots in Mesen.
+- ✅ **First-ply search driver built + validated 400/400** (`tests/test_search.py`):
+  enumerate→kernel→16-bit multi-term score→argmax. 944 B, ~270k cyc (~11 frames at
+  ~25k/frame). A complete resolve-aware depth-1 engine (current cart has none) and
+  the depth-2 skeleton. Should reach ~15% on L11 (vs cart's current ~9%); depth-2
+  second ply is the further increment.
+- ⚠ **BLOCKER: the Mesen bridge harness is flaky this session** — Mesen boots ROMs
+  (bridge ran 1200+ frames on the 4-bank ROM) but exits when backgrounded/detached
+  (Wayland GUI loses its session), so it only stays alive in the foreground where
+  it can't be driven concurrently. This blocks emulator validation of any ROM-level
+  change (boot/no-hang/clear-count). py65 validation (search logic) is unaffected.
+- ⏭ Next (needs a working emulator loop): (1) spin-trampoline + MMC1 bank-switch
+  wiring; (2) drop the validated search into the new bank; (3) resumable slices;
+  (4) measure on L11. v28cs stays the demo ship until validated.
 - Next: (1) build + validate **incremental shape eval** (B) on py65 — the keystone;
   (2) build the **6502 resolve board-sim** (find-4→clear→column-compact gravity),
   validate cell-for-cell vs `faithful_game.resolve`; (3) wire the resumable depth-2
