@@ -14,8 +14,12 @@ Labels exposed:
 """
 EMPTY = 0xFF
 ROWS, COLS = 16, 8
-BOARD = 0x0500
+BOARD = 0x0500         # the board the SIM operates on (resolve/shape/find_clears).
+LIVE_BOARD = 0x0500    # the stable settled playfield (read for landing/first_occ).
 MARK = 0x0300          # 16-byte BIT-PACKED mark buffer (cell k -> bit k&7 of byte k>>3)
+# py65 tests: BOARD==LIVE_BOARD==$0500 (kernel backup/restore). ROM working-copy:
+# set BOARD=$0100 (WORK), MARK=$0180; first_occ still reads LIVE_BOARD=$0500;
+# emit_kernel_wc copies LIVE_BOARD->BOARD per eval (no restore -> $0500 untouched).
 
 # zero-page map (ULTRACODE-verified coloring, INTEGRATION_SPEC.md): the search must
 # fit the only game-safe zp window $CA-$E1 (24 B). 12-byte shared pool $CA-$D5 (time-
@@ -289,6 +293,22 @@ def emit_kernel(a, resolve="resolve_targeted"):
     a.ins("RTS")
 
 
+def emit_kernel_wc(a, resolve="resolve_capped"):
+    """Working-copy kernel for the CARTRIDGE: copy the LIVE settled board
+    ($0500) -> private WORK board (BOARD, e.g. $0100), place the 2 cells in WORK,
+    <resolve> + shape on WORK. NO backup/restore -> the live $0500 is never
+    touched (the game renders it cleanly while we compute). Outputs RV_*/SH_*."""
+    a.label("kernel")
+    a.ins("LDX_imm", 127)
+    a.label("kwc_cp"); a.ins16("LDA_absX", LIVE_BOARD); a.ins16("STA_absX", BOARD)
+    a.ins("DEX"); a.br("BPL", "kwc_cp")
+    a.ins("LDX_zp", Z_OFFA); a.ins("LDA_zp", Z_TILEA); a.ins16("STA_absX", BOARD)
+    a.ins("LDX_zp", Z_OFFB); a.ins("LDA_zp", Z_TILEB); a.ins16("STA_absX", BOARD)
+    a.jsr(resolve)
+    a.jsr("shape")
+    a.ins("RTS")
+
+
 def emit_first_occ(a):
     """first_occ: input col in X (0-7). Output A = row (0-15) of the topmost
     occupied cell in that column, or 16 if the column is empty."""
@@ -296,7 +316,7 @@ def emit_first_occ(a):
     a.ins("TXA"); a.ins("STA_zp", FO_OFF)      # working offset = col (row 0)
     a.ins("LDY_imm", 0)                          # Y = row
     a.label("fo_loop")
-    a.ins("LDX_zp", FO_OFF); a.ins16("LDA_absX", BOARD)
+    a.ins("LDX_zp", FO_OFF); a.ins16("LDA_absX", LIVE_BOARD)   # landing reads LIVE settled board
     a.ins("CMP_imm", EMPTY); a.br("BNE", "fo_hit")
     a.ins("LDA_zp", FO_OFF); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", FO_OFF)
     a.ins("INY"); a.ins("CPY_imm", ROWS); a.br("BNE", "fo_loop")

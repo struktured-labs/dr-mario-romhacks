@@ -13,7 +13,8 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from py65_harness import Cpu
 from patch_vs_cpu import Asm6502
-from primitives import (emit_all, emit_kernel, emit_first_occ, BOARD, EMPTY, ROWS, COLS,
+import primitives
+from primitives import (emit_all, emit_kernel, emit_kernel_wc, emit_first_occ, EMPTY, ROWS, COLS,
                         RV_CELLS, RV_VIR, SH_MAXH, SH_HOLES, SH_TOPRISK,
                         Z_OFFA, Z_OFFB, Z_TILEA, Z_TILEB)
 from test_search import golden_search, rand_board, BIAS, score_components, first_occ
@@ -59,8 +60,8 @@ SE_SLO, SE_SHI, SE_T, T_LO, T_HI, SE_FOL = 0xCA, 0xCB, 0xCC, 0xCD, 0xCE, 0xCB
 WV = 18
 
 
-def build_slicer():
-    a = Asm6502(BASE)
+def build_slicer(wc=False, base=BASE):
+    a = Asm6502(base)
 
     # ================= arm: start a fresh search (called per new pill) =================
     a.label("arm")
@@ -189,7 +190,9 @@ def build_slicer():
     a.ins16("STA_abs", PUB_DA)
     a.ins("RTS")
 
-    emit_all(a); emit_kernel(a, resolve="resolve_capped"); emit_first_occ(a)
+    emit_all(a)
+    (emit_kernel_wc if wc else emit_kernel)(a, resolve="resolve_capped")
+    emit_first_occ(a)
     return a.assemble(), a.labels
 
 
