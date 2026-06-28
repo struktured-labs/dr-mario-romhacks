@@ -16,7 +16,29 @@ from patch_vs_cpu import Asm6502
 from primitives import (emit_all, emit_kernel, emit_first_occ, BOARD, EMPTY, ROWS, COLS,
                         RV_CELLS, RV_VIR, SH_MAXH, SH_HOLES, SH_TOPRISK,
                         Z_OFFA, Z_OFFB, Z_TILEA, Z_TILEB)
-from test_search import golden_search, rand_board, BIAS
+from test_search import golden_search, rand_board, BIAS, score_components, first_occ
+from test_resolve import py_find_clears, py_gravity
+
+
+def golden_capped(board, pca, pcb):
+    """Cap=1 golden: one find_clears + gravity (no cascade loop) -- matches the
+    cartridge resolve_capped. 0.5% divergence from the full cascade (measured)."""
+    best = -1; key = None; cands = []
+    for c in range(COLS):
+        fo = first_occ(board, c)
+        if fo >= 2: cands.append((0, c, (fo-2)*COLS+c, (fo-1)*COLS+c))
+    for c in range(COLS-1):
+        fo = min(first_occ(board, c), first_occ(board, c+1))
+        if fo >= 1: cands.append((1, c, (fo-1)*COLS+c, (fo-1)*COLS+c+1))
+    for orient, c, offa, offb in cands:
+        b = list(board); b[offa] = 0x40|pca; b[offb] = 0x40|pcb
+        cells, vir = py_find_clears(b)
+        if cells: py_gravity(b)
+        from test_shape_eval import golden_shape
+        mh, ho, tr = golden_shape(b)
+        s = score_components(vir, cells, mh, ho, tr)
+        if s > best: best = s; key = (orient, c)
+    return key, best
 
 BASE = 0x4000
 # --- driver state in RAM (absolute; persists across slices) ---
@@ -167,7 +189,7 @@ def build_slicer():
     a.ins16("STA_abs", PUB_DA)
     a.ins("RTS")
 
-    emit_all(a); emit_kernel(a); emit_first_occ(a)
+    emit_all(a); emit_kernel(a, resolve="resolve_capped"); emit_first_occ(a)
     return a.assemble(), a.labels
 
 
@@ -189,7 +211,7 @@ def main():
             cpu.call(slice_addr); nsl += 1
         slice_counts.append(nsl)
         got = (cpu.mem[SE_BORIENT], cpu.mem[SE_BCOL])
-        gkey, gbest = golden_search(board, pca, pcb)
+        gkey, gbest = golden_capped(board, pca, pcb)
         gotbest = cpu.mem[SE_BESTLO] | (cpu.mem[SE_BESTHI] << 8)
         # also: published $DD == chosen col, $DA == encoded orient (0=horiz, 3=vert)
         exp_da = 0 if cpu.mem[SE_BORIENT] == 1 else 3

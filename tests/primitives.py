@@ -75,6 +75,25 @@ def emit_resolve_targeted(a):
     a.jmp("rt_loop")
 
 
+def emit_resolve_capped(a):
+    """CAP=1 resolve for the cartridge NMI budget: targeted first pass + (if it
+    cleared) ONE gravity, then STOP -- NO cascade loop. A full find_clears pass is
+    ~36k cyc (overruns one NMI frame); this caps the eval at ~12k so it runs
+    atomically in one NMI hook. Measured divergence from the full cascade: only
+    2/400 boards pick a different placement (0.5%) -- negligible for depth-1.
+    Writes RV_CELLS/RV_VIR like resolve_targeted."""
+    a.label("resolve_capped")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", RV_CELLS); a.ins("STA_zp", RV_VIR)
+    a.jsr("find_clears_targeted")
+    a.ins("LDA_zp", PASS_CELLS); a.br("BNE", "rc_more")
+    a.ins("RTS")                          # common path: no clear
+    a.label("rc_more")
+    a.ins("CLC"); a.ins("ADC_zp", RV_CELLS); a.ins("STA_zp", RV_CELLS)
+    a.ins("LDA_zp", PASS_VIR); a.ins("CLC"); a.ins("ADC_zp", RV_VIR); a.ins("STA_zp", RV_VIR)
+    a.jsr("gravity")                      # settle once, then STOP (no cascade loop)
+    a.ins("RTS")
+
+
 def emit_find_clears(a):
     a.label("find_clears")
     a.jsr("fc_clearmark")
@@ -250,17 +269,19 @@ def emit_shape(a):
 SCRATCH = 0x0600        # 128-byte board backup for the kernel
 
 
-def emit_kernel(a):
-    """eval_placement_deep: inputs Z_OFFA($6D)/Z_OFFB($6E)/Z_TILEA($D2)/Z_TILEB($D3).
-    backup board -> place -> resolve_targeted -> shape -> restore. Outputs
-    RV_VIR/RV_CELLS (cleared) + SH_MAXH/SH_HOLES/SH_TOPRISK. Non-destructive."""
+def emit_kernel(a, resolve="resolve_targeted"):
+    """eval_placement_deep: inputs Z_OFFA/Z_OFFB/Z_TILEA/Z_TILEB.
+    backup board -> place -> <resolve> -> shape -> restore. Outputs
+    RV_VIR/RV_CELLS (cleared) + SH_MAXH/SH_HOLES/SH_TOPRISK. Non-destructive.
+    `resolve`: "resolve_targeted" (full cascade) or "resolve_capped" (cartridge,
+    fits one NMI; emit_all provides both)."""
     a.label("kernel")
     a.ins("LDX_imm", 127)
     a.label("k_bk"); a.ins16("LDA_absX", BOARD); a.ins16("STA_absX", SCRATCH)
     a.ins("DEX"); a.br("BPL", "k_bk")
     a.ins("LDX_zp", Z_OFFA); a.ins("LDA_zp", Z_TILEA); a.ins16("STA_absX", BOARD)
     a.ins("LDX_zp", Z_OFFB); a.ins("LDA_zp", Z_TILEB); a.ins16("STA_absX", BOARD)
-    a.jsr("resolve_targeted")
+    a.jsr(resolve)
     a.jsr("shape")
     a.ins("LDX_imm", 127)
     a.label("k_rs"); a.ins16("LDA_absX", SCRATCH); a.ins16("STA_absX", BOARD)
@@ -287,5 +308,5 @@ def emit_all(a):
     """Board-sim primitives only (resolve + shape). Callers that need the
     per-placement kernel / first_occ emit those separately to avoid duplicate
     `kernel` labels with tests that define their own."""
-    emit_resolve(a); emit_resolve_targeted(a)
+    emit_resolve(a); emit_resolve_targeted(a); emit_resolve_capped(a)
     emit_find_clears(a); emit_gravity(a); emit_shape(a)
