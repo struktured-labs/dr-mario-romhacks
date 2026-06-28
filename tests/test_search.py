@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from py65_harness import Cpu
 from patch_vs_cpu import Asm6502
 from primitives import (emit_all, emit_kernel, emit_first_occ, BOARD, EMPTY,
+                        Z_OFFA, Z_OFFB, Z_TILEA, Z_TILEB,
                         ROWS, COLS, RV_CELLS, RV_VIR, SH_MAXH, SH_HOLES, SH_TOPRISK)
 from test_resolve import py_resolve
 from test_shape_eval import golden_shape
@@ -24,12 +25,12 @@ BASE = 0x4000
 SE_ORIENT, SE_COL = 0x60, 0x61
 SE_BESTLO, SE_BESTHI = 0x62, 0x63
 SE_BCOL, SE_BORIENT = 0x64, 0x65
-SE_SLO, SE_SHI = 0x66, 0x67
+SE_SLO, SE_SHI = 0xCA, 0xCB     # pool (PhaseD score; disjoint from fc/kernel)
 SE_PCA, SE_PCB = 0x68, 0x69
-SE_T = 0x6A
-SE_FOL = 0x5F
-T_LO, T_HI = 0x5E, 0x5D
-Z_OFFA, Z_OFFB, Z_TILEA, Z_TILEB = 0x6D, 0x6E, 0xD2, 0xD3
+SE_T = 0xCC                      # pool
+SE_FOL = 0xCB                    # pool (PhaseA landing; disjoint from SE_SHI)
+T_LO, T_HI = 0xCD, 0xCE         # pool
+# Z_OFFA/Z_OFFB/Z_TILEA/Z_TILEB imported from primitives (verified zp map)
 BIAS = 500
 
 

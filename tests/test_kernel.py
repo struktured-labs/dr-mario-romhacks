@@ -13,14 +13,15 @@ sys.path.insert(0, os.path.dirname(__file__))
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from py65_harness import Cpu
 from patch_vs_cpu import Asm6502
-from primitives import emit_all, RV_CELLS, RV_VIR, SH_MAXH, SH_HOLES, SH_TOPRISK
+from primitives import (emit_all, RV_CELLS, RV_VIR, SH_MAXH, SH_HOLES, SH_TOPRISK,
+                        Z_OFFA, Z_OFFB, Z_TILEA, Z_TILEB)
 from test_resolve import py_resolve
 from test_shape_eval import golden_shape
 
 EMPTY = 0xFF
 BOARD = 0x0500
 SCRATCH = 0x0600
-Z_OFFA, Z_OFFB, Z_TILEA, Z_TILEB = 0x6D, 0x6E, 0xD2, 0xD3
+# Z_OFFA/Z_OFFB/Z_TILEA/Z_TILEB imported from primitives (verified zp map)
 BASE = 0x4000
 
 

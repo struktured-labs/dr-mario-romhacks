@@ -17,15 +17,23 @@ ROWS, COLS = 16, 8
 BOARD = 0x0500
 MARK = 0x0300          # 128-byte scratch mark buffer
 
-# zero-page map for the primitives (kept clear of the v18 search temps when
-# integrated; see patch_vs_cpu.py Z_* map). Tests use these freely.
-RV_CELLS, RV_VIR = 0xE0, 0xE1     # resolve grand totals
-PASS_CELLS, PASS_VIR = 0xEB, 0xEC  # find_clears per-pass
-SH_MAXH, SH_HOLES, SH_TOPRISK = 0xF1, 0xF2, 0xF3
-_ROW, _COL, _OFF, _RUN, _MCOL, _RSTART = 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7
-_STEP, _CNT, _FLCNT = 0xE8, 0xE9, 0xEA
-_GCOL, _GREAD, _GDEST, _GTILE = 0xED, 0xEE, 0xEF, 0xF0
-_SHCOL, _SHOFF, _SHSEEN, _SHTMP = 0xF4, 0xF5, 0xF6, 0xF7
+# zero-page map (ULTRACODE-verified coloring, INTEGRATION_SPEC.md): the search must
+# fit the only game-safe zp window $CA-$E1 (24 B). 12-byte shared pool $CA-$D5 (time-
+# disjoint phases reuse it), 9 dedicated, and $DA/$DD/$DE-area reserved for the wrapper
+# interface. Two simultaneously-live vars NEVER share a byte (proof: INTEGRATION_SPEC).
+RV_CELLS, RV_VIR = 0xE0, 0xE1         # dedicated: resolve grand totals (KEEP)
+PASS_CELLS, PASS_VIR = 0xD4, 0xD5     # pool P10/P11
+SH_MAXH, SH_HOLES, SH_TOPRISK = 0xD6, 0xD7, 0xD8   # dedicated (live shape->score)
+# find_clears temps (pool): _ROW/_COL share P0 (row pass fully before col pass)
+_ROW, _COL, _OFF, _RUN, _MCOL, _RSTART = 0xCA, 0xCA, 0xCB, 0xCE, 0xCF, 0xD0
+_STEP, _CNT, _FLCNT = 0xCC, 0xCD, 0xD1
+_GCOL, _GREAD, _GDEST, _GTILE = 0xCA, 0xCB, 0xCC, 0xCD   # gravity (disjoint from fc)
+_SHCOL, _SHOFF, _SHSEEN, _SHTMP = 0xCA, 0xCB, 0xCC, 0xCD  # shape (disjoint)
+# kernel/driver interface (avoid wrapper-owned $DA=orient, $DD=col, $DF=last-y)
+Z_OFFA, Z_OFFB = 0xDC, 0xDE           # placed-cell offsets (dedicated, persist a placement)
+Z_TILEA, Z_TILEB = 0xD9, 0xDB         # pill tiles (dedicated, set once per pill)
+FO_OFF = 0xCA                         # first_occ working offset (pool P0, landing phase)
+_BP1, _BP2 = 0xD2, 0xD3               # bitpack mark scratch (pool P8/P9)
 
 
 def emit_resolve(a):
@@ -110,19 +118,19 @@ def emit_find_clears(a):
     a.label("find_clears_targeted")
     a.jsr("fc_clearmark")
     # row A
-    a.ins("LDA_zp", 0x6D); a.ins("AND_imm", 0xF8); a.ins("STA_zp", _OFF)
+    a.ins("LDA_zp", Z_OFFA); a.ins("AND_imm", 0xF8); a.ins("STA_zp", _OFF)
     a.ins("LDA_imm", 1); a.ins("STA_zp", _STEP); a.ins("LDA_imm", COLS); a.ins("STA_zp", _CNT)
     a.jsr("fc_scan")
     # col A
-    a.ins("LDA_zp", 0x6D); a.ins("AND_imm", 0x07); a.ins("STA_zp", _OFF)
+    a.ins("LDA_zp", Z_OFFA); a.ins("AND_imm", 0x07); a.ins("STA_zp", _OFF)
     a.ins("LDA_imm", 8); a.ins("STA_zp", _STEP); a.ins("LDA_imm", ROWS); a.ins("STA_zp", _CNT)
     a.jsr("fc_scan")
     # row B
-    a.ins("LDA_zp", 0x6E); a.ins("AND_imm", 0xF8); a.ins("STA_zp", _OFF)
+    a.ins("LDA_zp", Z_OFFB); a.ins("AND_imm", 0xF8); a.ins("STA_zp", _OFF)
     a.ins("LDA_imm", 1); a.ins("STA_zp", _STEP); a.ins("LDA_imm", COLS); a.ins("STA_zp", _CNT)
     a.jsr("fc_scan")
     # col B
-    a.ins("LDA_zp", 0x6E); a.ins("AND_imm", 0x07); a.ins("STA_zp", _OFF)
+    a.ins("LDA_zp", Z_OFFB); a.ins("AND_imm", 0x07); a.ins("STA_zp", _OFF)
     a.ins("LDA_imm", 8); a.ins("STA_zp", _STEP); a.ins("LDA_imm", ROWS); a.ins("STA_zp", _CNT)
     a.jsr("fc_scan")
     a.jmp("fc_apply")
@@ -229,8 +237,8 @@ def emit_kernel(a):
     a.ins("LDX_imm", 127)
     a.label("k_bk"); a.ins16("LDA_absX", BOARD); a.ins16("STA_absX", SCRATCH)
     a.ins("DEX"); a.br("BPL", "k_bk")
-    a.ins("LDX_zp", 0x6D); a.ins("LDA_zp", 0xD2); a.ins16("STA_absX", BOARD)
-    a.ins("LDX_zp", 0x6E); a.ins("LDA_zp", 0xD3); a.ins16("STA_absX", BOARD)
+    a.ins("LDX_zp", Z_OFFA); a.ins("LDA_zp", Z_TILEA); a.ins16("STA_absX", BOARD)
+    a.ins("LDX_zp", Z_OFFB); a.ins("LDA_zp", Z_TILEB); a.ins16("STA_absX", BOARD)
     a.jsr("resolve_targeted")
     a.jsr("shape")
     a.ins("LDX_imm", 127)
@@ -243,12 +251,12 @@ def emit_first_occ(a):
     """first_occ: input col in X (0-7). Output A = row (0-15) of the topmost
     occupied cell in that column, or 16 if the column is empty."""
     a.label("first_occ")
-    a.ins("TXA"); a.ins("STA_zp", 0xF8)        # working offset = col (row 0)
+    a.ins("TXA"); a.ins("STA_zp", FO_OFF)      # working offset = col (row 0)
     a.ins("LDY_imm", 0)                          # Y = row
     a.label("fo_loop")
-    a.ins("LDX_zp", 0xF8); a.ins16("LDA_absX", BOARD)
+    a.ins("LDX_zp", FO_OFF); a.ins16("LDA_absX", BOARD)
     a.ins("CMP_imm", EMPTY); a.br("BNE", "fo_hit")
-    a.ins("LDA_zp", 0xF8); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", 0xF8)
+    a.ins("LDA_zp", FO_OFF); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", FO_OFF)
     a.ins("INY"); a.ins("CPY_imm", ROWS); a.br("BNE", "fo_loop")
     a.label("fo_hit")
     a.ins("TYA"); a.ins("RTS")                   # A = row of first occupied (or 16)
