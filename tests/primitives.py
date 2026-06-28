@@ -15,7 +15,7 @@ Labels exposed:
 EMPTY = 0xFF
 ROWS, COLS = 16, 8
 BOARD = 0x0500
-MARK = 0x0300          # 128-byte scratch mark buffer
+MARK = 0x0300          # 16-byte BIT-PACKED mark buffer (cell k -> bit k&7 of byte k>>3)
 
 # zero-page map (ULTRACODE-verified coloring, INTEGRATION_SPEC.md): the search must
 # fit the only game-safe zp window $CA-$E1 (24 B). 12-byte shared pool $CA-$D5 (time-
@@ -92,24 +92,36 @@ def emit_find_clears(a):
     a.ins("INC_zp", _COL); a.ins("LDA_zp", _COL); a.ins("CMP_imm", COLS); a.br("BNE", "fc_vcol")
     a.jmp("fc_apply")               # tail-call apply (ends in RTS)
 
-    # fc_clearmark: zero the 128-byte MARK buffer and PASS counters
+    # fc_clearmark: zero the 16-byte BIT-PACKED MARK buffer + PASS counters.
+    # MARK is 16 bytes; cell offset k -> bit (k&7) of byte (k>>3). Masks computed
+    # inline (1<<(k&7) via a shift loop) so no address-of-table is needed.
     a.label("fc_clearmark")
-    a.ins("LDA_imm", 0); a.ins("LDX_imm", 127)
+    a.ins("LDA_imm", 0); a.ins("LDX_imm", 15)
     a.label("fc_mkclr"); a.ins16("STA_absX", MARK); a.ins("DEX"); a.br("BPL", "fc_mkclr")
     a.ins("STA_zp", PASS_CELLS); a.ins("STA_zp", PASS_VIR); a.ins("RTS")
 
-    # fc_apply: clear every marked board cell, count cells/viruses into PASS_*
+    # fc_apply: walk cell offset 127..0; test its packed bit; clear+count if set.
+    # _BP1 holds the cell offset (X is reused for byte index); _BP2 holds the mask.
     a.label("fc_apply")
     a.ins("LDX_imm", 127)
     a.label("fc_ap")
-    a.ins16("LDA_absX", MARK); a.br("BEQ", "fc_apnext")
+    a.ins("STX_zp", _BP1)                                  # save cell offset
+    a.ins("TXA"); a.ins("AND_imm", 7); a.ins("TAY")        # Y = bit index
+    a.ins("LDA_imm", 1)
+    a.label("fc_apsh"); a.ins("DEY"); a.br("BMI", "fc_apshd")
+    a.ins("ASL_A"); a.jmp("fc_apsh")
+    a.label("fc_apshd"); a.ins("STA_zp", _BP2)             # mask = 1<<(off&7)
+    a.ins("TXA"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("TAX")  # X = byte idx
+    a.ins16("LDA_absX", MARK); a.ins("AND_zp", _BP2); a.br("BEQ", "fc_apnext")
+    # marked: clear board[_BP1], count
+    a.ins("LDX_zp", _BP1)
     a.ins16("LDA_absX", BOARD); a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0)
     a.br("BNE", "fc_apnotv"); a.ins("INC_zp", PASS_VIR)
     a.label("fc_apnotv")
     a.ins("INC_zp", PASS_CELLS)
     a.ins("LDA_imm", EMPTY); a.ins16("STA_absX", BOARD)
     a.label("fc_apnext")
-    a.ins("DEX"); a.br("BPL", "fc_ap")
+    a.ins("LDX_zp", _BP1); a.ins("DEX"); a.br("BPL", "fc_ap")   # restore offset, next
     a.ins("RTS")
 
     # ---- targeted first pass: scan only the 2 placed cells' rows+cols ----
@@ -159,13 +171,22 @@ def emit_find_clears(a):
     a.ins("LDA_zp", _OFF); a.ins("CLC"); a.ins("ADC_zp", _STEP); a.ins("STA_zp", _OFF)
     a.ins("INY"); a.ins("CPY_zp", _CNT); a.br("BNE", "fc_cell")
     a.jsr("fc_flush"); a.ins("RTS")
-    # fc_flush: if _RUN>=4 mark cells from _RSTART step _STEP
+    # fc_flush: if _RUN>=4 set the packed MARK bit for each run cell (from _RSTART,
+    # step _STEP, _FLCNT cells). Walks the offset in _BP1; uses ONLY A/X (NOT Y —
+    # fc_scan's loop counter is Y and fc_flush runs inside that loop). Leaf (no JSR).
     a.label("fc_flush")
     a.ins("LDA_zp", _RUN); a.ins("CMP_imm", 4); a.br("BCC", "fc_fldone")
-    a.ins("LDX_zp", _RSTART); a.ins("LDA_zp", _RUN); a.ins("STA_zp", _FLCNT)
+    a.ins("LDA_zp", _RSTART); a.ins("STA_zp", _BP1)        # offset walk in _BP1
+    a.ins("LDA_zp", _RUN); a.ins("STA_zp", _FLCNT)
     a.label("fc_flmark")
-    a.ins("LDA_imm", 1); a.ins16("STA_absX", MARK)
-    a.ins("TXA"); a.ins("CLC"); a.ins("ADC_zp", _STEP); a.ins("TAX")
+    a.ins("LDA_zp", _BP1); a.ins("AND_imm", 7); a.ins("TAX")   # X = bit index
+    a.ins("LDA_imm", 1)
+    a.label("fc_flsh"); a.ins("DEX"); a.br("BMI", "fc_flshd")
+    a.ins("ASL_A"); a.jmp("fc_flsh")
+    a.label("fc_flshd"); a.ins("STA_zp", _BP2)                 # mask = 1<<(off&7)
+    a.ins("LDA_zp", _BP1); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("TAX")  # byte idx
+    a.ins16("LDA_absX", MARK); a.ins("ORA_zp", _BP2); a.ins16("STA_absX", MARK)
+    a.ins("LDA_zp", _BP1); a.ins("CLC"); a.ins("ADC_zp", _STEP); a.ins("STA_zp", _BP1)
     a.ins("DEC_zp", _FLCNT); a.br("BNE", "fc_flmark")
     a.label("fc_fldone"); a.ins("RTS")
 
