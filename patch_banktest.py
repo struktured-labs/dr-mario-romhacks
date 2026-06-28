@@ -51,9 +51,15 @@ def build_trampoline():
 
 
 def build_newbank_routine():
-    # NO-OP: pure round-trip test. Touch NO game RAM (an earlier version wrote
-    # $0780/$0781, which the game uses -> corrupted P2 virus placement). This
-    # isolates whether the bank-switch round-trip itself is safe.
+    # Canonical artifact = NO-OP round-trip (proves the bank-switch is safe).
+    #
+    # Free-RAM hunt results (Mesen, new-bank routine gated on mode==4, fill $AA,
+    # then check L11 still clears ~4 without crashing):
+    #   $0700-$07FF : NOT free  - read by AI during play (clearing broke, 0 cleared)
+    #   $0580-$05FF : NOT free  - crashed (mode 255) after a few clears
+    #   $0100-$017F : FREE      - cleared 4 normally, clean exit (low stack; the
+    #                             game only uses ~17 B of stack, stays above $01EF)
+    # => use $0100-$017F for the search's board buffer; bit-pack the mark to 16 B.
     a = Asm6502(0x8000)
     a.ins("RTS")
     return a.assemble()
