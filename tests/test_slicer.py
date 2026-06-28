@@ -157,7 +157,14 @@ def build_slicer():
     a.ins("RTS")
     a.label("pb_ok")
     a.ins16("LDA_abs", SE_BCOL); a.ins16("STA_abs", PUB_DD)
-    a.ins16("LDA_abs", SE_BORIENT); a.ins16("STA_abs", PUB_DA)  # raw orient (ROM encodes 0-3)
+    # orient encode: SE_BORIENT 1(horiz)->$03A5=0 (spawn default); 0(vert,PCA upper)->$03A5=3 (V a-top).
+    # (Mesen-confirmed: P2 pill spawns horizontal $03A5=0; colors $0381 left/A, $0382 right/B.)
+    a.ins16("LDA_abs", SE_BORIENT); a.br("BNE", "pb_horiz")
+    a.ins("LDA_imm", 3); a.jmp("pb_setDA")               # vertical -> $DA=3
+    a.label("pb_horiz")
+    a.ins("LDA_imm", 0)                                   # horizontal -> $DA=0
+    a.label("pb_setDA")
+    a.ins16("STA_abs", PUB_DA)
     a.ins("RTS")
 
     emit_all(a); emit_kernel(a); emit_first_occ(a)
@@ -184,8 +191,9 @@ def main():
         got = (cpu.mem[SE_BORIENT], cpu.mem[SE_BCOL])
         gkey, gbest = golden_search(board, pca, pcb)
         gotbest = cpu.mem[SE_BESTLO] | (cpu.mem[SE_BESTHI] << 8)
-        # also: published $DD/$DA must equal the chosen col/orient
-        pub_ok = (cpu.mem[PUB_DD] == cpu.mem[SE_BCOL] and cpu.mem[PUB_DA] == cpu.mem[SE_BORIENT])
+        # also: published $DD == chosen col, $DA == encoded orient (0=horiz, 3=vert)
+        exp_da = 0 if cpu.mem[SE_BORIENT] == 1 else 3
+        pub_ok = (cpu.mem[PUB_DD] == cpu.mem[SE_BCOL] and cpu.mem[PUB_DA] == exp_da)
         if got != gkey or gotbest != gbest or not pub_ok:
             fails += 1
             if fails <= 8:
