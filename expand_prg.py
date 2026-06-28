@@ -1,20 +1,31 @@
 #!/usr/bin/env python3
 """Expand a Dr. Mario (MMC1) ROM's PRG from 2 banks (32KB) to 4 banks (64KB),
-WITHOUT changing any executed code, so depth-2 search code can live in a new
-switchable bank.
+WITHOUT changing how the game runs, so depth-2 search code can live in new space.
 
-MMC1 fixed-last config: $C000-$FFFF is fixed to the LAST 16KB bank (holds the
-reset/NMI vectors), $8000-$BFFF is switchable. So the original fixed bank (orig
-bank 1) MUST stay the last bank. Layout becomes:
+CRITICAL: this game runs MMC1 in **32KB PRG-switch mode** (reset writes control
+reg = $10, PRG mode 0). The whole $8000-$FFFF is ONE 32KB unit selected by the
+PRG-bank register (low bit ignored). So you canNOT insert a single 16KB bank in
+the middle -- that splits the 32KB pair and the game breaks (boots to title but
+input/nav dies; verified empirically).
 
-  index 0: orig bank 0   (switchable; the game keeps selecting this, as before)
-  index 1: NEW bank      (our search code goes here; select to run it)
-  index 2: blank         (spare)
-  index 3: orig bank 1   (fixed @ $C000; vectors intact)
+Correct layout keeps the original 32KB pair intact as **unit 0** and appends our
+code as **unit 1**, duplicating orig bank 1 so $C000-$FFFF (vectors/NMI/fixed AI
++ bank-switch trampoline) stays mapped in BOTH units:
 
-Power-of-2 bank count keeps MMC1 bank-number wrapping clean. The game selects
-bank 0 for $8000 exactly as before, so behavior is byte-identical until we add a
-trampoline that switches to bank 1.
+  index 0: orig bank 0     unit 0 ($8000-$BFFF)  = original low half
+  index 1: orig bank 1     unit 0 ($C000-$FFFF)  = original high half (vectors)
+  index 2: NEW 16KB        unit 1 ($8000-$BFFF)  = our search code
+  index 3: orig bank 1     unit 1 ($C000-$FFFF)  = SAME high half (vectors/NMI)
+
+- Power-on (MMC1 default fixes last bank @ $C000): last = index 3 = orig bank 1
+  -> reset vector $FF00 valid -> boots.
+- Reset sets 32KB mode, PRG-bank=0 -> unit 0 = original 32KB -> game runs
+  byte-for-byte as the unmodified ROM.
+- $C000-$FFFF is orig bank 1 in BOTH units -> the high half (and any trampoline
+  we add there) is always mapped, regardless of selected unit.
+- To run our code: write PRG-bank-reg = 2 (serial to $E000/$FFF0) -> unit 1 ->
+  $8000 = NEW. Switch back to 0 when done. The switch routine must live in the
+  always-mapped $C000-$FFFF half (orig bank 1).
 """
 import sys
 
@@ -30,14 +41,14 @@ def expand(in_path, out_path, new_bank_bytes=None):
     prg = rom[16:16 + nprg * BANK]
     chr_ = rom[16 + nprg * BANK:]
     bank0 = prg[:BANK]
-    bank1_fixed = prg[BANK:2 * BANK]
+    bank1 = prg[BANK:2 * BANK]
 
     new_bank = bytearray(b"\xff" * BANK)
     if new_bank_bytes:
         new_bank[:len(new_bank_bytes)] = new_bank_bytes
-    blank = b"\xff" * BANK
 
-    new_prg = bytes(bank0) + bytes(new_bank) + blank + bytes(bank1_fixed)
+    # unit 0 = [bank0, bank1] (original 32KB, untouched); unit 1 = [NEW, bank1]
+    new_prg = bytes(bank0) + bytes(bank1) + bytes(new_bank) + bytes(bank1)
     assert len(new_prg) == 4 * BANK
 
     out = bytearray(rom[:16])
@@ -47,11 +58,12 @@ def expand(in_path, out_path, new_bank_bytes=None):
     open(out_path, "wb").write(out)
     print(f"wrote {out_path}: PRG {nprg}->4 banks ({len(new_prg)} B), "
           f"CHR {nchr} banks unchanged, total {len(out)} B")
-    # sanity: vectors still in the (now last) fixed bank
-    fixed = new_prg[-BANK:]
+    # sanity: original 32KB (unit 0) byte-identical; vectors present in high half
+    assert new_prg[:2 * BANK] == bytes(prg), "unit 0 must equal the original 32KB"
+    fixed = new_prg[BANK:2 * BANK]   # bank1 = high half
     rst = fixed[0x3FFC] | (fixed[0x3FFD] << 8)
     nmi = fixed[0x3FFA] | (fixed[0x3FFB] << 8)
-    print(f"  fixed-bank vectors: RESET=${rst:04X} NMI=${nmi:04X} (expect FF00/8005)")
+    print(f"  unit 0 == original 32KB ✓ ; high-half vectors RESET=${rst:04X} NMI=${nmi:04X}")
     return out_path
 
 
