@@ -50,6 +50,24 @@ def build_trampoline():
     return code, entry
 
 
+DELAY_COUNT = 25   # probe
+
+
+def build_newbank_routine_delay():
+    # BUDGET PROBE: gated on mode==4, burn ~DELAY_COUNT*1280 cyc in the NMI hook
+    # EVERY frame. If L11 still clears 4 without mode 255, that per-frame compute
+    # budget is safe (my slicer does one eval/frame). Finds the hang threshold.
+    a = Asm6502(0x8000)
+    a.ins("LDA_abs", 0x46, 0x00); a.ins("CMP_imm", 4); a.br("BNE", "nb_done")
+    a.ins("LDX_imm", DELAY_COUNT)
+    a.label("nb_outer"); a.ins("LDY_imm", 0)
+    a.label("nb_inner"); a.ins("DEY"); a.br("BNE", "nb_inner")
+    a.ins("DEX"); a.br("BNE", "nb_outer")
+    a.label("nb_done")
+    a.ins("RTS")
+    return a.assemble()
+
+
 def build_newbank_routine():
     # Canonical artifact = NO-OP round-trip (proves the bank-switch is safe).
     #
@@ -87,7 +105,8 @@ def main():
     # 3) write the patched 2-bank ROM, then expand with the new-bank routine
     tmp = OUT + ".2bank"
     open(tmp, "wb").write(rom)
-    newrt = build_newbank_routine()
+    import os as _os
+    newrt = build_newbank_routine_delay() if _os.environ.get("BANKTEST_DELAY") else build_newbank_routine()
     expand(tmp, OUT, new_bank_bytes=newrt)
     import os; os.remove(tmp)
     print(f"new-bank routine: {len(newrt)} B at unit1 $8000; wrote {OUT}")
