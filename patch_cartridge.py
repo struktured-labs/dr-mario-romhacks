@@ -33,7 +33,7 @@ WRAP_FILE = 0x4010 + (WRAP_CPU - 0xC000)
 SEL_FILE = 0x4010 + (SEL_CPU - 0xC000)
 PRG_REG = 0xFFF0            # MMC1 PRG-bank register
 # slicer RAM interface
-ST_MODE, SE_PCA, SE_PCB = 0x0190, 0x0197, 0x0198
+ST_MODE, SE_PCA, SE_PCB = 0x01C0, 0x01C7, 0x01C8
 GRAV = 0x0392              # P2 gravity drop-counter (pin to freeze)
 
 

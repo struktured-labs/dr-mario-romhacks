@@ -43,16 +43,16 @@ def golden_capped(board, pca, pcb):
 
 BASE = 0x4000
 # --- driver state in RAM (absolute; persists across slices) ---
-ST_MODE  = 0x0190   # 0 IDLE / 1 SEARCHING / 2 DONE
-SE_COL   = 0x0191
-SE_ORIENT= 0x0192
-SE_BCOL  = 0x0193
-SE_BORIENT=0x0194
-SE_BESTLO= 0x0195
-SE_BESTHI= 0x0196
-SE_PCA   = 0x0197
-SE_PCB   = 0x0198
-ST_BUSY  = 0x0199
+ST_MODE  = 0x01C0   # 0 IDLE / 1 SEARCHING / 2 DONE
+SE_COL   = 0x01C1
+SE_ORIENT= 0x01C2
+SE_BCOL  = 0x01C3
+SE_BORIENT=0x01C4
+SE_BESTLO= 0x01C5
+SE_BESTHI= 0x01C6
+SE_PCA   = 0x01C7
+SE_PCB   = 0x01C8
+ST_BUSY  = 0x01C9
 PUB_DD   = 0x00DD   # publish target column (wrapper reads)
 PUB_DA   = 0x00DA   # publish target orient  (wrapper reads)
 # pool zp temps reused for score / landing (same as the verified diet)
