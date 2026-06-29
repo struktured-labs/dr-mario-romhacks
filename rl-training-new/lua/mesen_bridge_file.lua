@@ -222,6 +222,60 @@ local function handle_reset()
     return "OK reset"
 end
 
+-- Hard reset (power cycle) -> full RAM clear.
+local function handle_powercycle()
+    emu.powerCycle()
+    return "OK powercycle"
+end
+
+-- PC-execution profiler: register a memory callback over a CPU range that
+-- counts every instruction-execution there. Used to find which PCs dominate
+-- the trace during a freeze.
+local pc_hits = {}      -- pc -> count
+local profile_lo = 0
+local profile_hi = 0
+local profile_cb = nil
+local function pc_hit(addr, value, addr_type)
+    pc_hits[addr] = (pc_hits[addr] or 0) + 1
+end
+local function handle_profile(start_hex, end_hex)
+    local lo = tonumber(start_hex, 16)
+    local hi = tonumber(end_hex, 16)
+    -- Stop any prior profile
+    if profile_cb then
+        emu.removeMemoryCallback(profile_cb, emu.callbackType.exec, profile_lo, profile_hi)
+        profile_cb = nil
+    end
+    pc_hits = {}
+    profile_lo = lo
+    profile_hi = hi
+    profile_cb = pc_hit
+    emu.addMemoryCallback(pc_hit, emu.callbackType.exec, lo, hi)
+    return string.format("OK profile %04X-%04X", lo, hi)
+end
+local function handle_profile_stop()
+    if profile_cb then
+        emu.removeMemoryCallback(profile_cb, emu.callbackType.exec, profile_lo, profile_hi)
+        profile_cb = nil
+        return "OK profile stopped"
+    end
+    return "OK no profile active"
+end
+local function handle_profile_top(n)
+    n = tonumber(n) or 20
+    local pairs_list = {}
+    for pc, cnt in pairs(pc_hits) do
+        table.insert(pairs_list, {pc=pc, cnt=cnt})
+    end
+    table.sort(pairs_list, function(a,b) return a.cnt > b.cnt end)
+    local parts = {}
+    for i = 1, math.min(n, #pairs_list) do
+        local p = pairs_list[i]
+        table.insert(parts, string.format("%04X:%d", p.pc, p.cnt))
+    end
+    return "OK " .. table.concat(parts, " ")
+end
+
 local function dispatch(cmd_line)
     local parts = {}
     for word in string.gmatch(cmd_line, "%S+") do
@@ -253,6 +307,18 @@ local function dispatch(cmd_line)
         return seq, handle_stepmode(parts[3])
     elseif cmd == "RESET" then
         return seq, handle_reset()
+    elseif cmd == "POWERCYCLE" then
+        return seq, handle_powercycle()
+    elseif cmd == "PROFILE" and #parts >= 4 then
+        return seq, handle_profile(parts[3], parts[4])
+    elseif cmd == "PROFILE_STOP" then
+        return seq, handle_profile_stop()
+    elseif cmd == "PROFILE_TOP" then
+        return seq, handle_profile_top(parts[3])
+    elseif cmd == "GETSP" then
+        local st = emu.getState()
+        local sp = (st and st.cpu and (st.cpu.sp or st.cpu.SP)) or -1
+        return seq, "OK " .. tostring(sp)
     elseif cmd == "PING" then
         return seq, "PONG"
     end

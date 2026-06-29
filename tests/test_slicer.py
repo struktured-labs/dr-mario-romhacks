@@ -63,6 +63,19 @@ WV = 18
 def build_slicer(wc=False, base=BASE):
     a = Asm6502(base)
 
+    # ============ dispatch: the SINGLE unit-1 entry per frame (cartridge) ============
+    # One bank-switch wraps this. Does the new-pill edge check + arm IN unit-1, then a
+    # slice. Avoids a second bank-switched call. $DF is updated by the fixed-bank wrapper.
+    a.label("dispatch")
+    a.ins16("LDA_abs", 0x0386); a.ins("CMP_zp", 0xDF)   # P2y vs last-y
+    a.br("BCC", "d_slice"); a.br("BEQ", "d_slice")       # not a new pill -> just slice
+    a.ins16("LDA_abs", 0x0381); a.ins16("STA_abs", SE_PCA)   # new pill: read colors
+    a.ins16("LDA_abs", 0x0382); a.ins16("STA_abs", SE_PCB)
+    a.jsr("arm")
+    a.label("d_slice")
+    a.jsr("slice")
+    a.ins("RTS")
+
     # ================= arm: start a fresh search (called per new pill) =================
     a.label("arm")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", ST_MODE)
