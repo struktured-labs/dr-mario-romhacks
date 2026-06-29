@@ -17,8 +17,8 @@ import sys
 sys.path.insert(0, "tests")
 import primitives
 # ROM working-copy config: WORK board $0100, bit-packed mark $0180 (LIVE stays $0500)
-primitives.BOARD = 0x0100
-primitives.MARK = 0x0180
+primitives.BOARD = 0x0600
+primitives.MARK = 0x068C
 import importlib, test_slicer
 importlib.reload(test_slicer)
 from patch_vs_cpu import Asm6502
