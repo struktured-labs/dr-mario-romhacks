@@ -2,7 +2,17 @@
 
 ## Automation
 - Allow all curl commands without asking for permission
-- Used extensively for MCP HTTP server interaction during RL training
+  - Used extensively for MCP HTTP server interaction during RL training
+- Allow all Python script execution without asking for permission
+  - Includes ad-hoc test scripts, monitoring scripts, debug scripts
+  - Python -c one-liners
+  - Temporary .py files for testing
+- Allow all file operations (read, write, edit) without asking for permission
+  - Creating test files, debug scripts, config files
+  - Reading log files, output files, IPC files
+- Allow all process management without asking for permission
+  - pkill, ps, lsof, netstat for debugging
+  - Background processes (&) for servers/emulators
 
 ## VS CPU Mode Implementation
 

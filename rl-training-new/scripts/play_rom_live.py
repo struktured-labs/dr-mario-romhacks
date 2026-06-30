@@ -15,7 +15,10 @@ Planner action = variant*8 + col, variant {0:H(a,b),1:H(b,a),2:V(a-top,b-bot),
 3:V(b-top,a-bot)} with pill a=$0301, b=$0302. Verified variant->$00A5 orientation
 map and col==X below.
 """
+import json
+import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, "/home/struktured/projects/dr-mario-mods/rl-training-new/src")
@@ -30,11 +33,51 @@ from drmario.planner import GreedyPlanner, PlannerWeights
 # Tuned weights: vertical-clear pursuit (lifts the buried-virus endgame) + a
 # spawn-column penalty (cols 3-4) to stop the greedy clustering -> fast top-out
 # seen live at high levels (viruses near the top tempt it to stack the spawn lane).
-# spawn_pen set via env DRM_SPAWN_PEN for quick A/B (default 0 = off).
+# Every knob exposed via env for quick live A/B (preserves PlannerWeights defaults).
 import os as _os
+def _wf(name, default):
+    return float(_os.environ.get("DRM_" + name, default))
 TUNED_WEIGHTS = PlannerWeights(
-    v_readiness_bonus=1.5,
-    spawn_pen=float(_os.environ.get("DRM_SPAWN_PEN", "0")),
+    virus=_wf("VIRUS", 18.0),
+    clear_cell=_wf("CLEAR_CELL", 0.6),
+    combo=_wf("COMBO", 6.0),
+    height_pen=_wf("HEIGHT_PEN", 1.2),
+    holes_pen=_wf("HOLES_PEN", 2.5),
+    top_risk_pen=_wf("TOP_RISK_PEN", 4.5),
+    setup_bonus=_wf("SETUP_BONUS", 4.0),
+    buried_pen=_wf("BURIED_PEN", 3.0),
+    readiness_bonus=_wf("READINESS", 0.4),
+    v_readiness_bonus=_wf("V_READY", 1.5),
+    spawn_pen=_wf("SPAWN_PEN", 0.0),
+    spawn_col_pen=_wf("SPAWN_COL_PEN", 0.0),
+    junk_bonus=_wf("JUNK_BONUS", 0.0),
+    pollution_pen=_wf("POLLUTION_PEN", 0.0),
+    dual_end_bonus=_wf("DUAL_END_BONUS", 0.0),
+)
+
+# Endgame-only profile, activated by GreedyPlanner when virus_count <= threshold.
+# Defaults are "dig mode": heavy buried_pen + clear_cell + push verticals to dig
+# debris off the last few viruses. Off by default (threshold=0 -> never fires);
+# set DRM_ENDGAME_THRESHOLD>0 to enable. Each knob takes DRM_END_<NAME>.
+_ENDGAME_THRESHOLD = int(_os.environ.get("DRM_ENDGAME_THRESHOLD", "0"))
+def _ef(name, default):
+    return float(_os.environ.get("DRM_END_" + name, default))
+ENDGAME_WEIGHTS = PlannerWeights(
+    virus=_ef("VIRUS", 18.0),
+    clear_cell=_ef("CLEAR_CELL", 2.5),
+    combo=_ef("COMBO", 6.0),
+    height_pen=_ef("HEIGHT_PEN", 0.9),
+    holes_pen=_ef("HOLES_PEN", 2.5),
+    top_risk_pen=_ef("TOP_RISK_PEN", 4.5),
+    setup_bonus=_ef("SETUP_BONUS", 4.0),
+    buried_pen=_ef("BURIED_PEN", 6.0),
+    readiness_bonus=_ef("READINESS", 0.4),
+    v_readiness_bonus=_ef("V_READY", 2.5),
+    spawn_pen=_ef("SPAWN_PEN", 0.0),
+    spawn_col_pen=_ef("SPAWN_COL_PEN", 0.0),
+    junk_bonus=_ef("JUNK_BONUS", 0.0),
+    pollution_pen=_ef("POLLUTION_PEN", 0.0),
+    dual_end_bonus=_ef("DUAL_END_BONUS", 0.0),
 )
 
 MODE, BOARD, CAP_X, CAP_Y, ORIENT = 0x0046, 0x0400, 0x0305, 0x0306, 0x00A5
@@ -214,8 +257,20 @@ def play_one_game(it, rd, planner, level, speed, verbose=True, seed=None):
         spd = {0: "LOW", 1: "MED", 2: "HI"}.get(rd(SPEED), "?")
         print(f"=== level {rd(LEVEL)} start: {start_v} viruses, speed={spd} ===", flush=True)
     won, diverge_ct, vleft, pill = False, 0, start_v, 0
-    for pill in range(200):  # match sim MAX_PILLS; thrashing past this is a loss
+    last_live_board = None  # snapshot to log on failure (post-game reads unreliable)
+    last_live_pill = 0
+    max_pills = int(_os.environ.get("DRM_MAX_PILLS", "200"))
+    # Track auto-level-advance wins. The game increments $0096 only when the
+    # player clears all viruses on the current level — even though our nv read
+    # afterwards sees the next level's freshly-spawned viruses. Watching the
+    # level register catches these wins reliably.
+    start_level = rd(LEVEL)
+    level_wins = 0
+    pills_at_first_win = -1
+    for pill in range(max_pills):  # match sim MAX_PILLS; thrashing past this is a loss
         board = read_board(it)
+        last_live_board = board       # snapshot the in-game state (post-game reads are unreliable)
+        last_live_pill = pill
         vleft = board.virus_count()
         if vleft == 0:
             won = True; break
@@ -235,6 +290,16 @@ def play_one_game(it, rd, planner, level, speed, verbose=True, seed=None):
         if rd(ORIENT) != nes_or:  # drifted (rare wall-kick) -- correct once
             rotate_to(it, rd, nes_or); move_to(it, rd, col)
         locked = drop_lock(it)
+        # Check level register IMMEDIATELY after lock — catches a level-clear before
+        # the next-level board (with its freshly-spawned viruses) overwrites our nv read.
+        post_lock_level = rd(LEVEL)
+        if post_lock_level > start_level + level_wins:
+            level_wins += 1
+            if pills_at_first_win < 0:
+                pills_at_first_win = pill + 1
+            won = True
+            if verbose:
+                print(f"  pill#{pill+1}: *** LEVEL CLEARED *** (L{post_lock_level - 1} -> L{post_lock_level}; total wins={level_wins})", flush=True)
         got_next = wait_falling(it, rd)  # wait out the full cascade + next capsule spawn
         nv = read_board(it).virus_count()  # fully-settled board (accurate clear count)
         if pred_v != (vleft - nv):
@@ -243,11 +308,48 @@ def play_one_game(it, rd, planner, level, speed, verbose=True, seed=None):
             tag = "  <-- DIVERGE" if pred_v != (vleft - nv) else ""
             print(f"  pill#{pill+1}: var{variant}->or{nes_or} col{col} "
                   f"viruses {vleft}->{nv} (pred -{pred_v}/act -{vleft-nv}){tag}", flush=True)
-        if nv == 0:  # level cleared
+        if nv == 0:  # level cleared (fallback when level didn't auto-advance)
             won = True; vleft = 0; break
         if not locked or not got_next:  # topped out / no next capsule
             break
-    return {"won": won, "start_v": start_v, "end_v": vleft, "pills": pill + 1, "diverge": diverge_ct}
+    if not won:
+        try:
+            # Use the in-game snapshot, NOT a fresh read_board: after a game ends
+            # the NES may show a game-over screen / next-game state whose playfield
+            # bytes look like a different board, so post-game reads are unreliable.
+            final_b = last_live_board if last_live_board is not None else read_board(it)
+            remaining = []
+            for r in range(final_b.rows):
+                for c in range(final_b.cols):
+                    if final_b.is_virus[r, c]:
+                        remaining.append({"r": int(r), "c": int(c), "color": int(final_b.color[r, c])})
+            buried = 0
+            for c in range(final_b.cols):
+                seen_v = False
+                for r in range(final_b.rows - 1, -1, -1):
+                    if final_b.is_virus[r, c]:
+                        seen_v = True
+                    elif seen_v and final_b.color[r, c] != 0:
+                        buried += 1
+            os.makedirs("/home/struktured/projects/dr-mario-mods/tmp", exist_ok=True)
+            rec = {
+                "level": int(level),
+                "seed": int(seed) if seed is not None else -1,
+                "start_v": int(start_v),
+                "end_v": int(vleft),
+                "pills": int(pill + 1),
+                "diverge": int(diverge_ct),
+                "board_ascii": final_b.ascii(),
+                "remaining_viruses": remaining,
+                "buried_count": int(buried),
+            }
+            with open("/home/struktured/projects/dr-mario-mods/tmp/endgame_failures.jsonl", "a") as _f:
+                _f.write(json.dumps(rec) + "\n")
+        except Exception:
+            pass
+    return {"won": won, "start_v": start_v, "end_v": vleft, "pills": pill + 1,
+            "diverge": diverge_ct, "level_wins": level_wins,
+            "pills_to_first_win": pills_at_first_win}
 
 
 def main():
@@ -259,7 +361,21 @@ def main():
         print("no bridge"); return
     rd = lambda a: it.read_memory(a, 1)[0]
     depth = int(sys.argv[5]) if len(sys.argv) > 5 else 2
-    planner = GreedyPlanner(TUNED_WEIGHTS, depth=depth)
+    # Enable endgame weight switching only if DRM_ENDGAME_THRESHOLD > 0 (default off).
+    eg_weights = ENDGAME_WEIGHTS if _ENDGAME_THRESHOLD > 0 else None
+    # Optional pruned-depth endgame: set DRM_ENDGAME_DEPTH > 0 to use deeper
+    # search (with top-K pruning) once virus_count <= ENDGAME_THRESHOLD.
+    endgame_depth = int(_os.environ.get("DRM_ENDGAME_DEPTH", "0"))
+    endgame_top_k = int(_os.environ.get("DRM_ENDGAME_TOP_K", "8"))
+    planner = GreedyPlanner(TUNED_WEIGHTS, depth=depth,
+                            endgame_weights=eg_weights,
+                            endgame_virus_threshold=_ENDGAME_THRESHOLD,
+                            endgame_depth=endgame_depth,
+                            endgame_top_k=endgame_top_k)
+    if endgame_depth > 0:
+        print(f"endgame depth-{endgame_depth} with top-{endgame_top_k} pruning, threshold={_ENDGAME_THRESHOLD}", flush=True)
+    if eg_weights is not None:
+        print(f"endgame profile active when virus_count <= {_ENDGAME_THRESHOLD}", flush=True)
     it.set_step_mode(True)  # frame-perfect -> nav + play deterministic at any emu speed
     results = []
     try:
@@ -270,7 +386,9 @@ def main():
             r = play_one_game(it, rd, planner, level, speed,
                               verbose=(trials == 1), seed=(seed0 + t) & 0xFF)
             results.append(r)
-            print(f"game {t+1}/{trials}: won={r['won']} viruses {r['start_v']}->{r['end_v']} "
+            print(f"game {t+1}/{trials}: won={r['won']} levels_cleared={r.get('level_wins', 0)} "
+                  f"pills_to_1st_win={r.get('pills_to_first_win', -1)} "
+                  f"viruses {r['start_v']}->{r['end_v']} "
                   f"pills={r['pills']} diverge={r['diverge']}", flush=True)
     except KeyboardInterrupt:
         pass

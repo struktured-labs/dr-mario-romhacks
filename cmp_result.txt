@@ -1,0 +1,12 @@
+===== v28cs baseline =====
+  game 1 (seed 4919): cleared 4
+  game 2 (seed 27644): cleared 4
+  game 3 (seed 9001): cleared 4
+  game 4 (seed 51234): cleared 5
+=== drmario_v28cs.nes: games=4  total_cleared=17  avg=4.2  best=5  [seed=4919:4 seed=27644:4 seed=9001:4 seed=51234:5] ===
+===== v28bt buried_pen =====
+  game 1 (seed 4919): cleared 7
+  game 2 (seed 27644): cleared 2
+  game 3 (seed 9001): cleared 1
+  game 4 (seed 51234): cleared 4
+=== drmario_v28bt.nes: games=4  total_cleared=14  avg=3.5  best=7  [seed=4919:7 seed=27644:2 seed=9001:1 seed=51234:4] ===

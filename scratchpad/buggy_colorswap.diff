@@ -1,0 +1,83 @@
+diff --git a/patch_vs_cpu.py b/patch_vs_cpu.py
+index bd32019..db71fd1 100644
+--- a/patch_vs_cpu.py
++++ b/patch_vs_cpu.py
+@@ -659,9 +659,14 @@ VIR_W = 32
+ CELL_W = 2
+ 
+ 
+-def build_v18_ai(ai_cpu, with_rotation=False):
++def build_v18_ai(ai_cpu, with_rotation=False, burial_cpu=None):
+     """Emit the v18 depth-1 simulation AI. Returns bytes. ai_cpu = CPU load addr.
+ 
++    burial_cpu: if given, eval_pair JSRs the externally-assembled v19 score_burial
++    (build_v19_burial) while the candidate cells are still placed, and score_update
++    subtracts Z_BURIED (saturating floor at 0) — the buried_pen lever that stops the
++    AI stacking capsules on top of viruses.
++
+     with_rotation: if True (the "v28" build), (a) save the best-scoring
+     placement's orientation into Z_BORIENT ($DA), and (b) replace the inline
+     movement tail with a JMP to a relocated orient+move routine at $FF54 that
+@@ -873,6 +878,8 @@ def build_v18_ai(ai_cpu, with_rotation=False):
+     a.ins("LDA_zp", Z_OFFB); a.ins("STA_zp", Z_CELLOFF)
+     a.jsr("scan_cell_row")               # B's row
+     a.label("ep_undo")
++    if burial_cpu is not None:
++        a.jsr(burial_cpu)            # count buried cells while candidate is still placed
+     a.ins("LDA_imm", 0xFF)            # A=$FF preserved across LDX/STA below
+     a.ins("LDX_zp", Z_OFFA)
+     a.ins16("STA_absX", 0x0500)
+@@ -1050,8 +1057,14 @@ def build_v18_ai(ai_cpu, with_rotation=False):
+     a.ins("STA_zp", Z_SCORE)
+     a.ins("LDA_zp", Z_CELLS)
+     a.ins("ASL_A")                                  # CELLS * 2
+-    a.ins("CLC"); a.ins("ADC_zp", Z_SCORE); a.ins("STA_zp", Z_SCORE)
+-    a.ins("CLC"); a.ins("LDA_zp", Z_SCORE); a.ins("ADC_zp", Z_HIROW); a.ins("STA_zp", Z_SCORE)
++    a.ins("CLC"); a.ins("ADC_zp", Z_HIROW)          # + hirow (weight 1)
++    a.ins("CLC"); a.ins("ADC_zp", Z_SCORE)          # + vir*32 -> A = raw score (<=127)
++    if burial_cpu is not None:
++        a.ins("SEC"); a.ins("SBC_zp", 0xDC)         # - buried (Z_BURIED, W=1)
++        a.br("BCS", "su_noflo")
++        a.ins("LDA_imm", 0x00)                       # saturating floor at 0
++        a.label("su_noflo")
++    a.ins("STA_zp", Z_SCORE)
+     # update best if strictly greater (plain unsigned: all scores >= 0)
+     a.ins("LDA_zp", Z_BEST)
+     a.ins("CMP_zp", Z_SCORE)             # best - score
+@@ -1155,7 +1168,17 @@ def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=
+     V18_CPU = 0x8000 + (V18_ROM_OFF - 0x10)   # -> $FB00
+     assert V18_CPU == 0xFB00, f"unexpected v18 cpu addr {V18_CPU:#06x}"
+ 
+-    v18, v18_labels = build_v18_ai(V18_CPU, with_rotation=with_rotation)
++    # buried_pen (with_rotation): the v19 score_burial routine is relocated into
++    # the dead v17-AI window right AFTER the rotation wrapper, and eval_pair JSRs
++    # it. Compute its address from the wrapper length (chicken/egg break).
++    burial_cpu = None
++    if with_rotation:
++        wrapper_len = len(_build_rotation_wrapper(0xFF54, 0x0000, rotate_exec))
++        burial_cpu = 0xFF54 + wrapper_len            # -> $FF8E
++        BURIAL_OFF = 0x7F64 + wrapper_len            # -> 0x7F9E
++
++    v18, v18_labels = build_v18_ai(V18_CPU, with_rotation=with_rotation,
++                                   burial_cpu=burial_cpu)
+     end = V18_ROM_OFF + len(v18)
+     region_end = 0x7D10
+     if end > region_end:
+@@ -1174,6 +1197,17 @@ def apply_patches_v18(input_path, output_path, with_rotation=False, rotate_exec=
+     rom_data[0x37D1] = (V18_CPU >> 8) & 0xFF
+     print(f"✓ Re-hooked controller (0x37CF): JMP ${V18_CPU:04X} (was v17 AI)")
+ 
++    if with_rotation:
++        burial = build_v19_burial(burial_cpu)
++        bend = BURIAL_OFF + len(burial)
++        if bend > 0x7FE0:
++            print(f"ERROR: score_burial ({len(burial)} bytes) overflows window "
++                  f"0x{BURIAL_OFF:04X}-0x7FE0")
++            return False
++        rom_data[BURIAL_OFF:bend] = burial
++        print(f"✓ score_burial at 0x{BURIAL_OFF:04X} (CPU ${burial_cpu:04X}, "
++              f"{len(burial)} bytes) — buried_pen")
++
+     if with_rotation:
+         _emit_rotation_wrapper(rom_data, v18_labels["search_entry"], rotate_exec)
+ 
