@@ -35,9 +35,11 @@ def _adv(a, o_addr, c_addr, exhausted_label):
     # use explicit labels via caller; simpler inline:
 
 
-def build_resumable():
-    P.BOARD = CUR; P.LIVE_BOARD = CUR; P.MARK = 0x0780
-    a = Asm6502(0x8000)
+def build_resumable(base=0x8000, cur=CUR, work1=WORK1, live=LIVE, mark=0x0780, sq_lo=None, sq_hi=None):
+    P.BOARD = cur; P.LIVE_BOARD = cur; P.MARK = mark
+    if sq_lo is not None:
+        P.SQ_LO_ADDR = sq_lo; P.SQ_HI_ADDR = sq_hi
+    a = Asm6502(base)
     # ---- arm: init search ----
     a.label("arm")
     a.ins("LDA_imm",0)
@@ -260,7 +262,7 @@ def build_resumable():
 
     # reuse atomic helpers
     D2._emit_calc_imm(a); D2._emit_cmp_update(a)
-    D2._emit_copy(a,"cp_live_cur",LIVE,CUR); D2._emit_copy(a,"cp_cur_work1",CUR,WORK1); D2._emit_copy(a,"cp_work1_cur",WORK1,CUR)
+    D2._emit_copy(a,"cp_live_cur",live,cur); D2._emit_copy(a,"cp_cur_work1",cur,work1); D2._emit_copy(a,"cp_work1_cur",work1,cur)
     emit_landplace(a)
     P.emit_first_occ(a); P.emit_find_clears(a); P.emit_gravity(a); P.emit_shape(a)
     P.emit_resolve_capped(a)
