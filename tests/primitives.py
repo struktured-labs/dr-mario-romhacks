@@ -345,3 +345,227 @@ def emit_all(a):
     `kernel` labels with tests that define their own."""
     emit_resolve(a); emit_resolve_targeted(a); emit_resolve_capped(a)
     emit_find_clears(a); emit_gravity(a); emit_shape(a)
+
+
+# ============================================================================
+# DEPTH-2 RICH EVAL (validated cell-exact in test_eval_terms / test_score_combine):
+# the 6 terms -> weighted leaf score (win_flag + 16-bit). State in $6000 PRG-RAM
+# (cart) / RAM (py65) to avoid zp pressure. All term routines read BOARD.
+# ============================================================================
+EV_BUR_LO, EV_BUR_HI = 0x6110, 0x6111
+EV_RDY_LO, EV_RDY_HI = 0x6112, 0x6113
+EV_SET, EV_VIRFLAG, EV_WIN = 0x6114, 0x6115, 0x6116
+EV_SCO_LO, EV_SCO_HI = 0x6117, 0x6118
+EV_MLO, EV_MHI, EV_PLO, EV_PHI = 0x6119, 0x611A, 0x611B, 0x611C
+SQ_LO_ADDR, SQ_HI_ADDR = 0x7A00, 0x7A11      # 17-byte square tables (lo, hi)
+EO_LO, EO_HI = 0xE9, 0xEA                     # term accumulator output (disjoint from RV)
+ET0, ET1, ET2, ET3, ET4, ET5, ET6 = 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8
+ESCR = 0xEF                                   # setup virus-check scratch
+BIAS5000 = 5000
+
+
+def emit_buried(a):
+    a.label("buried")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_BUR_LO); a.ins16("STA_abs", EV_BUR_HI); a.ins("STA_zp", ET1)
+    a.label("bu_col")
+    a.ins("LDA_zp", ET1); a.ins("STA_zp", ET0)
+    a.ins("LDY_imm", 0); a.ins("LDA_imm", ROWS); a.ins("STA_zp", ET2)
+    a.label("bu_cell")
+    a.ins("LDX_zp", ET0); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "bu_next")
+    a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0); a.br("BNE", "bu_occ")
+    a.ins("TYA"); a.ins("CLC"); a.ins16("ADC_abs", EV_BUR_LO); a.ins16("STA_abs", EV_BUR_LO)
+    a.ins16("LDA_abs", EV_BUR_HI); a.ins("ADC_imm", 0); a.ins16("STA_abs", EV_BUR_HI)
+    a.label("bu_occ")
+    a.ins("INY")
+    a.label("bu_next")
+    a.ins("LDA_zp", ET0); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", ET0)
+    a.ins("DEC_zp", ET2); a.br("BNE", "bu_cell")
+    a.ins("INC_zp", ET1); a.ins("LDA_zp", ET1); a.ins("CMP_imm", COLS); a.br("BNE", "bu_col")
+    a.ins("RTS")
+
+
+def emit_readiness(a):
+    a.label("readiness")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", EO_LO); a.ins("STA_zp", EO_HI); a.ins("STA_zp", ET0)
+    a.label("rd_cell")
+    a.ins("LDX_zp", ET0); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BNE", "rd_c1"); a.jmp("rd_next")
+    a.label("rd_c1")
+    a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0); a.br("BEQ", "rd_c2"); a.jmp("rd_next")
+    a.label("rd_c2")
+    a.ins("LDX_zp", ET0); a.ins16("LDA_absX", BOARD); a.ins("AND_imm", 0x0F); a.ins("STA_zp", ET1)
+    a.ins("LDA_zp", ET0); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("STA_zp", ET2)
+    a.ins("LDA_imm", 1); a.ins("STA_zp", ET3)
+    a.ins("LDA_zp", ET0); a.ins("STA_zp", ET4)
+    a.ins("LDA_zp", ET0); a.ins("AND_imm", 7); a.ins("TAX")
+    a.label("rd_hl")
+    a.ins("CPX_imm", 0); a.br("BEQ", "rd_hr0")
+    a.ins("DEX"); a.ins("DEC_zp", ET4)
+    a.ins("LDY_zp", ET4); a.ins16("LDA_absY", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "rd_hr0")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", ET1); a.br("BNE", "rd_hr0")
+    a.ins("INC_zp", ET3); a.jmp("rd_hl")
+    a.label("rd_hr0")
+    a.ins("LDA_zp", ET0); a.ins("STA_zp", ET4)
+    a.ins("LDA_zp", ET0); a.ins("AND_imm", 7); a.ins("TAX")
+    a.label("rd_hr")
+    a.ins("CPX_imm", COLS - 1); a.br("BEQ", "rd_v")
+    a.ins("INX"); a.ins("INC_zp", ET4)
+    a.ins("LDY_zp", ET4); a.ins16("LDA_absY", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "rd_v")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", ET1); a.br("BNE", "rd_v")
+    a.ins("INC_zp", ET3); a.jmp("rd_hr")
+    a.label("rd_v")
+    a.ins("LDA_imm", 1); a.ins("STA_zp", ET5)
+    a.ins("LDA_zp", ET0); a.ins("STA_zp", ET4)
+    a.ins("LDX_zp", ET2)
+    a.label("rd_vu")
+    a.ins("CPX_imm", 0); a.br("BEQ", "rd_vd0")
+    a.ins("DEX"); a.ins("LDA_zp", ET4); a.ins("SEC"); a.ins("SBC_imm", 8); a.ins("STA_zp", ET4)
+    a.ins("LDY_zp", ET4); a.ins16("LDA_absY", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "rd_vd0")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", ET1); a.br("BNE", "rd_vd0")
+    a.ins("INC_zp", ET5); a.jmp("rd_vu")
+    a.label("rd_vd0")
+    a.ins("LDA_zp", ET0); a.ins("STA_zp", ET4)
+    a.ins("LDX_zp", ET2)
+    a.label("rd_vd")
+    a.ins("CPX_imm", ROWS - 1); a.br("BEQ", "rd_max")
+    a.ins("INX"); a.ins("LDA_zp", ET4); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", ET4)
+    a.ins("LDY_zp", ET4); a.ins16("LDA_absY", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "rd_max")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", ET1); a.br("BNE", "rd_max")
+    a.ins("INC_zp", ET5); a.jmp("rd_vd")
+    a.label("rd_max")
+    a.ins("LDA_zp", ET3); a.ins("CMP_zp", ET5); a.br("BCS", "rd_useh"); a.ins("LDA_zp", ET5)
+    a.label("rd_useh")
+    a.ins("TAX")
+    a.ins16("LDA_absX", SQ_LO_ADDR); a.ins("CLC"); a.ins("ADC_zp", EO_LO); a.ins("STA_zp", EO_LO)
+    a.ins16("LDA_absX", SQ_HI_ADDR); a.ins("ADC_zp", EO_HI); a.ins("STA_zp", EO_HI)
+    a.label("rd_next")
+    a.ins("INC_zp", ET0); a.ins("LDA_zp", ET0); a.ins("CMP_imm", 128); a.br("BEQ", "rd_done"); a.jmp("rd_cell")
+    a.label("rd_done")
+    a.ins("RTS")           # result left in EO_LO/EO_HI; leaf_score copies to EV_RDY
+
+
+def emit_setup(a):
+    a.label("setup")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", EO_LO)
+    a.ins("LDA_imm", 1); a.ins("STA_zp", ET3); a.ins("LDA_imm", ROWS); a.ins("STA_zp", ET5)
+    a.ins("LDA_imm", COLS); a.ins("STA_zp", ET6); a.jsr("su_pass")
+    a.ins("LDA_imm", 8); a.ins("STA_zp", ET3); a.ins("LDA_imm", COLS); a.ins("STA_zp", ET5)
+    a.ins("LDA_imm", ROWS); a.ins("STA_zp", ET6); a.jsr("su_pass")
+    a.ins("RTS")
+    a.label("su_pass")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", ET0)
+    a.label("su_line")
+    a.ins("LDA_zp", ET3); a.ins("CMP_imm", 1); a.br("BNE", "su_lcol")
+    a.ins("LDA_zp", ET0); a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ASL_A"); a.jmp("su_lset")
+    a.label("su_lcol")
+    a.ins("LDA_zp", ET0)
+    a.label("su_lset")
+    a.ins("STA_zp", ET2); a.ins("LDA_imm", 0); a.ins("STA_zp", ET1)
+    a.label("su_i")
+    a.ins("LDX_zp", ET2); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "su_iadv")
+    a.ins("AND_imm", 0x0F); a.ins("STA_zp", ET4)
+    a.ins("LDA_zp", ET2); a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("TAX")
+    a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "su_iadv")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", ET4); a.br("BNE", "su_iadv")
+    a.ins("TXA"); a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("TAX")
+    a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "su_iadv")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", ET4); a.br("BNE", "su_iadv")
+    a.jsr("su_touch"); a.br("BCC", "su_iadv"); a.ins("INC_zp", EO_LO)
+    a.label("su_iadv")
+    a.ins("LDA_zp", ET2); a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("STA_zp", ET2)
+    a.ins("INC_zp", ET1)
+    a.ins("LDA_zp", ET6); a.ins("SEC"); a.ins("SBC_imm", 2); a.ins("CMP_zp", ET1); a.br("BNE", "su_i")
+    a.ins("INC_zp", ET0); a.ins("LDA_zp", ET0); a.ins("CMP_zp", ET5); a.br("BNE", "su_line")
+    a.ins("RTS")
+    a.label("su_touch")
+    a.ins("LDX_zp", ET2); a.jsr("su_chkv"); a.br("BCS", "su_t1")
+    a.ins("LDA_zp", ET2); a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("TAX"); a.jsr("su_chkv"); a.br("BCS", "su_t1")
+    a.ins("LDA_zp", ET2); a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("TAX")
+    a.jsr("su_chkv"); a.br("BCS", "su_t1")
+    a.ins("LDA_zp", ET1); a.br("BEQ", "su_tend")
+    a.ins("LDA_zp", ET2); a.ins("SEC"); a.ins("SBC_zp", ET3); a.ins("TAX"); a.jsr("su_chkv"); a.br("BCS", "su_t1")
+    a.label("su_tend")
+    a.ins("LDA_zp", ET6); a.ins("SEC"); a.ins("SBC_imm", 3); a.ins("CMP_zp", ET1); a.br("BEQ", "su_t0"); a.br("BCC", "su_t0")
+    a.ins("LDA_zp", ET2); a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("CLC"); a.ins("ADC_zp", ET3)
+    a.ins("CLC"); a.ins("ADC_zp", ET3); a.ins("TAX"); a.jsr("su_chkv"); a.br("BCS", "su_t1")
+    a.label("su_t0")
+    a.ins("CLC"); a.ins("RTS")
+    a.label("su_t1")
+    a.ins("SEC"); a.ins("RTS")
+    a.label("su_chkv")
+    a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "su_cv0")
+    a.ins("STA_zp", ESCR)
+    a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0); a.br("BNE", "su_cv0")
+    a.ins("LDA_zp", ESCR); a.ins("AND_imm", 0x0F); a.ins("CMP_zp", ET4); a.br("BNE", "su_cv0")
+    a.ins("SEC"); a.ins("RTS")
+    a.label("su_cv0")
+    a.ins("CLC"); a.ins("RTS")
+
+
+def emit_has_virus(a):
+    # EV_VIRFLAG = 1 if BOARD has any virus, else 0
+    a.label("has_virus")
+    a.ins("LDX_imm", 127)
+    a.label("hv_lp")
+    a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "hv_no")
+    a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0); a.br("BEQ", "hv_yes")
+    a.label("hv_no")
+    a.ins("DEX"); a.br("BPL", "hv_lp")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_VIRFLAG); a.ins("RTS")
+    a.label("hv_yes")
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", EV_VIRFLAG); a.ins("RTS")
+
+
+def emit_combine(a):
+    # SCO = 5000 -12*maxh -25*holes -45*toprisk +40*set -30*bur +4*rdy ; EV_WIN=1 if no virus
+    a.label("combine")
+    a.ins16("LDA_abs", EV_VIRFLAG); a.br("BNE", "cm_go")
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", EV_WIN)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_SCO_LO); a.ins16("STA_abs", EV_SCO_HI); a.ins("RTS")
+    a.label("cm_go")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_WIN)
+    a.ins("LDA_imm", BIAS5000 & 0xFF); a.ins16("STA_abs", EV_SCO_LO)
+    a.ins("LDA_imm", (BIAS5000 >> 8) & 0xFF); a.ins16("STA_abs", EV_SCO_HI)
+    # helper macro via su-like calls
+    def t8(src_zp, k, sub):
+        a.ins("LDA_zp", src_zp); a.ins16("STA_abs", EV_MLO); a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_MHI)
+        a.ins("LDX_imm", k); a.jsr("cm_mul"); a.jsr("cm_sub" if sub else "cm_add")
+    def t16(lo, hi, k, sub):
+        a.ins16("LDA_abs", lo); a.ins16("STA_abs", EV_MLO); a.ins16("LDA_abs", hi); a.ins16("STA_abs", EV_MHI)
+        a.ins("LDX_imm", k); a.jsr("cm_mul"); a.jsr("cm_sub" if sub else "cm_add")
+    t8(SH_MAXH, 12, True); t8(SH_HOLES, 25, True); t8(SH_TOPRISK, 45, True)
+    a.ins16("LDA_abs", EV_SET); a.ins16("STA_abs", EV_MLO); a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_MHI)
+    a.ins("LDX_imm", 40); a.jsr("cm_mul"); a.jsr("cm_add")
+    t16(EV_BUR_LO, EV_BUR_HI, 30, True)
+    t16(EV_RDY_LO, EV_RDY_HI, 4, False)
+    a.ins("RTS")
+    a.label("cm_mul")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_PLO); a.ins16("STA_abs", EV_PHI)
+    a.label("cm_mlp")
+    a.ins16("LDA_abs", EV_PLO); a.ins("CLC"); a.ins16("ADC_abs", EV_MLO); a.ins16("STA_abs", EV_PLO)
+    a.ins16("LDA_abs", EV_PHI); a.ins16("ADC_abs", EV_MHI); a.ins16("STA_abs", EV_PHI)
+    a.ins("DEX"); a.br("BNE", "cm_mlp"); a.ins("RTS")
+    a.label("cm_add")
+    a.ins16("LDA_abs", EV_SCO_LO); a.ins("CLC"); a.ins16("ADC_abs", EV_PLO); a.ins16("STA_abs", EV_SCO_LO)
+    a.ins16("LDA_abs", EV_SCO_HI); a.ins16("ADC_abs", EV_PHI); a.ins16("STA_abs", EV_SCO_HI); a.ins("RTS")
+    a.label("cm_sub")
+    a.ins16("LDA_abs", EV_SCO_LO); a.ins("SEC"); a.ins16("SBC_abs", EV_PLO); a.ins16("STA_abs", EV_SCO_LO)
+    a.ins16("LDA_abs", EV_SCO_HI); a.ins16("SBC_abs", EV_PHI); a.ins16("STA_abs", EV_SCO_HI); a.ins("RTS")
+
+
+def emit_leaf_score(a):
+    # Run all terms on BOARD -> EV_WIN (1=virus-free) + EV_SCO (16-bit weighted score).
+    a.label("leaf_score")
+    a.jsr("shape")
+    a.jsr("buried")           # writes EV_BUR_LO/HI directly
+    a.jsr("readiness")        # writes EO_LO/HI -> copy to EV_RDY
+    a.ins("LDA_zp", EO_LO); a.ins16("STA_abs", EV_RDY_LO)
+    a.ins("LDA_zp", EO_HI); a.ins16("STA_abs", EV_RDY_HI)
+    a.jsr("setup")            # writes EO_LO -> copy to EV_SET
+    a.ins("LDA_zp", EO_LO); a.ins16("STA_abs", EV_SET)
+    a.jsr("has_virus")
+    a.jsr("combine")
+    a.ins("RTS")
+
+
+def emit_eval(a):
+    emit_buried(a); emit_readiness(a); emit_setup(a); emit_has_virus(a); emit_combine(a); emit_leaf_score(a)
