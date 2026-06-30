@@ -59,6 +59,26 @@ accumulate into a RAM cell across the two phases. shape/buried fit one phase as-
 `tests/test_depth2.py::validate_resumable`: drive arm->step*->DONE in py65, confirm
 (best_col,best_orient4) == decide_d2_4 over N boards, AND every step's cycle count <=8000.
 
+## >>> RESUMABLE SEARCH DONE (2026-06-30, commit after e5e5b47) <<<
+tests/test_resumable.py: build_resumable()/validate. 8/8 vs build_search(resolve='targeted'),
+max step 6625 cyc (all <=8k), cross-frame shadows added (Z_OFF, SH_*), 3066 bytes (fits unit-1).
+arm=$8000, step=$801b. NEXT = CART INTEGRATION (below), then live L11, then speed (incremental).
+
+## Cart integration (patch_cartridge.py) -- DETAILED PLAN
+RAM relocation (py65 uses CUR=$0700/WORK1=$0600/MARK=$0780; CART must use $6000 PRG-RAM since
+$0700 is game-used). Set for cart build: P.BOARD=P.LIVE_BOARD=$6000 (CUR), WORK1=$6080, P.MARK=$6100.
+EV/state/shadows/regions already $6110-$6155. CUR/WORK1/MARK + all state in the free 8KB MMC1
+PRG-RAM ($6000-$7FFF; original Dr.Mario has no RAM chip). VERIFY writes land (MMC1 RAM-enable bit;
+test via bridge: write $6000, read back). SQ square tables (readiness): put in unit-1 ROM (append
+to slicer, reference that ROM addr as SQ_LO_ADDR/SQ_HI_ADDR) -- NOT RAM (uninitialized on cart).
+Dispatch (per frame, bank-switched): edge-check new pill ($0386 vs $DF) -> if new, read pill colors
+$0381/$0382 -> S_CA/S_CB and next-pill $031A/$031B -> S_NA/S_NB, JSR arm; then JSR step (ONE phase).
+Publish (when ARMED->0 / ST2_PC=13): best_col(S_BEST_C)->$DD, best_orient4(S_BEST_O)-> $03A5 target
+via map {0:3,1:1,2:0,3:2} -> $DA. 4-STATE wrapper: rotate $03A5 toward $DA target (edge A presses,
+up to 2 rotations), then move toward $DD, drop when aligned. Freeze gravity ($0392=0) + clear
+$F6/$F8 while ARMED (searching). KEEP 0x37CF->$FB00 blob (P2 leveling); blob JMP $FF54 = wrapper.
+NOTE ~100s/pill (slow) -> for live measurement use Mesen fast-forward; proves the goal.
+
 ## Cart integration (patch_cartridge.py)
 - slicer(depth2) in unit-1; dispatch edge+arm+step. Boards/state in $6000 (enable MMC1 PRG-RAM;
   verify writes land). 4-state wrapper: rotate $03A5 to published $DA (4 states, not 2); move to $DD.
