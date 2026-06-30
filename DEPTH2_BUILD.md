@@ -76,6 +76,22 @@ leaf_score, test_leaf_score golden, then re-validate build_search vs updated ora
 Term costs: shape 5k, buried 5.6k, setup 18k(split 2-3), readiness 17.5k(split 3: readiness_rg
 done, 500/500). setup still needs a resumable rows/cols-pass split.
 
+## RESUMABLE MACHINE STATUS (2026-06-30) -- tests/test_resumable.py
+WORKS: 3/3 vs decide_d2_4. ~11000 steps/board (~100s/pill -- correct but slow; needs
+incremental eval for real-time). Per-PC max cyc (must all be <=8k for the cart):
+  LAND1 2879, RES1 4674, IMM1 8011, LAND2 2900, RES2 16921(!!), SHAPE 5301, BURIED 4961,
+  READ 5540, SETUP 4442, COMB 5650, VALUE 124, CMP 207.
+NEXT FIXES (before cart integration, else freeze):
+  1. SPLIT RES2 (PC5, 16921 = find_clears_targeted ~6k + gravity ~6k + calc_imm): ->
+     CLEAR2 (fct + RV + calc_imm + init-leaf; if cleared PC=15 else PC=6) + GRAV2 (PC15
+     gravity -> PC6). Also split RES1 (PC1->CLEAR1+GRAV1 PC14) for safety; RES1's RV must
+     survive the GRAV1 frame -> stash RV in RAM (ST2_RVC/RVV ~$6146/7), reload in IMM1.
+  2. calc_imm: currently X=180 (180 iters ~2k). Optimize to M=180,X=RV_VIR(<=4) + M=10,
+     X=RV_CELLS(<=8) with X==0 guards -> ~0.1k. (affects atomic build_search too; re-spot-check.)
+  3. leaf_score_full (no-legal-p2 VALUE path, ~52k) NOT hit in test boards but WILL freeze
+     if hit -> make that path phased too (rare; copy WORK1->CUR and run the leaf phases).
+  4. Validate resumable == build_search(resolve='targeted') (apples-to-apples; both targeted).
+
 ## Build order
 1. (measure targeted L11) 2. split readiness/setup into region phases (validate cell-exact)
 3. resumable phase machine + validate vs atomic 4. cart integrate 5. live L11 test 6. cache.

@@ -51,7 +51,7 @@ def build_resumable():
     # jump table via compares
     for pcval,lbl in [(0,"p_land1"),(1,"p_res1"),(2,"p_imm1"),(4,"p_land2"),(5,"p_res2"),
                       (6,"p_shape"),(7,"p_buried"),(8,"p_read"),(9,"p_setup"),(10,"p_comb"),
-                      (11,"p_value"),(12,"p_cmp")]:
+                      (11,"p_value"),(12,"p_cmp"),(14,"p_grav1"),(15,"p_grav2")]:
         a.ins("CMP_imm", pcval); a.br("BNE", f"n_{pcval}"); a.jmp(lbl); a.label(f"n_{pcval}")
     a.ins("RTS")   # PC 13 DONE or unknown
 
@@ -76,15 +76,24 @@ def build_resumable():
     a.ins("LDA_imm",13); a.ins16("STA_abs",ST2_PC); a.jmp("p_publish")
     a.label("pl1_ok"); setpc(1)
 
-    # PHASE 1 RES1
+    # PHASE 1 CLEAR1: find_clears + imm + has_virus (all unaffected by gravity); split gravity->PC14
     a.label("p_res1")
-    a.jsr("resolve_capped"); setpc(2)
-
-    # PHASE 2 IMM1
-    a.label("p_imm1")
+    a.jsr("find_clears_targeted")
+    a.ins("LDA_zp",P.PASS_CELLS); a.ins("STA_zp",P.RV_CELLS)
+    a.ins("LDA_zp",P.PASS_VIR); a.ins("STA_zp",P.RV_VIR)
     a.jsr("calc_imm")
     a.ins16("LDA_abs",CI_LO); a.ins16("STA_abs",S_IMM_LO); a.ins16("LDA_abs",CI_HI); a.ins16("STA_abs",S_IMM_HI)
-    a.jsr("has_virus"); a.ins16("LDA_abs",P.EV_VIRFLAG); a.br("BNE","pi1_notwon")
+    a.jsr("has_virus")
+    a.ins("LDA_zp",P.PASS_CELLS); a.br("BEQ","cl1_nograv")
+    a.ins("LDA_imm",14); a.ins16("STA_abs",ST2_PC); a.jmp("st_rts")
+    a.label("cl1_nograv"); setpc(2)
+    # PHASE 14 GRAV1
+    a.label("p_grav1")
+    a.jsr("gravity"); setpc(2)
+
+    # PHASE 2 IMM1: branch on won (EV_VIRFLAG + S_IMM already set in CLEAR1)
+    a.label("p_imm1")
+    a.ins16("LDA_abs",P.EV_VIRFLAG); a.br("BNE","pi1_notwon")
     a.ins("LDA_imm",1); a.ins16("STA_abs",CAND_WIN)
     a.ins16("LDA_abs",S_IMM_LO); a.ins16("STA_abs",CAND_LO); a.ins16("LDA_abs",S_IMM_HI); a.ins16("STA_abs",CAND_HI)
     a.ins("LDA_imm",12); a.ins16("STA_abs",ST2_PC); a.jmp("st_rts")
@@ -108,12 +117,20 @@ def build_resumable():
     a.label("pl2_ok")
     a.ins("LDA_imm",1); a.ins16("STA_abs",S_ANY2); setpc(5)
 
-    # PHASE 5 RES2 (+ init leaf accumulators)
+    # PHASE 5 CLEAR2: find_clears + imm2 + init leaf accumulators; split gravity->PC15
     a.label("p_res2")
-    a.jsr("resolve_capped"); a.jsr("calc_imm")   # CI = imm2
+    a.jsr("find_clears_targeted")
+    a.ins("LDA_zp",P.PASS_CELLS); a.ins("STA_zp",P.RV_CELLS)
+    a.ins("LDA_zp",P.PASS_VIR); a.ins("STA_zp",P.RV_VIR)
+    a.jsr("calc_imm")   # CI = imm2 (RAM)
     a.ins("LDA_imm",0); a.ins16("STA_abs",P.EV_RDY_LO); a.ins16("STA_abs",P.EV_RDY_HI)
     a.ins16("STA_abs",P.EV_SET); a.ins16("STA_abs",RD_RGN); a.ins16("STA_abs",SU_RGN)
-    setpc(6)
+    a.ins("LDA_zp",P.PASS_CELLS); a.br("BEQ","cl2_nograv")
+    a.ins("LDA_imm",15); a.ins16("STA_abs",ST2_PC); a.jmp("st_rts")
+    a.label("cl2_nograv"); setpc(6)
+    # PHASE 15 GRAV2
+    a.label("p_grav2")
+    a.jsr("gravity"); setpc(6)
 
     # PHASE 6 SHAPE
     a.label("p_shape"); a.jsr("shape"); setpc(7)

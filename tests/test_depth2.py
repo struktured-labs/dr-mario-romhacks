@@ -113,15 +113,20 @@ def _emit_copy(a, name, src, dst):
 
 
 def _emit_calc_imm(a):
-    # CI = 180*RV_VIR + 10*RV_CELLS  (X=count always >0)
+    # CI = 180*RV_VIR + 10*RV_CELLS. Use M=const, X=count(<=8) with X==0 guard so cm_mul
+    # loops at most 8 times (was X=180 -> 180 iters ~2k). Accumulate into CI.
     a.label("calc_imm")
-    a.ins("LDA_zp",P.RV_VIR); a.ins16("STA_abs",P.EV_MLO); a.ins("LDA_imm",0); a.ins16("STA_abs",P.EV_MHI)
-    a.ins("LDX_imm",180); a.jsr("cm_mul")
-    a.ins16("LDA_abs",P.EV_PLO); a.ins16("STA_abs",TMP_LO); a.ins16("LDA_abs",P.EV_PHI); a.ins16("STA_abs",TMP_HI)
-    a.ins("LDA_zp",P.RV_CELLS); a.ins16("STA_abs",P.EV_MLO); a.ins("LDA_imm",0); a.ins16("STA_abs",P.EV_MHI)
-    a.ins("LDX_imm",10); a.jsr("cm_mul")
-    a.ins16("LDA_abs",P.EV_PLO); a.ins("CLC"); a.ins16("ADC_abs",TMP_LO); a.ins16("STA_abs",CI_LO)
-    a.ins16("LDA_abs",P.EV_PHI); a.ins16("ADC_abs",TMP_HI); a.ins16("STA_abs",CI_HI); a.ins("RTS")
+    a.ins("LDA_imm",0); a.ins16("STA_abs",CI_LO); a.ins16("STA_abs",CI_HI)
+    a.ins("LDX_zp",P.RV_VIR); a.br("BEQ","ci_cells")
+    a.ins("LDA_imm",180); a.ins16("STA_abs",P.EV_MLO); a.ins("LDA_imm",0); a.ins16("STA_abs",P.EV_MHI); a.jsr("cm_mul")
+    a.ins16("LDA_abs",CI_LO); a.ins("CLC"); a.ins16("ADC_abs",P.EV_PLO); a.ins16("STA_abs",CI_LO)
+    a.ins16("LDA_abs",CI_HI); a.ins16("ADC_abs",P.EV_PHI); a.ins16("STA_abs",CI_HI)
+    a.label("ci_cells")
+    a.ins("LDX_zp",P.RV_CELLS); a.br("BEQ","ci_done")
+    a.ins("LDA_imm",10); a.ins16("STA_abs",P.EV_MLO); a.ins("LDA_imm",0); a.ins16("STA_abs",P.EV_MHI); a.jsr("cm_mul")
+    a.ins16("LDA_abs",CI_LO); a.ins("CLC"); a.ins16("ADC_abs",P.EV_PLO); a.ins16("STA_abs",CI_LO)
+    a.ins16("LDA_abs",CI_HI); a.ins16("ADC_abs",P.EV_PHI); a.ins16("STA_abs",CI_HI)
+    a.label("ci_done"); a.ins("RTS")
 
 
 def _emit_cmp_update(a):
@@ -155,7 +160,7 @@ def _emit_search(a):
     a.ins16("LDA_abs",S_CA); a.ins("STA_zp",PCA); a.ins16("LDA_abs",S_CB); a.ins("STA_zp",PCB)
     a.jsr("land_place"); a.ins("CMP_imm",1); a.br("BEQ","o_legal"); a.jmp("o_next")
     a.label("o_legal")
-    a.jsr("resolve_capped_full"); a.jsr("calc_imm")
+    a.jsr(RESOLVE_LBL); a.jsr("calc_imm")
     a.ins16("LDA_abs",CI_LO); a.ins16("STA_abs",S_IMM_LO); a.ins16("LDA_abs",CI_HI); a.ins16("STA_abs",S_IMM_HI)
     a.jsr("has_virus"); a.ins16("LDA_abs",P.EV_VIRFLAG); a.br("BNE","o_notwon")
     # won after ply1: CAND = (1, imm1)
@@ -175,7 +180,7 @@ def _emit_search(a):
     a.jsr("land_place"); a.ins("CMP_imm",1); a.br("BEQ","i_legal"); a.jmp("i_next")
     a.label("i_legal")
     a.ins("LDA_imm",1); a.ins16("STA_abs",S_ANY2)
-    a.jsr("resolve_capped_full"); a.jsr("calc_imm")   # CI = imm2
+    a.jsr(RESOLVE_LBL); a.jsr("calc_imm")   # CI = imm2
     a.jsr("leaf_score")                          # EV_WIN, EV_SCO on CUR
     # leaf = (EV_WIN, imm2 + EV_SCO)
     a.ins16("LDA_abs",CI_LO); a.ins("CLC"); a.ins16("ADC_abs",P.EV_SCO_LO); a.ins16("STA_abs",CAND_LO)
@@ -219,7 +224,11 @@ def _emit_search(a):
     a.ins("RTS")
 
 
-def build_search():
+RESOLVE_LBL = "resolve_capped_full"
+
+def build_search(resolve="full"):
+    global RESOLVE_LBL
+    RESOLVE_LBL = "resolve_capped" if resolve=="targeted" else "resolve_capped_full"
     P.BOARD = CUR; P.LIVE_BOARD = CUR; P.MARK = 0x0780
     a = _Asm(0x8000)
     _emit_search(a)
@@ -229,7 +238,7 @@ def build_search():
     _emit_copy(a, "cp_work1_cur", WORK1, CUR)
     emit_landplace(a)
     P.emit_first_occ(a); P.emit_find_clears(a); P.emit_gravity(a); P.emit_shape(a)
-    P.emit_resolve_capped_full(a); P.emit_eval(a)
+    P.emit_resolve_capped_full(a); P.emit_resolve_capped(a); P.emit_eval(a)
     code = a.assemble()
     return code, a.labels
 
