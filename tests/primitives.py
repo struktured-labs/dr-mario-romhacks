@@ -569,3 +569,20 @@ def emit_leaf_score(a):
 
 def emit_eval(a):
     emit_buried(a); emit_readiness(a); emit_setup(a); emit_has_virus(a); emit_combine(a); emit_leaf_score(a)
+
+
+def emit_resolve_capped_full(a):
+    """CAP=1 with a FULL find_clears (not targeted): one full find_clears + (if it
+    cleared) one gravity, then STOP. Matches nes_d2_golden._cap1 / cart_d2_golden
+    exactly -- needed for the depth-2 search where the board-after-first-ply can
+    carry post-gravity >=4 runs that a targeted scan would miss. Writes RV_CELLS/RV_VIR."""
+    a.label("resolve_capped_full")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", RV_CELLS); a.ins("STA_zp", RV_VIR)
+    a.jsr("find_clears")
+    a.ins("LDA_zp", PASS_CELLS); a.br("BNE", "rcf_more")
+    a.ins("RTS")
+    a.label("rcf_more")
+    a.ins("CLC"); a.ins("ADC_zp", RV_CELLS); a.ins("STA_zp", RV_CELLS)
+    a.ins("LDA_zp", PASS_VIR); a.ins("CLC"); a.ins("ADC_zp", RV_VIR); a.ins("STA_zp", RV_VIR)
+    a.jsr("gravity")
+    a.ins("RTS")
