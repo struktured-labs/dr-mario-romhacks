@@ -227,8 +227,8 @@ def build_resumable(base=0x8000, cur=CUR, work1=WORK1, live=LIVE, mark=0x0780, s
     a.br("BCC","d_step"); a.br("BEQ","d_step")
     a.ins16("LDA_abs",0x0381); a.ins("AND_imm",0x0F); a.ins16("STA_abs",S_CA)   # current pill colors
     a.ins16("LDA_abs",0x0382); a.ins("AND_imm",0x0F); a.ins16("STA_abs",S_CB)
-    a.ins16("LDA_abs",0x031A); a.ins("AND_imm",0x0F); a.ins16("STA_abs",S_NA)   # next-pill preview
-    a.ins16("LDA_abs",0x031B); a.ins("AND_imm",0x0F); a.ins16("STA_abs",S_NB)
+    a.ins16("LDA_abs",0x039A); a.ins("AND_imm",0x0F); a.ins16("STA_abs",S_NA)   # P2 next-pill preview ($0381/2+$80)
+    a.ins16("LDA_abs",0x039B); a.ins("AND_imm",0x0F); a.ins16("STA_abs",S_NB)   # ($031A/B is P1's next -- wrong)
     a.jsr("arm")
     a.label("d_step")
     a.jsr("step")
