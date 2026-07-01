@@ -11,7 +11,7 @@ Hard terms (setup, readiness) recompute local windows/runs -- separate file, or 
 import sys, os, random
 sys.path.insert(0, os.path.dirname(__file__))
 from test_shape_eval import golden_shape
-from test_eval_terms import g_buried
+from test_eval_terms import g_buried, g_setup
 from nes_d2_golden import _landing, _first_occ
 
 EMPTY = 0xFF
@@ -70,6 +70,52 @@ def _clears(nb, offa, offb):
     return False
 
 
+def _col(b, o):
+    return -1 if b[o] == EMPTY else (b[o] & 0x0F)
+
+def _isvir(b, o):
+    return b[o] != EMPTY and (b[o] & 0xF0) == 0xD0
+
+def _window_q(nb, cells, ends):
+    """1 if the 3-cell window is a same-color run touching a same-color virus (matches g_setup)."""
+    o0, o1, o2 = cells
+    c0 = _col(nb, o0)
+    if c0 == -1 or _col(nb, o1) != c0 or _col(nb, o2) != c0:
+        return 0
+    if any(_isvir(nb, o) and (nb[o] & 0x0F) == c0 for o in cells):
+        return 1
+    for e in ends:
+        if e is not None and _isvir(nb, e) and (nb[e] & 0x0F) == c0:
+            return 1
+    return 0
+
+def _affected_windows(off):
+    """Row+col length-3 windows CONTAINING off (with their end-adjacent cells)."""
+    r, c = off >> 3, off & 7
+    wins = []
+    for i in range(max(0, c-2), min(c, COLS-3) + 1):        # row windows
+        base = r*COLS + i
+        wins.append(((base, base+1, base+2),
+                     (base-1 if i > 0 else None, base+3 if i+3 < COLS else None)))
+    for j in range(max(0, r-2), min(r, ROWS-3) + 1):        # col windows
+        base = j*COLS + c
+        wins.append(((base, base+COLS, base+2*COLS),
+                     (base-COLS if j > 0 else None, base+3*COLS if j+3 < ROWS else None)))
+    return wins
+
+def setup_delta(nb, offa, offb, base_setup):
+    """base_setup + (new run-of-3-touching-virus windows through offa/offb). Old contribution
+    was 0 (offa/offb were empty). Assumes NON-CLEARING (no >=4 runs form)."""
+    seen = set(); d = 0
+    for off in (offa, offb):
+        for cells, ends in _affected_windows(off):
+            if cells in seen:
+                continue
+            seen.add(cells)
+            d += _window_q(nb, cells, ends)
+    return base_setup + d
+
+
 def _rand_settled(rng):
     b = [EMPTY] * 128
     for c in range(COLS):
@@ -86,6 +132,7 @@ def main():
         surf, vc = base_info(b)
         mh0, ho0, tr0 = golden_shape(b)
         bur0 = g_buried(b)
+        set0 = g_setup(b)
         base = (surf, vc, mh0, ho0, tr0, bur0)
         ta, tb = rng.randint(0, 2), rng.randint(0, 2)
         for orient2 in (0, 1):
@@ -97,16 +144,16 @@ def main():
                 nb = _place(b, orient2, col, ta, tb)
                 if _clears(nb, offa, offb):
                     continue                                   # clearing -> full path (rare)
-                d = delta_easy(b, orient2, col, base)
-                nmh, nho, ntr, nbur = d
-                emh, eho, etr = golden_shape(nb); ebur = g_buried(nb)
+                nmh, nho, ntr, nbur = delta_easy(b, orient2, col, base)
+                nset = setup_delta(nb, offa, offb, set0)
+                emh, eho, etr = golden_shape(nb); ebur = g_buried(nb); eset = g_setup(nb)
                 tested += 1
-                if (nmh, nho, ntr, nbur) != (emh, eho, etr, ebur):
+                if (nmh, nho, ntr, nbur, nset) != (emh, eho, etr, ebur, eset):
                     fails += 1
                     if fails <= 6:
-                        print(f"  MISMATCH o{orient2} c{col}: got ({nmh},{nho},{ntr},{nbur}) "
-                              f"exp ({emh},{eho},{etr},{ebur})")
-    print(f"incremental easy deltas (maxh/holes/toprisk/buried): {tested-fails}/{tested} match")
+                        print(f"  MISMATCH o{orient2} c{col}: got ({nmh},{nho},{ntr},{nbur},set{nset}) "
+                              f"exp ({emh},{eho},{etr},{ebur},set{eset})")
+    print(f"incremental deltas (maxh/holes/toprisk/buried/SETUP): {tested-fails}/{tested} match")
     sys.exit(1 if fails else 0)
 
 
