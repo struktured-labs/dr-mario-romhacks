@@ -35,6 +35,14 @@ def build_resumable_incr(base=0x8000, cur=CUR, work1=WORK1, live=LIVE, mark=0x07
     # point the delta routines at this machine's board + offa/offb source
     D.BOARD = cur; D.DROP_SETUP = DROP_SETUP
     D.Z_OFFA = P.Z_OFFA; D.Z_OFFB = P.Z_OFFB
+    # Remap delta scratch onto the NMI-safe zp pool the existing machine already clobbers
+    # ($40-$66 is game-critical during NMI). Only the DROP_SETUP (production) vars matter; they
+    # run only in the DELTA phase (alongside combine which owns $D6-D8), so this pool is free.
+    # easy-delta vars alias readiness vars (easy completes before readiness_new runs).
+    D.CURCELL, D.PCOL, D.VO, D.TVMASK = 0xCA, 0xD4, 0xD5, 0xD9
+    D.RCOL, D.HRUN, D.VRUN, D.WOFF, D.RUN = 0xE0, 0xE1, 0xE2, 0xE3, 0xE4
+    D.NV, D.RAYOFF, D.NI = 0xE5, 0xE6, 0xE7
+    D.COLA, D.COLB, D.DT, D.SA, D.SB = 0xE0, 0xE1, 0xE2, 0xE3, 0xE4   # alias (dead during easy)
     a = Asm6502(base)
 
     # ---- arm ----
