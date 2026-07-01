@@ -25,7 +25,7 @@ from test_depth2 import S_CA, S_CB, S_NA, S_NB, S_BEST_C, S_BEST_O, decide_d2_4,
 
 SQ_LO_ROM, SQ_HI_ROM = 0xB000, 0xB011
 STUB = 0xC000
-DONE = 0x6140            # firmware sets =1 when the search has written the result
+DONE = 0x61FF            # firmware sets =1 when the search has written the result
 
 
 def build_image(board, cA, cB, nA, nB):

@@ -23,11 +23,16 @@ NMI's ~8k cycles/frame. Verilated; correctness checked against the Python oracle
 The in-cart NMI-resumable 6502 is capped at ~8k cyc/frame → ~4700 frames → **~78s/pill**.
 A coprocessor is free-running; the SAME work at an FPGA clock:
 
-| clock | full search (~54M) | incremental search (~8M, ~7× fewer) |
+| clock | full search (~54M clk, measured) | incremental search (~13–23M clk, MEASURED) |
 |---|---|---|
-| 21.5 MHz (NES master) | ~2.5 s | ~0.37 s |
-| 50 MHz | ~1.1 s | **~0.16 s** |
-| 100 MHz (easy on Cyclone V) | ~0.55 s | **~0.08 s** |
+| 21.5 MHz (NES master) | ~2.5 s | ~0.6–1.1 s |
+| 50 MHz | ~1.1 s | **~0.27–0.46 s** |
+| 100 MHz (easy on Cyclone V) | ~0.55 s | **~0.13–0.23 s** |
+
+Incremental measured via `build_firmware_incr.py` (drives `build_resumable_incr` to completion:
+`JSR arm; loop{JSR step} while ARMED`). drop_setup=0 matches the oracle exactly; drop_setup=1
+(the shipping ~66%-clear variant) ~13–23M clk. An *atomic* incremental (no resumable phase
+dispatch overhead) would shave another ~2–3× → ~50–80ms, but ~150ms is already instant.
 
 i.e. **~50–1000× faster than the frame-limited cart**, running unchanged 6502 code — and it
 deletes the resumable phase-machine, NMI budget, and zp-remap complexity entirely.

@@ -12,7 +12,7 @@ module top(input clk, input reset, output [7:0] done, output [7:0] rc, output [7
     DI <= mem[AB];
   end
   initial $readmemh("firmware.hex", mem);
-  assign done = mem[16'h6140];
+  assign done = mem[16'h61FF];
   assign rc   = mem[16'h6134];
   assign ro   = mem[16'h6135];
 endmodule

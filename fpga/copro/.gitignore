@@ -5,3 +5,7 @@ copro_sim
 copro_vsim
 sim_out.txt
 *.o
+firmware_rom.hex
+hostdata.txt
+obj_iface/
+iface_vsim
