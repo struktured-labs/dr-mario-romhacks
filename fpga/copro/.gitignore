@@ -1,0 +1,7 @@
+firmware.hex
+expected.txt
+obj_dir/
+copro_sim
+copro_vsim
+sim_out.txt
+*.o
