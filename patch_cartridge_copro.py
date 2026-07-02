@@ -1,17 +1,20 @@
 #!/usr/bin/env python3
 """Build drmario_copro.nes — the COPROCESSOR cartridge for the custom MiSTer NES core
-(mapper 100 = MMC1 + Dr.Mario coprocessor at $5000-$51FF).
+(mapper 100 = MMC1 + Dr.Mario coprocessor at $5000-$51FF), with AUTO-NAV: the cart boots
+itself into a VS-CPU L11 match and re-arms after every match. No controller needed (built
+for a MiSTer whose physical controls are broken; also makes it a self-running demo).
 
-Game side is tiny: per new pill, copy the P2 board ($0500-$057F) into the copro window
-($5000-$507F), write colors ($5080-3), pulse GO ($5084), then hold the pill while DONE
-($5084)==0; when DONE, read best_col($5085)/best_orient($5086), publish to $DD/$DA and act.
-The heavy depth-2 search runs on the SECOND 6502 inside the FPGA (~0.2-0.5s/pill vs 78s).
-
-Reuses the proven d2-cart infra verbatim: v28cs base (blob 0x37CF->$FB00 preserved: P2
-leveling + play-mode JMP $FF54), $FF54 wrapper (gate + inline MMC1 bank-switch + JSR driver
-+ ARMED hold/act), 2->4 bank expansion with the driver in unit-1 at $8000. Only differences:
-the unit-1 payload is ~130B instead of 4.9KB, and the iNES header mapper becomes 100.
-NOT Mesen-compatible (Mesen has no copro mapper) -- MiSTer custom core only.
+How: the v28cs blob head at $FB00 (reached from the 0x37CF controller hook EVERY frame,
+all modes) is repointed to the $FF54 trampoline, which bank-switches to unit-1 and runs
+`main` each frame:
+  menu modes  -> autonav state machine injecting P1 presses into $F5 (SELECT,SELECT,START,
+                 LEFT x15, RIGHT x11, START) so the hack's own menu toggle sets VS-CPU
+                 state properly; mirrors $F5->$F6 when $04=1 (P2 level cursor).
+  intro (8)   -> hands off (no stray START).
+  play (4)    -> the copro driver: on new pill upload board+colors to the FPGA window,
+                 GO, hold pill while DONE=0, then publish best move to $DD/$DA and act.
+The heavy depth-2 search runs on the SECOND 6502 inside the FPGA (~0.2-0.3s/pill vs 78s).
+NOT Mesen-compatible (mapper 100) — MiSTer custom core only.
 """
 import sys
 sys.path.insert(0, "tests")
@@ -23,35 +26,108 @@ OUT = "drmario_copro.nes"
 UNIT1_CPU = 0x8000
 WRAP_CPU = 0xFF54
 WRAP_FILE = 0x4010 + (WRAP_CPU - 0xC000)
+BLOB_FILE = 0x7B10                       # CPU $FB00
 PRG_REG = 0xFFF0
-ARMED = 0x6143             # PRG-RAM flag: !=0 searching (wrapper holds), ==0 act
+ARMED = 0x6143             # PRG-RAM: !=0 searching (hold), ==0 act
+NAV_ST, NAV_T, NAV_C = 0x6146, 0x6147, 0x614E   # autonav state/timer/press-counter
 GRAV = 0x0392
 # copro window (mapper 100)
-W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5084, 0x5085, 0x5086
+W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5085 - 1, 0x5085, 0x5086
+# NES pad bits on $F5 (pressed-this-frame): A=$80 B=$40 Sel=$20 Start=$10 U=$08 D=$04 L=$02 R=$01
+B_SEL, B_START, B_LEFT, B_RIGHT = 0x20, 0x10, 0x02, 0x01
 
 
-def build_driver():
-    """Unit-1 payload at $8000: per-NMI dispatch. Edge -> upload board+colors+GO, ARMED=1;
-    while ARMED: poll DONE; when set -> publish $DD/$DA (orient map {0:3,1:1,2:0,3:2},
-    $FF topout fallback col3/or3), ARMED=0."""
+def build_main():
     a = Asm6502(UNIT1_CPU)
+
+    # ================= per-frame entry =================
+    a.label("main")
+    a.ins16("LDA_abs", 0x0046); a.ins("CMP_imm", 0x04); a.br("BNE", "not_play")
+    a.ins("LDA_imm", 7); a.ins16("STA_abs", NAV_ST)         # in play
+    a.ins("LDA_zp", 0x04); a.br("BNE", "go_ai"); a.ins("RTS")
+    a.label("go_ai"); a.jmp("dispatch")
+    a.label("not_play")
+    a.ins("CMP_imm", 0x08); a.br("BNE", "menus")
+    a.ins("LDA_imm", 7); a.ins16("STA_abs", NAV_ST); a.ins("RTS")   # intro: hands off
+    a.label("menus")
+    a.ins16("LDA_abs", NAV_ST); a.ins("CMP_imm", 7); a.br("BNE", "nav")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_ST); a.ins16("STA_abs", NAV_T)  # re-arm
+    a.label("nav")
+    a.jsr("autonav")
+    a.ins("LDA_zp", 0x04); a.br("BEQ", "m_done")
+    a.ins("LDA_zp", 0xF5); a.ins("STA_zp", 0xF6)            # VS: mirror P1->P2 (level cursor)
+    a.label("m_done"); a.ins("RTS")
+
+    # ================= autonav (menu modes only) =================
+    # stages: 0 title-wait  1 sel#2-wait  2 start-wait  3 lvl-screen-settle
+    #         4 LEFT x15    5 RIGHT x11   6 START(retry)
+    def inject(bits):
+        a.ins("LDA_imm", bits); a.ins("STA_zp", 0xF5); a.ins("STA_zp", 0xF7)   # edge + held
+
+    def stage(n, nxt_label):
+        a.ins16("LDA_abs", NAV_ST); a.ins("CMP_imm", n); a.br("BNE", nxt_label)
+
+    a.label("autonav")
+    a.ins16("INC_abs", NAV_T)
+    stage(0, "an1")
+    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 180); a.br("BCS", "an0_go"); a.ins("RTS")
+    a.label("an0_go"); inject(B_SEL); a.jmp("an_next")
+    a.label("an1"); stage(1, "an2")
+    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 30); a.br("BCS", "an1_go"); a.ins("RTS")
+    a.label("an1_go"); inject(B_SEL); a.jmp("an_next")
+    a.label("an2"); stage(2, "an3")
+    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 30); a.br("BCS", "an2_go"); a.ins("RTS")
+    a.label("an2_go"); inject(B_START); a.jmp("an_next")
+    a.label("an3"); stage(3, "an4")
+    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 120); a.br("BCS", "an3_go"); a.ins("RTS")
+    a.label("an3_go")
+    a.ins("LDA_imm", 15); a.ins16("STA_abs", NAV_C); a.jmp("an_next")
+    a.label("an4"); stage(4, "an5")
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.br("BEQ", "an4_go"); a.ins("RTS")
+    a.label("an4_go")
+    inject(B_LEFT)
+    a.ins16("DEC_abs", NAV_C); a.ins16("LDA_abs", NAV_C); a.br("BEQ", "an4_dn"); a.ins("RTS")
+    a.label("an4_dn")
+    a.ins("LDA_imm", 11); a.ins16("STA_abs", NAV_C)
+    a.ins("LDA_imm", 5); a.ins16("STA_abs", NAV_ST); a.ins("RTS")
+    a.label("an5"); stage(5, "an6")
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.br("BEQ", "an5_go"); a.ins("RTS")
+    a.label("an5_go")
+    inject(B_RIGHT)
+    a.ins16("DEC_abs", NAV_C); a.ins16("LDA_abs", NAV_C); a.br("BEQ", "an5_dn"); a.ins("RTS")
+    a.label("an5_dn")
+    a.ins("LDA_imm", 6); a.ins16("STA_abs", NAV_ST)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T); a.ins("RTS")
+    a.label("an6"); stage(6, "an_rts")
+    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 30); a.br("BCS", "an6_go"); a.ins("RTS")
+    a.label("an6_go")
+    inject(B_START)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T); a.ins("RTS")   # retry every 30f until play
+    a.label("an_next")
+    a.ins16("INC_abs", NAV_ST); a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T)
+    a.label("an_rts"); a.ins("RTS")
+
+    # ================= play-mode copro driver =================
     a.label("dispatch")
-    a.ins16("LDA_abs", 0x0386); a.ins("CMP_zp", 0xDF)      # new-pill edge (same as d2 cart)
+    a.ins16("LDA_abs", 0x0386); a.ins("CMP_zp", 0xDF)       # new-pill edge (same as d2 cart)
     a.br("BCC", "no_new"); a.br("BEQ", "no_new")
-    # upload board: $0500-$057F -> $5000-$507F
-    a.ins("LDX_imm", 0)
+    a.ins("LDX_imm", 0)                                     # upload board $0500-7F -> $5000-7F
     a.label("cp")
     a.ins16("LDA_absX", 0x0500); a.ins16("STA_absX", W_BOARD)
     a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", "cp")
-    # colors: current $0381/$0382, P2 next preview $039A/$039B (low nibbles)
     for src, dst in [(0x0381, W_CA), (0x0382, W_CA + 1), (0x039A, W_CA + 2), (0x039B, W_CA + 3)]:
         a.ins16("LDA_abs", src); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", dst)
-    a.ins16("STA_abs", W_GO)                               # GO (value irrelevant)
+    a.ins16("STA_abs", W_GO)                                # GO (value irrelevant)
     a.ins("LDA_imm", 1); a.ins16("STA_abs", ARMED)
     a.label("no_new")
-    a.ins16("LDA_abs", ARMED); a.br("BNE", "chk"); a.ins("RTS")
+    a.ins16("LDA_abs", 0x0386); a.ins("STA_zp", 0xDF)       # $DF = P2y (edge memory)
+    a.ins16("LDA_abs", ARMED); a.br("BNE", "chk")
+    a.jmp("act")                                            # idle: keep steering to target
     a.label("chk")
-    a.ins16("LDA_abs", W_DONE); a.br("BNE", "pub"); a.ins("RTS")   # still searching
+    a.ins16("LDA_abs", W_DONE); a.br("BNE", "pub")
+    # searching: hold (freeze gravity + clear P2 input)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV)
+    a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.ins("RTS")
     a.label("pub")
     a.ins16("LDA_abs", W_COL); a.ins("STA_zp", 0xDD)
     a.ins16("LDA_abs", W_OR); a.ins("CMP_imm", 0xFF); a.br("BNE", "map")
@@ -63,7 +139,17 @@ def build_driver():
     a.label("m3"); a.ins("LDA_imm", 2)
     a.label("mst"); a.ins("STA_zp", 0xDA)
     a.label("fin"); a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED)
-    a.ins("RTS")
+    # ---- act: rotate $03A5 toward $DA (A edge), move toward $DD, drop when aligned ----
+    a.label("act")
+    a.ins16("LDA_abs", 0x03A5); a.ins("CMP_zp", 0xDA); a.br("BEQ", "mv")
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xF8)
+    a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF6); a.ins("RTS")
+    a.label("mv")
+    a.ins16("LDA_abs", 0x0385); a.ins("CMP_zp", 0xDD); a.br("BEQ", "dn")
+    a.ins("LDY_imm", 0x01); a.br("BCC", "st")
+    a.ins("LDY_imm", 0x02); a.jmp("st")
+    a.label("dn"); a.ins("LDY_imm", 0x04)
+    a.label("st"); a.ins("STY_zp", 0xF6); a.ins("RTS")
     return a.assemble(), a.labels
 
 
@@ -75,43 +161,25 @@ def _sel(w, value):
             w.ins("LSR_A")
 
 
-def build_wrapper(dispatch_cpu):
-    """Identical shape to the proven d2 wrapper: gate -> bank2 -> JSR dispatch -> bank0 ->
-    $DF=P2y -> ARMED? hold (freeze grav + clear input) : act (rotate $03A5->$DA, move->$DD)."""
+def build_wrapper(main_cpu):
+    """Trampoline (every frame, all modes): bank2 -> JSR main -> bank0 -> RTS."""
     w = Asm6502(WRAP_CPU)
-    w.ins("LDA_abs", 0x46, 0x00); w.ins("CMP_imm", 0x04); w.br("BNE", "nw_skip")
-    w.ins("LDA_zp", 0x04); w.br("BEQ", "nw_skip")
     _sel(w, 2)
-    w.jsr(dispatch_cpu)
+    w.jsr(main_cpu)
     _sel(w, 0)
-    w.ins("LDA_abs", 0x86, 0x03); w.ins("STA_zp", 0xDF)
-    w.ins("LDA_abs", ARMED & 0xFF, (ARMED >> 8) & 0xFF); w.br("BEQ", "nw_act")
-    w.ins("LDA_imm", 0x00); w.ins("STA_abs", GRAV & 0xFF, (GRAV >> 8) & 0xFF)
-    w.ins("STA_zp", 0xF6); w.ins("STA_zp", 0xF8)
-    w.label("nw_skip")
     w.ins("RTS")
-    w.label("nw_act")
-    w.ins("LDA_abs", 0xA5, 0x03); w.ins("CMP_zp", 0xDA); w.br("BEQ", "nw_mv")
-    w.ins("LDA_imm", 0x00); w.ins("STA_zp", 0xF8)
-    w.ins("LDA_imm", 0x80); w.ins("STA_zp", 0xF6); w.ins("RTS")
-    w.label("nw_mv")
-    w.ins("LDA_abs", 0x85, 0x03); w.ins("CMP_zp", 0xDD); w.br("BEQ", "nw_dn")
-    w.ins("LDY_imm", 0x01); w.br("BCC", "nw_st")
-    w.ins("LDY_imm", 0x02); w.jmp("nw_st")
-    w.label("nw_dn"); w.ins("LDY_imm", 0x04)
-    w.label("nw_st"); w.ins("STY_zp", 0xF6); w.ins("RTS")
     return w.assemble()
 
 
 def main():
-    driver, labels = build_driver()
-    dispatch_cpu = UNIT1_CPU + labels["dispatch"]
-    print(f"driver: {len(driver)} B at ${UNIT1_CPU:04X}; dispatch=${dispatch_cpu:04X}")
+    unit1, labels = build_main()
+    main_cpu = UNIT1_CPU + labels["main"]
+    print(f"unit-1 main: {len(unit1)} B at ${UNIT1_CPU:04X}; main=${main_cpu:04X}")
     bank = bytearray(b"\x00" * 0x4000)
-    bank[0:len(driver)] = driver
+    bank[0:len(unit1)] = unit1
 
-    wrap = build_wrapper(dispatch_cpu)
-    print(f"wrapper: {len(wrap)} B at ${WRAP_CPU:04X}")
+    wrap = build_wrapper(main_cpu)
+    print(f"trampoline: {len(wrap)} B at ${WRAP_CPU:04X}")
     assert WRAP_CPU + len(wrap) <= 0xFFD2, "wrapper overflows the dead-v17 window"
 
     rom = bytearray(open(V28CS, "rb").read())
@@ -120,17 +188,22 @@ def main():
     HOOK_FILE = 0x37CF
     assert rom[HOOK_FILE] == 0x4C and rom[HOOK_FILE + 1] == 0x00 and rom[HOOK_FILE + 2] == 0xFB, \
         "expected v28cs hook JMP $FB00 at 0x37CF"
+    # blob head: STA $F6; LDA $04; BNE... -> STA $F6; JMP $FF54  (trampoline runs every frame)
+    assert rom[BLOB_FILE:BLOB_FILE + 6] == bytes.fromhex("85f6a504d003"), \
+        "unexpected v28cs blob head"
+    rom[BLOB_FILE:BLOB_FILE + 5] = bytes([0x85, 0xF6, 0x4C, 0x54, 0xFF])
+    print("blob head repointed: STA $F6; JMP $FF54 (every frame, all modes)")
+
     tmp = OUT + ".2bank"
     open(tmp, "wb").write(rom)
     expand(tmp, OUT, new_bank_bytes=bytes(bank))
     import os
     os.remove(tmp)
-    # set iNES mapper = 100 (0x64): byte6[7:4]=4, byte7[7:4]=6
     out = bytearray(open(OUT, "rb").read())
-    out[6] = (out[6] & 0x0F) | 0x40
+    out[6] = (out[6] & 0x0F) | 0x40      # mapper 100 = 0x64
     out[7] = (out[7] & 0x0F) | 0x60
     open(OUT, "wb").write(out)
-    print(f"wrote {OUT} (mapper 100 = MMC1 + FPGA coprocessor; MiSTer custom core only)")
+    print(f"wrote {OUT} (mapper 100, AUTO-NAV VS-CPU L11, FPGA coprocessor)")
 
 
 if __name__ == "__main__":
