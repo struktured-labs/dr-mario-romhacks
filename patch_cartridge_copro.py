@@ -41,21 +41,19 @@ def build_main():
     a = Asm6502(UNIT1_CPU)
 
     # ================= per-frame entry =================
+    # Forces VS-CPU mode directly ($04=1, $0727=2, $0316=11) on every non-play frame.
+    # No SELECT injection (misterclaw's virtual pad doesn't declare SELECT). User just
+    # pushes START twice: title -> level select -> match. FPGA coprocessor plays P2.
     a.label("main")
     a.ins16("LDA_abs", 0x0046); a.ins("CMP_imm", 0x04); a.br("BNE", "not_play")
-    a.ins("LDA_imm", 7); a.ins16("STA_abs", NAV_ST)         # in play
     a.ins("LDA_zp", 0x04); a.br("BNE", "go_ai"); a.ins("RTS")
     a.label("go_ai"); a.jmp("dispatch")
     a.label("not_play")
-    a.ins("CMP_imm", 0x08); a.br("BNE", "menus")
-    a.ins("LDA_imm", 7); a.ins16("STA_abs", NAV_ST); a.ins("RTS")   # intro: hands off
-    a.label("menus")
-    a.ins16("LDA_abs", NAV_ST); a.ins("CMP_imm", 7); a.br("BNE", "nav")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_ST); a.ins16("STA_abs", NAV_T)  # re-arm
-    a.label("nav")
-    a.jsr("autonav")
-    a.ins("LDA_zp", 0x04); a.br("BEQ", "m_done")
-    a.ins("LDA_zp", 0xF5); a.ins("STA_zp", 0xF6)            # VS: mirror P1->P2 (level cursor)
+    a.ins("CMP_imm", 0x08); a.br("BEQ", "m_done")           # intro: hands off
+    # menu modes: force VS-CPU state + mirror P1->P2 so level cursor tracks
+    a.ins("LDA_imm", 1); a.ins("STA_zp", 0x04)              # VS flag
+    a.ins("LDA_imm", 2); a.ins16("STA_abs", 0x0727)         # 2-player game mode
+    a.ins("LDA_zp", 0xF5); a.ins("STA_zp", 0xF6)            # mirror P1 -> P2
     a.label("m_done"); a.ins("RTS")
 
     # ================= autonav (menu modes only) =================
