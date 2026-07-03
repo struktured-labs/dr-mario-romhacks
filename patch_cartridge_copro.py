@@ -30,9 +30,21 @@ BLOB_FILE = 0x7B10                       # CPU $FB00
 PRG_REG = 0xFFF0
 ARMED = 0x6143             # PRG-RAM: !=0 searching (hold), ==0 act
 NAV_T, NAV_MAGIC = 0x6147, 0x6149   # autonav frame counter + PRG-RAM power-on magic
-GRAV = 0x0392
+GRAV_P1, GRAV_P2 = 0x0312, 0x0392   # per-player gravity counters
+# CPU-vs-CPU: FPGA coprocessor is time-shared between P1 and P2 (~0.3s per pill each);
+# ARMED tracks in-flight search, WHICH is 1=serving P1, 2=serving P2, PEND_* records
+# player i's pill has locked and needs a search, TGT_C/O_* are that player's target move.
+WHICH  = 0x614D
+PEND1  = 0x614E
+PEND2  = 0x614F
+TGT_C1 = 0x6150
+TGT_O1 = 0x6151
+TGT_C2 = 0x6152
+TGT_O2 = 0x6153
+LASTY1 = 0x6154
+LASTY2 = 0x6155
 # copro window (mapper 100)
-W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5085 - 1, 0x5085, 0x5086
+W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5084, 0x5085, 0x5086
 # NES pad bits on $F5 (pressed-this-frame): A=$80 B=$40 Sel=$20 Start=$10 U=$08 D=$04 L=$02 R=$01
 B_SEL, B_START, B_LEFT, B_RIGHT = 0x20, 0x10, 0x02, 0x01
 
@@ -98,49 +110,119 @@ def build_main():
     inject(B_START)
     a.ins("RTS")
 
-    # ================= play-mode copro driver =================
+    # ================= play-mode CPU-vs-CPU driver (time-shared FPGA) =================
     a.label("dispatch")
-    a.ins16("LDA_abs", 0x0386); a.ins("CMP_zp", 0xDF)       # new-pill edge (same as d2 cart)
-    a.br("BCC", "no_new"); a.br("BEQ", "no_new")
-    a.ins("LDX_imm", 0)                                     # upload board $0500-7F -> $5000-7F
-    a.label("cp")
+    # ---- pill-lock edge detect (both players) ----
+    a.ins16("LDA_abs", 0x0306); a.ins16("CMP_abs", LASTY1)
+    a.br("BCC", "no_p1_new"); a.br("BEQ", "no_p1_new")
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND1)
+    a.label("no_p1_new")
+    a.ins16("LDA_abs", 0x0306); a.ins16("STA_abs", LASTY1)
+    a.ins16("LDA_abs", 0x0386); a.ins16("CMP_abs", LASTY2)
+    a.br("BCC", "no_p2_new"); a.br("BEQ", "no_p2_new")
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND2)
+    a.label("no_p2_new")
+    a.ins16("LDA_abs", 0x0386); a.ins16("STA_abs", LASTY2)
+
+    # ---- FPGA search state machine ----
+    a.ins16("LDA_abs", ARMED); a.br("BEQ", "d_start")       # nothing in flight -> maybe start one
+    a.ins16("LDA_abs", W_DONE); a.br("BNE", "d_pub")        # got a result -> publish
+    a.jmp("d_hold")                                          # still searching -> hold serving player
+
+    a.label("d_pub")
+    a.ins16("LDA_abs", W_COL)                                # store best col to WHICH's target
+    a.ins16("LDX_abs", WHICH); a.ins("CPX_imm", 2); a.br("BEQ", "pub_c2")
+    a.ins16("STA_abs", TGT_C1); a.jmp("pub_o")
+    a.label("pub_c2"); a.ins16("STA_abs", TGT_C2)
+    a.label("pub_o")
+    a.ins16("LDA_abs", W_OR); a.ins("CMP_imm", 0xFF); a.br("BNE", "pub_map")
+    a.ins("LDA_imm", 3); a.jmp("pub_st")                    # topout: col 3, orient 3
+    a.label("pub_map")                                      # orient4 -> $03A5 {0:3,1:1,2:0,3:2}
+    a.ins("CMP_imm", 0); a.br("BNE", "pm1"); a.ins("LDA_imm", 3); a.jmp("pub_st")
+    a.label("pm1"); a.ins("CMP_imm", 1); a.br("BNE", "pm2"); a.ins("LDA_imm", 1); a.jmp("pub_st")
+    a.label("pm2"); a.ins("CMP_imm", 2); a.br("BNE", "pm3"); a.ins("LDA_imm", 0); a.jmp("pub_st")
+    a.label("pm3"); a.ins("LDA_imm", 2)
+    a.label("pub_st")
+    a.ins16("LDX_abs", WHICH); a.ins("CPX_imm", 2); a.br("BEQ", "pub_o2")
+    a.ins16("STA_abs", TGT_O1); a.jmp("pub_done")
+    a.label("pub_o2"); a.ins16("STA_abs", TGT_O2)
+    a.label("pub_done")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED)
+    a.jmp("d_start_now")                                    # immediately try to start the other
+
+    a.label("d_hold")
+    # freeze the served player's gravity + inputs (the other player keeps acting via `act`)
+    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 2); a.br("BEQ", "hold_p2")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
+    a.ins("STA_zp", 0xF5); a.ins("STA_zp", 0xF7); a.jmp("act")
+    a.label("hold_p2")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
+    a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act")
+
+    a.label("d_start")
+    a.label("d_start_now")
+    # priority: whichever is pending (P2 first if both, matches prior demo behavior)
+    a.ins16("LDA_abs", PEND2); a.br("BNE", "start_p2")
+    a.ins16("LDA_abs", PEND1); a.br("BNE", "start_p1")
+    a.jmp("act")
+
+    a.label("start_p2")
+    a.ins("LDX_imm", 0)
+    a.label("cp2")
     a.ins16("LDA_absX", 0x0500); a.ins16("STA_absX", W_BOARD)
-    a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", "cp")
+    a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", "cp2")
     for src, dst in [(0x0381, W_CA), (0x0382, W_CA + 1), (0x039A, W_CA + 2), (0x039B, W_CA + 3)]:
         a.ins16("LDA_abs", src); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", dst)
-    a.ins16("STA_abs", W_GO)                                # GO (value irrelevant)
+    a.ins16("STA_abs", W_GO)
+    a.ins("LDA_imm", 2); a.ins16("STA_abs", WHICH)
     a.ins("LDA_imm", 1); a.ins16("STA_abs", ARMED)
-    a.label("no_new")
-    a.ins16("LDA_abs", 0x0386); a.ins("STA_zp", 0xDF)       # $DF = P2y (edge memory)
-    a.ins16("LDA_abs", ARMED); a.br("BNE", "chk")
-    a.jmp("act")                                            # idle: keep steering to target
-    a.label("chk")
-    a.ins16("LDA_abs", W_DONE); a.br("BNE", "pub")
-    # searching: hold (freeze gravity + clear P2 input)
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV)
-    a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.ins("RTS")
-    a.label("pub")
-    a.ins16("LDA_abs", W_COL); a.ins("STA_zp", 0xDD)
-    a.ins16("LDA_abs", W_OR); a.ins("CMP_imm", 0xFF); a.br("BNE", "map")
-    a.ins("LDA_imm", 3); a.ins("STA_zp", 0xDD); a.ins("STA_zp", 0xDA); a.jmp("fin")
-    a.label("map")                                          # orient4 -> $03A5 {0:3,1:1,2:0,3:2}
-    a.ins("CMP_imm", 0); a.br("BNE", "m1"); a.ins("LDA_imm", 3); a.jmp("mst")
-    a.label("m1"); a.ins("CMP_imm", 1); a.br("BNE", "m2"); a.ins("LDA_imm", 1); a.jmp("mst")
-    a.label("m2"); a.ins("CMP_imm", 2); a.br("BNE", "m3"); a.ins("LDA_imm", 0); a.jmp("mst")
-    a.label("m3"); a.ins("LDA_imm", 2)
-    a.label("mst"); a.ins("STA_zp", 0xDA)
-    a.label("fin"); a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED)
-    # ---- act: rotate $03A5 toward $DA (A edge), move toward $DD, drop when aligned ----
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", PEND2)
+    a.jmp("act")
+
+    a.label("start_p1")
+    a.ins("LDX_imm", 0)
+    a.label("cp1")
+    a.ins16("LDA_absX", 0x0400); a.ins16("STA_absX", W_BOARD)
+    a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", "cp1")
+    for src, dst in [(0x0301, W_CA), (0x0302, W_CA + 1), (0x031A, W_CA + 2), (0x031B, W_CA + 3)]:
+        a.ins16("LDA_abs", src); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", dst)
+    a.ins16("STA_abs", W_GO)
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", WHICH)
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", ARMED)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", PEND1)
+    a.jmp("act")
+
+    # ---- act: steer BOTH players toward their published targets ----
     a.label("act")
-    a.ins16("LDA_abs", 0x03A5); a.ins("CMP_zp", 0xDA); a.br("BEQ", "mv")
+    # P2 first (only if we're not currently freezing it)
+    a.ins16("LDA_abs", ARMED); a.br("BEQ", "act_p2")
+    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 2); a.br("BEQ", "act_p1")
+    a.label("act_p2")
+    a.ins16("LDA_abs", 0x03A5); a.ins16("CMP_abs", TGT_O2); a.br("BEQ", "mv_p2")
     a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xF8)
-    a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF6); a.ins("RTS")
-    a.label("mv")
-    a.ins16("LDA_abs", 0x0385); a.ins("CMP_zp", 0xDD); a.br("BEQ", "dn")
-    a.ins("LDY_imm", 0x01); a.br("BCC", "st")
-    a.ins("LDY_imm", 0x02); a.jmp("st")
-    a.label("dn"); a.ins("LDY_imm", 0x04)
-    a.label("st"); a.ins("STY_zp", 0xF6); a.ins("RTS")
+    a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF6); a.jmp("act_p1")
+    a.label("mv_p2")
+    a.ins16("LDA_abs", 0x0385); a.ins16("CMP_abs", TGT_C2); a.br("BEQ", "dn_p2")
+    a.ins("LDY_imm", 0x01); a.br("BCC", "st_p2")
+    a.ins("LDY_imm", 0x02); a.jmp("st_p2")
+    a.label("dn_p2"); a.ins("LDY_imm", 0x04)
+    a.label("st_p2"); a.ins("STY_zp", 0xF6)
+    a.label("act_p1")
+    # skip P1 acting if we're currently searching for P1
+    a.ins16("LDA_abs", ARMED); a.br("BEQ", "act_p1_go")
+    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 1); a.br("BEQ", "act_done")
+    a.label("act_p1_go")
+    a.ins16("LDA_abs", 0x0325); a.ins16("CMP_abs", TGT_O1); a.br("BEQ", "mv_p1")
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xF7)
+    a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF5); a.jmp("act_done")
+    a.label("mv_p1")
+    a.ins16("LDA_abs", 0x0305); a.ins16("CMP_abs", TGT_C1); a.br("BEQ", "dn_p1")
+    a.ins("LDY_imm", 0x01); a.br("BCC", "st_p1")
+    a.ins("LDY_imm", 0x02); a.jmp("st_p1")
+    a.label("dn_p1"); a.ins("LDY_imm", 0x04)
+    a.label("st_p1"); a.ins("STY_zp", 0xF5)
+    a.label("act_done")
+    a.ins("RTS")
     return a.assemble(), a.labels
 
 
