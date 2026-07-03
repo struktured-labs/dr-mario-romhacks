@@ -59,35 +59,43 @@ def build_main():
     a.ins("LDA_zp", 0xF5); a.ins("STA_zp", 0xF6)            # VS: mirror P1->P2 (level cursor)
     a.label("m_done"); a.ins("RTS")
 
-    # ================= autonav: DIRECT STATE, no input simulation =================
-    # Input injection into $F5 is scrubbed by the game's DPCM double-read verify loop
-    # (traced: injected values poison the pass-compare and get re-read away before the
-    # title handler at ~$98xx consumes $F5). So we don't simulate input at all:
-    #  - title (mode 0): call the hack's own SELECT-toggle routine at $FF30 (fixed bank;
-    #    touches only $0727/$04/$06F1) every 32 ticks until $04==1 (1P->2P->VS cycle).
-    #  - level select (mode 1): force $0316=11 directly (display may lag; match reads the var).
-    #  - STARTs come from the player / misterclaw virtual pad (START+dpad deliver fine;
-    #    only SELECT was undeliverable, which the $FF30 call replaces).
+    # ============ autonav: direct state + $F5-only START injection (ZERO input) ============
+    # SELECT-equivalent: JSR $FF30 (hack's own toggle; touches only $0727/$04/$06F1) until
+    # $04==1. Levels: force $0316/$0396/$96=11 in mode 1. STARTs: inject $F5=$10 in a press
+    # window. KEY: inject $F5 ONLY -- the read routine ANDs two raw passes (hook fires in
+    # both, value survives) then computes newly-pressed = raw & ~held($F7); writing $F7 too
+    # marks the button already-held and zeroes the edge (the original injection bug).
+    # Window (NAV_T & $1F) < 4: pressed ~1 frame in ~6 (hook ~5 calls/frame), then released.
+    def inject(bits):
+        a.ins("LDA_imm", bits); a.ins("STA_zp", 0xF5)
+        a.ins16("STA_abs", 0x6148)                          # DBG: last injected
+        a.ins16("INC_abs", 0x614B)                          # DBG: inject count
     a.label("autonav")
     a.ins16("INC_abs", NAV_T)
     a.ins16("LDA_abs", 0x0046)
     a.ins("CMP_imm", 0x00); a.br("BEQ", "an_title")
     a.ins("CMP_imm", 0x01); a.br("BEQ", "an_lvl")
+    a.ins("CMP_imm", 0x07); a.br("BEQ", "an_start")         # post-match: START -> rematch
     a.ins("RTS")
     a.label("an_title")
-    a.ins("LDA_zp", 0x04); a.br("BEQ", "an_tog"); a.ins("RTS")   # already VS-CPU
+    a.ins("LDA_zp", 0x04); a.br("BEQ", "an_tog")
+    a.jmp("an_start")                                       # VS armed -> START off the title
     a.label("an_tog")
     a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 1); a.br("BEQ", "an_tog_go")
     a.ins("RTS")
     a.label("an_tog_go")
     a.jsr(0xFF30)                                           # hack's toggle: 1P->2P->VS-CPU
-    a.ins16("INC_abs", 0x614B)                              # DBG: toggle-call count
     a.ins("RTS")
     a.label("an_lvl")
     a.ins("LDA_imm", 11)
     a.ins16("STA_abs", 0x0316)                              # P1 level
     a.ins16("STA_abs", 0x0396)                              # P2 level (+$80 struct offset)
     a.ins("STA_zp", 0x96)                                   # live cursor (cosmetic)
+    a.label("an_start")
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 4); a.br("BCC", "an_st_go")
+    a.ins("RTS")
+    a.label("an_st_go")
+    inject(B_START)
     a.ins("RTS")
 
     # ================= play-mode copro driver =================
