@@ -29,7 +29,7 @@ WRAP_FILE = 0x4010 + (WRAP_CPU - 0xC000)
 BLOB_FILE = 0x7B10                       # CPU $FB00
 PRG_REG = 0xFFF0
 ARMED = 0x6143             # PRG-RAM: !=0 searching (hold), ==0 act
-NAV_ST, NAV_T, NAV_C = 0x6146, 0x6147, 0x614E   # autonav state/timer/press-counter
+NAV_T, NAV_MAGIC = 0x6147, 0x6149   # autonav frame counter + PRG-RAM power-on magic
 GRAV = 0x0392
 # copro window (mapper 100)
 W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5085 - 1, 0x5085, 0x5086
@@ -41,69 +41,54 @@ def build_main():
     a = Asm6502(UNIT1_CPU)
 
     # ================= per-frame entry =================
-    # Forces VS-CPU mode directly ($04=1, $0727=2, $0316=11) on every non-play frame.
-    # No SELECT injection (misterclaw's virtual pad doesn't declare SELECT). User just
-    # pushes START twice: title -> level select -> match. FPGA coprocessor plays P2.
     a.label("main")
+    # PRG-RAM power-on init (SDRAM boots as garbage): magic byte at NAV_MAGIC
+    a.ins16("LDA_abs", NAV_MAGIC); a.ins("CMP_imm", 0xA5); a.br("BEQ", "inited")
+    a.ins("LDA_imm", 0xA5); a.ins16("STA_abs", NAV_MAGIC)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED); a.ins16("STA_abs", NAV_T)
+    a.label("inited")
     a.ins16("LDA_abs", 0x0046); a.ins("CMP_imm", 0x04); a.br("BNE", "not_play")
     a.ins("LDA_zp", 0x04); a.br("BNE", "go_ai"); a.ins("RTS")
     a.label("go_ai"); a.jmp("dispatch")
     a.label("not_play")
-    a.ins("CMP_imm", 0x08); a.br("BEQ", "m_done")           # intro: hands off
-    # menu modes: force VS-CPU state + mirror P1->P2 so level cursor tracks
-    a.ins("LDA_imm", 1); a.ins("STA_zp", 0x04)              # VS flag
-    a.ins("LDA_imm", 2); a.ins16("STA_abs", 0x0727)         # 2-player game mode
-    a.ins("LDA_zp", 0xF5); a.ins("STA_zp", 0xF6)            # mirror P1 -> P2
+    a.ins("CMP_imm", 0x08); a.br("BNE", "menus")
+    a.ins("RTS")                                            # intro/init: hands off
+    a.label("menus")
+    a.jsr("autonav")
+    a.ins("LDA_zp", 0x04); a.br("BEQ", "m_done")
+    a.ins("LDA_zp", 0xF5); a.ins("STA_zp", 0xF6)            # VS: mirror P1->P2 (level cursor)
     a.label("m_done"); a.ins("RTS")
 
-    # ================= autonav (menu modes only) =================
-    # stages: 0 title-wait  1 sel#2-wait  2 start-wait  3 lvl-screen-settle
-    #         4 LEFT x15    5 RIGHT x11   6 START(retry)
-    def inject(bits):
-        a.ins("LDA_imm", bits); a.ins("STA_zp", 0xF5); a.ins("STA_zp", 0xF7)   # edge + held
-
-    def stage(n, nxt_label):
-        a.ins16("LDA_abs", NAV_ST); a.ins("CMP_imm", n); a.br("BNE", nxt_label)
-
+    # ================= autonav: DIRECT STATE, no input simulation =================
+    # Input injection into $F5 is scrubbed by the game's DPCM double-read verify loop
+    # (traced: injected values poison the pass-compare and get re-read away before the
+    # title handler at ~$98xx consumes $F5). So we don't simulate input at all:
+    #  - title (mode 0): call the hack's own SELECT-toggle routine at $FF30 (fixed bank;
+    #    touches only $0727/$04/$06F1) every 32 ticks until $04==1 (1P->2P->VS cycle).
+    #  - level select (mode 1): force $0316=11 directly (display may lag; match reads the var).
+    #  - STARTs come from the player / misterclaw virtual pad (START+dpad deliver fine;
+    #    only SELECT was undeliverable, which the $FF30 call replaces).
     a.label("autonav")
     a.ins16("INC_abs", NAV_T)
-    stage(0, "an1")
-    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 180); a.br("BCS", "an0_go"); a.ins("RTS")
-    a.label("an0_go"); inject(B_SEL); a.jmp("an_next")
-    a.label("an1"); stage(1, "an2")
-    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 30); a.br("BCS", "an1_go"); a.ins("RTS")
-    a.label("an1_go"); inject(B_SEL); a.jmp("an_next")
-    a.label("an2"); stage(2, "an3")
-    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 30); a.br("BCS", "an2_go"); a.ins("RTS")
-    a.label("an2_go"); inject(B_START); a.jmp("an_next")
-    a.label("an3"); stage(3, "an4")
-    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 120); a.br("BCS", "an3_go"); a.ins("RTS")
-    a.label("an3_go")
-    a.ins("LDA_imm", 15); a.ins16("STA_abs", NAV_C); a.jmp("an_next")
-    a.label("an4"); stage(4, "an5")
-    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.br("BEQ", "an4_go"); a.ins("RTS")
-    a.label("an4_go")
-    inject(B_LEFT)
-    a.ins16("DEC_abs", NAV_C); a.ins16("LDA_abs", NAV_C); a.br("BEQ", "an4_dn"); a.ins("RTS")
-    a.label("an4_dn")
-    a.ins("LDA_imm", 11); a.ins16("STA_abs", NAV_C)
-    a.ins("LDA_imm", 5); a.ins16("STA_abs", NAV_ST); a.ins("RTS")
-    a.label("an5"); stage(5, "an6")
-    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.br("BEQ", "an5_go"); a.ins("RTS")
-    a.label("an5_go")
-    inject(B_RIGHT)
-    a.ins16("DEC_abs", NAV_C); a.ins16("LDA_abs", NAV_C); a.br("BEQ", "an5_dn"); a.ins("RTS")
-    a.label("an5_dn")
-    a.ins("LDA_imm", 6); a.ins16("STA_abs", NAV_ST)
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T); a.ins("RTS")
-    a.label("an6"); stage(6, "an_rts")
-    a.ins16("LDA_abs", NAV_T); a.ins("CMP_imm", 30); a.br("BCS", "an6_go"); a.ins("RTS")
-    a.label("an6_go")
-    inject(B_START)
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T); a.ins("RTS")   # retry every 30f until play
-    a.label("an_next")
-    a.ins16("INC_abs", NAV_ST); a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T)
-    a.label("an_rts"); a.ins("RTS")
+    a.ins16("LDA_abs", 0x0046)
+    a.ins("CMP_imm", 0x00); a.br("BEQ", "an_title")
+    a.ins("CMP_imm", 0x01); a.br("BEQ", "an_lvl")
+    a.ins("RTS")
+    a.label("an_title")
+    a.ins("LDA_zp", 0x04); a.br("BEQ", "an_tog"); a.ins("RTS")   # already VS-CPU
+    a.label("an_tog")
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 1); a.br("BEQ", "an_tog_go")
+    a.ins("RTS")
+    a.label("an_tog_go")
+    a.jsr(0xFF30)                                           # hack's toggle: 1P->2P->VS-CPU
+    a.ins16("INC_abs", 0x614B)                              # DBG: toggle-call count
+    a.ins("RTS")
+    a.label("an_lvl")
+    a.ins("LDA_imm", 11)
+    a.ins16("STA_abs", 0x0316)                              # P1 level
+    a.ins16("STA_abs", 0x0396)                              # P2 level (+$80 struct offset)
+    a.ins("STA_zp", 0x96)                                   # live cursor (cosmetic)
+    a.ins("RTS")
 
     # ================= play-mode copro driver =================
     a.label("dispatch")
