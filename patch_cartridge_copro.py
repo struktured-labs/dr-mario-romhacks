@@ -151,7 +151,9 @@ def build_main():
     stagnate(0x0385, 0x0386, STKX2, STKY2, STK2, 2, "s2")
 
     # ---- FPGA search state machine ----
-    a.ins16("LDA_abs", ARMED); a.br("BEQ", "d_start")       # nothing in flight -> maybe start one
+    a.ins16("LDA_abs", ARMED); a.br("BNE", "d_busy")        # nothing in flight -> maybe start one
+    a.jmp("d_start")
+    a.label("d_busy")
     a.ins16("LDA_abs", W_DONE); a.br("BNE", "d_pub")        # got a result -> publish
     a.jmp("d_hold")                                          # still searching -> hold serving player
 
@@ -184,6 +186,18 @@ def build_main():
     a.label("hold_p2")
     a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
     a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act")
+
+    # freeze QUEUED players too: a pill whose search hasn't run yet must not fall unguided
+    # (time-sharing wait was letting pills drop 2-4 rows before their target arrived ->
+    # unreachable columns -> bad placements). Called from act below.
+    a.label("freeze_pending")
+    a.ins16("LDA_abs", PEND1); a.br("BEQ", "fp_p2")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
+    a.label("fp_p2")
+    a.ins16("LDA_abs", PEND2); a.br("BEQ", "fp_done")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
+    a.label("fp_done")
+    a.ins("RTS")
 
     a.label("d_start")
     a.label("d_start_now")
@@ -220,6 +234,7 @@ def build_main():
 
     # ---- act: steer BOTH players toward their published targets ----
     a.label("act")
+    a.jsr("freeze_pending")
     # P2 first (only if we're not currently freezing it)
     a.ins16("LDA_abs", ARMED); a.br("BEQ", "act_p2")
     a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 2); a.br("BEQ", "act_p1")
