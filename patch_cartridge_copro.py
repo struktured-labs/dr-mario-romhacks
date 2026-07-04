@@ -46,6 +46,7 @@ LASTY2 = 0x6155
 STKX1, STKY1, STK1 = 0x6156, 0x6157, 0x6158   # P1 stagnation: last x/y + stuck-frame count
 STKX2, STKY2, STK2 = 0x6159, 0x615A, 0x615B   # P2 stagnation
 WDOG, WRETRY = 0x615C, 0x615D   # search watchdog: ticks-while-ARMED + one-retry latch
+DELAY1, DELAY2 = 0x615E, 0x615F  # post-edge settle: preview/board can update a beat after spawn
 # if a pill sits still this many frames (while not search-frozen), force DOWN to unstick
 STUCK_LIM = 60        # 1s -- continuous holds again; if truly stuck kick fast to unpark
 # copro window (mapper 100)
@@ -126,12 +127,14 @@ def build_main():
     a.ins16("LDA_abs", 0x0306); a.ins16("CMP_abs", LASTY1)
     a.br("BCC", "no_p1_new"); a.br("BEQ", "no_p1_new")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND1)
+    a.ins("LDA_imm", 15); a.ins16("STA_abs", DELAY1)        # ~3 frames settle before upload
     a.ins("LDA_imm", 0); a.ins16("STA_abs", WRETRY)
     a.label("no_p1_new")
     a.ins16("LDA_abs", 0x0306); a.ins16("STA_abs", LASTY1)
     a.ins16("LDA_abs", 0x0386); a.ins16("CMP_abs", LASTY2)
     a.br("BCC", "no_p2_new"); a.br("BEQ", "no_p2_new")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND2)
+    a.ins("LDA_imm", 15); a.ins16("STA_abs", DELAY2)        # ~3 frames settle before upload
     a.ins("LDA_imm", 0); a.ins16("STA_abs", WRETRY)
     a.label("no_p2_new")
     a.ins16("LDA_abs", 0x0386); a.ins16("STA_abs", LASTY2)
@@ -226,9 +229,20 @@ def build_main():
 
     a.label("d_start")
     a.label("d_start_now")
-    # priority: whichever is pending (P2 first if both, matches prior demo behavior)
-    a.ins16("LDA_abs", PEND2); a.br("BNE", "start_p2")
-    a.ins16("LDA_abs", PEND1); a.br("BNE", "start_p1")
+    # decrement settle timers
+    a.ins16("LDA_abs", DELAY1); a.br("BEQ", "dly1_z"); a.ins16("DEC_abs", DELAY1)
+    a.label("dly1_z")
+    a.ins16("LDA_abs", DELAY2); a.br("BEQ", "dly2_z"); a.ins16("DEC_abs", DELAY2)
+    a.label("dly2_z")
+    # priority: whichever is pending AND settled (P2 first if both)
+    a.ins16("LDA_abs", PEND2); a.br("BEQ", "try_p1")
+    a.ins16("LDA_abs", DELAY2); a.br("BNE", "try_p1")
+    a.jmp("start_p2")
+    a.label("try_p1")
+    a.ins16("LDA_abs", PEND1); a.br("BEQ", "no_start")
+    a.ins16("LDA_abs", DELAY1); a.br("BNE", "no_start")
+    a.jmp("start_p1")
+    a.label("no_start")
     a.jmp("act")
 
     a.label("start_p2")
