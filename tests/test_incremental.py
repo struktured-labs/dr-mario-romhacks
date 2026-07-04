@@ -129,6 +129,58 @@ def _vir_run2(b, o):
     while rr < ROWS and _col(b, rr*COLS+c) == color: vr += 1; rr += 1
     return max(hr, vr) ** 2
 
+def _vir_run2_ext(b, o):
+    """Extendability-aware readiness of one virus: per direction, run^2 only if the
+    contiguous span of (same-color OR empty) cells through the virus is >= 4; else 0.
+    max over the two directions."""
+    color = b[o] & 0x0F; r, c = o >> 3, o & 7
+    # horizontal run
+    hr = 1; cc = c - 1
+    while cc >= 0 and _col(b, r*COLS+cc) == color: hr += 1; cc -= 1
+    lo = cc
+    while lo >= 0 and (b[r*COLS+lo] == EMPTY or _col(b, r*COLS+lo) == color): lo -= 1
+    cc = c + 1
+    while cc < COLS and _col(b, r*COLS+cc) == color: hr += 1; cc += 1
+    hi = cc
+    while hi < COLS and (b[r*COLS+hi] == EMPTY or _col(b, r*COLS+hi) == color): hi += 1
+    h_ok = (hi - lo - 1) >= 4
+    # vertical run
+    vr = 1; rr = r - 1
+    while rr >= 0 and _col(b, rr*COLS+c) == color: vr += 1; rr -= 1
+    vlo = rr
+    while vlo >= 0 and (b[vlo*COLS+c] == EMPTY or _col(b, vlo*COLS+c) == color): vlo -= 1
+    rr = r + 1
+    while rr < ROWS and _col(b, rr*COLS+c) == color: vr += 1; rr += 1
+    vhi = rr
+    while vhi < ROWS and (b[vhi*COLS+c] == EMPTY or _col(b, vhi*COLS+c) == color): vhi += 1
+    v_ok = (vhi - vlo - 1) >= 4
+    return max(hr*hr if h_ok else 0, vr*vr if v_ok else 0)
+
+
+def g_readiness_ext(b):
+    """Board-wide extendability-aware readiness (golden)."""
+    return sum(_vir_run2_ext(b, o) for o in range(128)
+               if b[o] != EMPTY and (b[o] & 0xF0) == 0xD0)
+
+
+def readiness_ext_delta(b, nb, offa, offb, base_rdy):
+    """Ext readiness delta: a placed cell can change any virus in its ROW or COLUMN
+    (runs via contiguity, spans via occupancy). Recompute those viruses old vs new."""
+    affected = set()
+    for off in (offa, offb):
+        r, c = off >> 3, off & 7
+        for cc in range(COLS):
+            o = r*COLS + cc
+            if _isvir(b, o): affected.add(o)
+        for rr in range(ROWS):
+            o = rr*COLS + c
+            if _isvir(b, o): affected.add(o)
+    d = 0
+    for o in affected:
+        d += _vir_run2_ext(nb, o) - _vir_run2_ext(b, o)
+    return base_rdy + d
+
+
 def readiness_delta(b, nb, offa, offb, base_rdy):
     """Only viruses in the placed cells' row/col with the placed color can change their run.
     Recompute those viruses' run^2 on old vs new; sum the deltas. (Non-contiguous ones delta 0.)"""
