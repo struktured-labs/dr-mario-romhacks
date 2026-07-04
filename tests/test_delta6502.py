@@ -54,6 +54,7 @@ RA, RB, WROW, WCOL, WI, WJ, ILO, IHI, JLO, JHI = 0x4F, 0x50, 0x51, 0x52, 0x53, 0
 CURCELL, PCOL, VO, LNIDX, CUROFF, TVMASK = 0x59, 0x5A, 0x5B, 0x5C, 0x5D, 0x5E
 RCOL, HRUN, VRUN, WOFF, RUN = 0x5F, 0x60, 0x61, 0x62, 0x63
 NV, RAYOFF, NI = 0x64, 0x65, 0x66
+SPAN, RUNON = 0x67, 0x68
 VLIST = 0x61A0                       # up to 32 affected-virus offsets
 NV_SH = 0x61C1                       # RAM shadow of NV (persists across the DELTA phase split)
 
@@ -272,6 +273,89 @@ def emit_vir_run2(a):
     a.ins16("LDA_abs", RUN2_LO); a.ins("CLC"); a.ins("ADC_zp", RUN); a.ins16("STA_abs", RUN2_LO)
     a.ins16("LDA_abs", RUN2_HI); a.ins("ADC_imm", 0); a.ins16("STA_abs", RUN2_HI)
     a.ins("DEX"); a.br("BNE", "vr_ml")
+    a.ins("RTS")
+
+
+def emit_vir_run2_ext(a):
+    """RUN2 = extendability-aware readiness for the virus at VO: per direction run^2 only
+    if the span of (EMPTY or same-low-nibble) cells through the virus >= 4, else 0."""
+    a.label("vir_run2_ext")
+    a.ins("LDX_zp", VO); a.ins16("LDA_absX", BOARD); a.ins("AND_imm", 0x0F); a.ins("STA_zp", RCOL)
+    # ---------- horizontal: run in HRUN, span in SPAN ----------
+    a.ins("LDA_imm", 1); a.ins("STA_zp", HRUN); a.ins("STA_zp", SPAN)
+    a.ins("LDA_imm", 1); a.ins("STA_zp", RUNON)              # still-in-run flag
+    a.ins("LDA_zp", VO); a.ins("STA_zp", WOFF)
+    a.label("vx_hl")                                          # walk left
+    a.ins("LDA_zp", WOFF); a.ins("AND_imm", 7); a.br("BEQ", "vx_hr")
+    a.ins("DEC_zp", WOFF)
+    a.ins("LDX_zp", WOFF); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "vx_hl_e")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", RCOL); a.br("BNE", "vx_hr")
+    a.ins("INC_zp", SPAN)                                     # same color: span+, run+ if contiguous
+    a.ins("LDA_zp", RUNON); a.br("BEQ", "vx_hl")
+    a.ins("INC_zp", HRUN); a.jmp("vx_hl")
+    a.label("vx_hl_e")
+    a.ins("INC_zp", SPAN); a.ins("LDA_imm", 0); a.ins("STA_zp", RUNON); a.jmp("vx_hl")
+    a.label("vx_hr")                                          # walk right
+    a.ins("LDA_imm", 1); a.ins("STA_zp", RUNON)
+    a.ins("LDA_zp", VO); a.ins("STA_zp", WOFF)
+    a.label("vx_hrl")
+    a.ins("LDA_zp", WOFF); a.ins("AND_imm", 7); a.ins("CMP_imm", 7); a.br("BEQ", "vx_hd")
+    a.ins("INC_zp", WOFF)
+    a.ins("LDX_zp", WOFF); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "vx_hr_e")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", RCOL); a.br("BNE", "vx_hd")
+    a.ins("INC_zp", SPAN)
+    a.ins("LDA_zp", RUNON); a.br("BEQ", "vx_hrl")
+    a.ins("INC_zp", HRUN); a.jmp("vx_hrl")
+    a.label("vx_hr_e")
+    a.ins("INC_zp", SPAN); a.ins("LDA_imm", 0); a.ins("STA_zp", RUNON); a.jmp("vx_hrl")
+    a.label("vx_hd")
+    a.ins("LDA_zp", SPAN); a.ins("CMP_imm", 4); a.br("BCS", "vx_hok")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", HRUN)                # dead direction
+    a.label("vx_hok")
+    # ---------- vertical: run in VRUN, span in SPAN ----------
+    a.ins("LDA_imm", 1); a.ins("STA_zp", VRUN); a.ins("STA_zp", SPAN)
+    a.ins("LDA_imm", 1); a.ins("STA_zp", RUNON)
+    a.ins("LDA_zp", VO); a.ins("STA_zp", WOFF)
+    a.label("vx_vu")
+    a.ins("LDA_zp", WOFF); a.ins("CMP_imm", 8); a.br("BCC", "vx_vd")
+    a.ins("LDA_zp", WOFF); a.ins("SEC"); a.ins("SBC_imm", 8); a.ins("STA_zp", WOFF)
+    a.ins("LDX_zp", WOFF); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "vx_vu_e")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", RCOL); a.br("BNE", "vx_vd")
+    a.ins("INC_zp", SPAN)
+    a.ins("LDA_zp", RUNON); a.br("BEQ", "vx_vu")
+    a.ins("INC_zp", VRUN); a.jmp("vx_vu")
+    a.label("vx_vu_e")
+    a.ins("INC_zp", SPAN); a.ins("LDA_imm", 0); a.ins("STA_zp", RUNON); a.jmp("vx_vu")
+    a.label("vx_vd")
+    a.ins("LDA_imm", 1); a.ins("STA_zp", RUNON)
+    a.ins("LDA_zp", VO); a.ins("STA_zp", WOFF)
+    a.label("vx_vdl")
+    a.ins("LDA_zp", WOFF); a.ins("CMP_imm", 120); a.br("BCS", "vx_vfin")
+    a.ins("LDA_zp", WOFF); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", WOFF)
+    a.ins("LDX_zp", WOFF); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "vx_vd_e")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", RCOL); a.br("BNE", "vx_vfin")
+    a.ins("INC_zp", SPAN)
+    a.ins("LDA_zp", RUNON); a.br("BEQ", "vx_vdl")
+    a.ins("INC_zp", VRUN); a.jmp("vx_vdl")
+    a.label("vx_vd_e")
+    a.ins("INC_zp", SPAN); a.ins("LDA_imm", 0); a.ins("STA_zp", RUNON); a.jmp("vx_vdl")
+    a.label("vx_vfin")
+    a.ins("LDA_zp", SPAN); a.ins("CMP_imm", 4); a.br("BCS", "vx_vok")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", VRUN)
+    a.label("vx_vok")
+    # ---------- RUN2 = max(HRUN,VRUN)^2 ----------
+    a.ins("LDA_zp", HRUN); a.ins("CMP_zp", VRUN); a.br("BCS", "vx_h"); a.ins("LDA_zp", VRUN); a.jmp("vx_sq")
+    a.label("vx_h"); a.ins("LDA_zp", HRUN)
+    a.label("vx_sq")
+    a.ins("STA_zp", RUN)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", RUN2_LO); a.ins16("STA_abs", RUN2_HI)
+    a.ins("LDA_zp", RUN); a.br("BEQ", "vx_done")              # dead both ways -> 0
+    a.ins("LDX_zp", RUN)
+    a.label("vx_ml")
+    a.ins16("LDA_abs", RUN2_LO); a.ins("CLC"); a.ins("ADC_zp", RUN); a.ins16("STA_abs", RUN2_LO)
+    a.ins16("LDA_abs", RUN2_HI); a.ins("ADC_imm", 0); a.ins16("STA_abs", RUN2_HI)
+    a.ins("DEX"); a.br("BNE", "vx_ml")
+    a.label("vx_done")
     a.ins("RTS")
 
 
