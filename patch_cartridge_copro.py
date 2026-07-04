@@ -45,6 +45,7 @@ LASTY1 = 0x6154
 LASTY2 = 0x6155
 STKX1, STKY1, STK1 = 0x6156, 0x6157, 0x6158   # P1 stagnation: last x/y + stuck-frame count
 STKX2, STKY2, STK2 = 0x6159, 0x615A, 0x615B   # P2 stagnation
+WDOG, WRETRY = 0x615C, 0x615D   # search watchdog: ticks-while-ARMED + one-retry latch
 # if a pill sits still this many frames (while not search-frozen), force DOWN to unstick
 STUCK_LIM = 60        # 1s -- continuous holds again; if truly stuck kick fast to unpark
 # copro window (mapper 100)
@@ -63,6 +64,7 @@ def build_main():
     a.ins("LDA_imm", 0xA5); a.ins16("STA_abs", NAV_MAGIC)
     a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED); a.ins16("STA_abs", NAV_T)
     a.ins16("STA_abs", STK1); a.ins16("STA_abs", STK2)
+    a.ins16("STA_abs", WDOG); a.ins16("STA_abs", WRETRY)
     a.ins("LDA_imm", 3)                                     # sane targets pre-first-publish
     a.ins16("STA_abs", TGT_C1); a.ins16("STA_abs", TGT_O1)
     a.ins16("STA_abs", TGT_C2); a.ins16("STA_abs", TGT_O2)
@@ -124,11 +126,13 @@ def build_main():
     a.ins16("LDA_abs", 0x0306); a.ins16("CMP_abs", LASTY1)
     a.br("BCC", "no_p1_new"); a.br("BEQ", "no_p1_new")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND1)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", WRETRY)
     a.label("no_p1_new")
     a.ins16("LDA_abs", 0x0306); a.ins16("STA_abs", LASTY1)
     a.ins16("LDA_abs", 0x0386); a.ins16("CMP_abs", LASTY2)
     a.br("BCC", "no_p2_new"); a.br("BEQ", "no_p2_new")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND2)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", WRETRY)
     a.label("no_p2_new")
     a.ins16("LDA_abs", 0x0386); a.ins16("STA_abs", LASTY2)
 
@@ -149,6 +153,27 @@ def build_main():
         a.label(f"sk_{tag}")
     stagnate(0x0305, 0x0306, STKX1, STKY1, STK1, 1, "s1")
     stagnate(0x0385, 0x0386, STKX2, STKY2, STK2, 2, "s2")
+
+    # ---- search WATCHDOG: a real search finishes in ~90 hook ticks (~0.3s); if ARMED
+    # persists ~200 ticks the handshake wedged. Without this, d_hold pins the served
+    # player's gravity forever AND stagnation is gated off -> the observed hovering pill.
+    # Trip: abandon (ARMED=0). First trip per pill: re-queue the search (PEND). Second:
+    # fail open (gravity + failsafe resume; stale targets are fine).
+    a.ins16("LDA_abs", ARMED); a.br("BNE", "wd_armed")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", WDOG); a.jmp("wd_done")
+    a.label("wd_armed")
+    a.ins16("INC_abs", WDOG)
+    a.ins16("LDA_abs", WDOG); a.ins("CMP_imm", 200); a.br("BCS", "wd_trip")
+    a.jmp("wd_done")
+    a.label("wd_trip")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED); a.ins16("STA_abs", WDOG)
+    a.ins16("LDA_abs", WRETRY); a.br("BNE", "wd_done")      # already retried: fail open
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", WRETRY)
+    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 2); a.br("BEQ", "wd_rq2")
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND1); a.jmp("wd_done")
+    a.label("wd_rq2")
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND2)
+    a.label("wd_done")
 
     # ---- FPGA search state machine ----
     a.ins16("LDA_abs", ARMED); a.br("BNE", "d_busy")        # nothing in flight -> maybe start one
