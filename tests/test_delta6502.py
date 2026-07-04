@@ -23,7 +23,8 @@ from primitives import (SH_MAXH, SH_HOLES, SH_TOPRISK, EV_BUR_LO, EV_BUR_HI,
                         EV_RDY_LO, EV_RDY_HI, EV_SET, EV_VIRFLAG, EV_SCO_LO, EV_SCO_HI,
                         EV_WIN, emit_combine)
 from test_incremental import (base_info as py_base_info, delta_easy, setup_delta as py_setup,
-                              readiness_delta as py_rdy, _place, _clears, _rand_settled)
+                              readiness_delta as py_rdy, _place, _clears, _rand_settled,
+                              g_vreadiness, vreadiness_delta)
 from test_shape_eval import golden_shape
 from test_eval_terms import g_buried, g_setup, g_readiness
 from nes_d2_golden import _landing
@@ -39,6 +40,9 @@ BASE_MH, BASE_HO, BASE_TR, BASE_SET = 0x6170, 0x6171, 0x6172, 0x6173
 BASE_BUR_LO, BASE_BUR_HI = 0x6174, 0x6175
 BASE_RDY_LO, BASE_RDY_HI = 0x6176, 0x6177
 BASE_VIRFLAG = 0x6178
+BASE_VRDY_LO, BASE_VRDY_HI = 0x6179, 0x617A
+VNEW_LO, VNEW_HI, VOLD_LO, VOLD_HI = 0x61C2, 0x61C3, 0x61C4, 0x61C5
+NV2_SH, VLIST2 = 0x61C7, 0x61C8      # vertical-affected list (separate from readiness VLIST)
 RSUM_LO, RSUM_HI = 0x6180, 0x6181
 RUN2_LO, RUN2_HI = 0x6182, 0x6183
 RNEW_LO, RNEW_HI = 0x6184, 0x6185
@@ -359,6 +363,120 @@ def emit_vir_run2_ext(a):
     a.ins("RTS")
 
 
+def emit_vir_vrun2(a):
+    """RUN2 = vertical-only readiness (vrun^2) for the virus at VO."""
+    a.label("vir_vrun2")
+    a.ins("LDX_zp", VO); a.ins16("LDA_absX", BOARD); a.ins("AND_imm", 0x0F); a.ins("STA_zp", RCOL)
+    a.ins("LDA_imm", 1); a.ins("STA_zp", VRUN)
+    a.ins("LDA_zp", VO); a.ins("STA_zp", WOFF)
+    a.label("vv_u")
+    a.ins("LDA_zp", WOFF); a.ins("CMP_imm", 8); a.br("BCC", "vv_d")
+    a.ins("LDA_zp", WOFF); a.ins("SEC"); a.ins("SBC_imm", 8); a.ins("STA_zp", WOFF)
+    a.ins("LDX_zp", WOFF); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "vv_d")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", RCOL); a.br("BNE", "vv_d")
+    a.ins("INC_zp", VRUN); a.jmp("vv_u")
+    a.label("vv_d")
+    a.ins("LDA_zp", VO); a.ins("STA_zp", WOFF)
+    a.label("vv_dl")
+    a.ins("LDA_zp", WOFF); a.ins("CMP_imm", 120); a.br("BCS", "vv_sq")
+    a.ins("LDA_zp", WOFF); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", WOFF)
+    a.ins("LDX_zp", WOFF); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "vv_sq")
+    a.ins("AND_imm", 0x0F); a.ins("CMP_zp", RCOL); a.br("BNE", "vv_sq")
+    a.ins("INC_zp", VRUN); a.jmp("vv_dl")
+    a.label("vv_sq")
+    a.ins("LDA_zp", VRUN); a.ins("STA_zp", RUN)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", RUN2_LO); a.ins16("STA_abs", RUN2_HI)
+    a.ins("LDX_zp", RUN)
+    a.label("vv_ml")
+    a.ins16("LDA_abs", RUN2_LO); a.ins("CLC"); a.ins("ADC_zp", RUN); a.ins16("STA_abs", RUN2_LO)
+    a.ins16("LDA_abs", RUN2_HI); a.ins("ADC_imm", 0); a.ins16("STA_abs", RUN2_HI)
+    a.ins("DEX"); a.br("BNE", "vv_ml")
+    a.ins("RTS")
+
+
+def emit_vrdy_new(a):
+    """Collect same-color viruses vertically contiguous to each placed cell (walk up/down
+    through same-nibble cells) into VLIST2; sum their NEW vrun2 into VNEW."""
+    a.label("vrdy_new")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", VNEW_LO); a.ins16("STA_abs", VNEW_HI); a.ins("STA_zp", NV)
+    a.jsr("clear_visit")                 # dedup (vertical pills walk across each other's cells)
+    a.label("vn_body")
+    for i, zoff in enumerate(("A", "B")):
+        src = Z_OFFA if zoff == "A" else Z_OFFB
+        a.ins("LDA_zp", src); a.ins("STA_zp", CURCELL)
+        a.ins("LDX_zp", src); a.ins16("LDA_absX", BOARD); a.ins("AND_imm", 0x0F); a.ins("STA_zp", PCOL)
+        for dname, guard, step in (("u", "up", -8), ("d", "dn", 8)):
+            a.ins("LDA_zp", CURCELL); a.ins("STA_zp", RAYOFF)
+            a.label(f"vn_{zoff}{dname}")
+            if step < 0:
+                a.ins("LDA_zp", RAYOFF); a.ins("CMP_imm", 8); a.br("BCC", f"vn_{zoff}{dname}_x")
+                a.ins("LDA_zp", RAYOFF); a.ins("SEC"); a.ins("SBC_imm", 8); a.ins("STA_zp", RAYOFF)
+            else:
+                a.ins("LDA_zp", RAYOFF); a.ins("CMP_imm", 120); a.br("BCS", f"vn_{zoff}{dname}_x")
+                a.ins("LDA_zp", RAYOFF); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("STA_zp", RAYOFF)
+            a.ins("LDX_zp", RAYOFF); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", f"vn_{zoff}{dname}_x")
+            a.ins("AND_imm", 0x0F); a.ins("CMP_zp", PCOL); a.br("BNE", f"vn_{zoff}{dname}_x")
+            # same-color: virus? -> record (dedup by simple linear check is overkill; columns
+            # of A and B may overlap only when vertical pill: dedup via VISIT bitmap reuse)
+            a.ins("LDX_zp", RAYOFF); a.ins16("LDA_absX", BOARD); a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0); a.br("BNE", f"vn_{zoff}{dname}")
+            # VISIT dedup: bit (off&7) of byte (off>>3)
+            a.ins("LDA_zp", RAYOFF); a.ins("AND_imm", 7); a.ins("TAY"); a.ins("LDA_imm", 1)
+            a.label(f"vn_{zoff}{dname}_sh")
+            a.ins("DEY"); a.br("BMI", f"vn_{zoff}{dname}_shd"); a.ins("ASL_A"); a.jmp(f"vn_{zoff}{dname}_sh")
+            a.label(f"vn_{zoff}{dname}_shd")
+            a.ins("STA_zp", TVMASK)
+            a.ins("LDA_zp", RAYOFF); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("TAX")
+            a.ins16("LDA_absX", VISIT); a.ins("AND_zp", TVMASK); a.br("BNE", f"vn_{zoff}{dname}")
+            a.ins16("LDA_absX", VISIT); a.ins("ORA_zp", TVMASK); a.ins16("STA_absX", VISIT)
+            a.ins("LDX_zp", NV); a.ins("LDA_zp", RAYOFF); a.ins16("STA_absX", VLIST2); a.ins("INC_zp", NV)
+            a.ins("LDA_zp", RAYOFF); a.ins("STA_zp", VO); a.jsr("vir_vrun2")
+            a.ins16("LDA_abs", VNEW_LO); a.ins("CLC"); a.ins16("ADC_abs", RUN2_LO); a.ins16("STA_abs", VNEW_LO)
+            a.ins16("LDA_abs", VNEW_HI); a.ins16("ADC_abs", RUN2_HI); a.ins16("STA_abs", VNEW_HI)
+            a.jmp(f"vn_{zoff}{dname}")
+            a.label(f"vn_{zoff}{dname}_x")
+    a.ins("LDA_zp", NV); a.ins16("STA_abs", NV2_SH)
+    a.ins("RTS")
+
+
+def emit_vrdy_old(a):
+    """Mask placed cells, re-score VLIST2 on the old board -> VOLD; EV_VRDY = BASE_VRDY +
+    VNEW - VOLD; restore cells."""
+    a.label("vrdy_old")
+    a.ins("LDX_zp", Z_OFFA); a.ins16("LDA_absX", BOARD); a.ins16("STA_abs", SAVA); a.ins("LDA_imm", EMPTY); a.ins16("STA_absX", BOARD)
+    a.ins("LDX_zp", Z_OFFB); a.ins16("LDA_absX", BOARD); a.ins16("STA_abs", SAVB); a.ins("LDA_imm", EMPTY); a.ins16("STA_absX", BOARD)
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", VOLD_LO); a.ins16("STA_abs", VOLD_HI); a.ins("STA_zp", NI)
+    a.label("vo_lp")
+    a.ins("LDA_zp", NI); a.ins16("CMP_abs", NV2_SH); a.br("BCS", "vo_done")
+    a.ins("LDX_zp", NI); a.ins16("LDA_absX", VLIST2); a.ins("STA_zp", VO); a.jsr("vir_vrun2")
+    a.ins16("LDA_abs", VOLD_LO); a.ins("CLC"); a.ins16("ADC_abs", RUN2_LO); a.ins16("STA_abs", VOLD_LO)
+    a.ins16("LDA_abs", VOLD_HI); a.ins16("ADC_abs", RUN2_HI); a.ins16("STA_abs", VOLD_HI)
+    a.ins("INC_zp", NI); a.jmp("vo_lp")
+    a.label("vo_done")
+    a.ins("LDX_zp", Z_OFFA); a.ins16("LDA_abs", SAVA); a.ins16("STA_absX", BOARD)
+    a.ins("LDX_zp", Z_OFFB); a.ins16("LDA_abs", SAVB); a.ins16("STA_absX", BOARD)
+    a.ins16("LDA_abs", BASE_VRDY_LO); a.ins("CLC"); a.ins16("ADC_abs", VNEW_LO); a.ins16("STA_abs", P.EV_VRDY_LO)
+    a.ins16("LDA_abs", BASE_VRDY_HI); a.ins16("ADC_abs", VNEW_HI); a.ins16("STA_abs", P.EV_VRDY_HI)
+    a.ins16("LDA_abs", P.EV_VRDY_LO); a.ins("SEC"); a.ins16("SBC_abs", VOLD_LO); a.ins16("STA_abs", P.EV_VRDY_LO)
+    a.ins16("LDA_abs", P.EV_VRDY_HI); a.ins16("SBC_abs", VOLD_HI); a.ins16("STA_abs", P.EV_VRDY_HI)
+    a.ins("RTS")
+
+
+def emit_vrdy_full(a):
+    """EV_VRDY = sum of vertical run^2 over all viruses on BOARD (full scan)."""
+    a.label("vrdy_full")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", P.EV_VRDY_LO); a.ins16("STA_abs", P.EV_VRDY_HI)
+    a.ins("LDA_imm", 0); a.ins("STA_zp", VO)
+    a.label("vf_lp")
+    a.ins("LDX_zp", VO); a.ins16("LDA_absX", BOARD); a.ins("CMP_imm", EMPTY); a.br("BEQ", "vf_nx")
+    a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0); a.br("BNE", "vf_nx")
+    a.jsr("vir_vrun2")
+    a.ins16("LDA_abs", P.EV_VRDY_LO); a.ins("CLC"); a.ins16("ADC_abs", RUN2_LO); a.ins16("STA_abs", P.EV_VRDY_LO)
+    a.ins16("LDA_abs", P.EV_VRDY_HI); a.ins16("ADC_abs", RUN2_HI); a.ins16("STA_abs", P.EV_VRDY_HI)
+    a.label("vf_nx")
+    a.ins("INC_zp", VO); a.ins("LDA_zp", VO); a.ins("CMP_imm", 128); a.br("BNE", "vf_lp")
+    a.ins("RTS")
+
+
 def emit_collect_virus(a):
     """VO is a same-low-nibble cell contiguous to a placed cell. If it's a virus not yet visited:
     mark, append offset to VLIST, add its new run2 to RSUM."""
@@ -517,6 +635,7 @@ def emit_delta_terms(a):
         a.jsr("setup_delta")
         a.ins16("LDA_abs", BASE_SET); a.ins("CLC"); a.ins("ADC_zp", DSET); a.ins16("STA_abs", EV_SET)
     a.jsr("readiness_new")               # heavy half 1 (collect + new run2); split point on the cart
+    a.jsr("vrdy_new")                    # vertical-readiness new pass (VLIST2, uses NV after readiness saved it)
     a.ins("RTS")
 
 
@@ -531,6 +650,7 @@ def emit_delta_finish(a):
     Assumes SH_MAXH/HOLES/TOPRISK restored, EV_BUR/EV_SET/BASE_* still in RAM, offa/offb set."""
     a.label("delta_finish")
     a.jsr("readiness_old")               # heavy half 2 (old run2) -> EV_RDY
+    a.jsr("vrdy_old")                    # vertical-readiness old pass -> EV_VRDY
     a.ins16("LDA_abs", BASE_VIRFLAG); a.ins16("STA_abs", EV_VIRFLAG)   # virflag unchanged (non-clearing)
     a.jsr("combine")
     a.ins("RTS")
@@ -541,6 +661,7 @@ def build():
     emit_base_info(a); emit_wq(a); emit_row_wins(a); emit_col_wins(a); emit_setup_delta(a)
     emit_vir_run2(a); emit_collect_virus(a); emit_collect_cell(a); emit_clear_visit(a)
     emit_readiness_new(a); emit_readiness_old(a); emit_readiness_delta(a)
+    emit_vir_vrun2(a); emit_vrdy_new(a); emit_vrdy_old(a); emit_vrdy_full(a)
     emit_delta_terms(a); emit_delta_finish(a); emit_delta_eval(a); emit_combine(a)
     return a, a.assemble()
 
@@ -553,11 +674,12 @@ def py_leaf(b, nb, orient2, col, offa, offb):
     mh, ho, tr, bur = delta_easy(b, orient2, col, base)
     st = py_setup(nb, offa, offb, g_setup(b))
     rd = py_rdy(b, nb, offa, offb, g_readiness(b))
+    vr = vreadiness_delta(b, nb, offa, offb, g_vreadiness(b))
     virfree = not any((x & 0xF0) == 0xD0 for x in nb)
     if virfree:
-        return 0, mh, ho, tr, bur, st, rd
-    sco = 5000 - 12*mh - 25*ho - 45*tr + 40*st - 30*bur + 4*rd
-    return sco, mh, ho, tr, bur, st, rd
+        return 0, mh, ho, tr, bur, st, rd, vr
+    sco = 5000 - 12*mh - 25*ho - 45*tr + 40*st - 30*bur + 4*rd + 12*vr
+    return sco, mh, ho, tr, bur, st, rd, vr
 
 
 def s16(lo, hi):
@@ -584,6 +706,8 @@ def main():
         cpu.mem[BASE_TR] = tr0 & 0xFF; cpu.mem[BASE_SET] = set0 & 0xFF
         cpu.mem[BASE_BUR_LO] = bur0 & 0xFF; cpu.mem[BASE_BUR_HI] = (bur0 >> 8) & 0xFF
         cpu.mem[BASE_RDY_LO] = rdy0 & 0xFF; cpu.mem[BASE_RDY_HI] = (rdy0 >> 8) & 0xFF
+        vrdy0 = g_vreadiness(b)
+        cpu.mem[BASE_VRDY_LO] = vrdy0 & 0xFF; cpu.mem[BASE_VRDY_HI] = (vrdy0 >> 8) & 0xFF
         cpu.mem[BASE_VIRFLAG] = virflag
         ta, tb = rng.randint(0, 2), rng.randint(0, 2)
         for orient2 in (0, 1):
@@ -600,10 +724,11 @@ def main():
                 cpu.call(A_delta)
                 got = (cpu.mem[SH_MAXH], cpu.mem[SH_HOLES], cpu.mem[SH_TOPRISK],
                        cpu.mem[EV_BUR_LO] | (cpu.mem[EV_BUR_HI] << 8),
-                       cpu.mem[EV_SET], cpu.mem[EV_RDY_LO] | (cpu.mem[EV_RDY_HI] << 8))
+                       cpu.mem[EV_SET], cpu.mem[EV_RDY_LO] | (cpu.mem[EV_RDY_HI] << 8),
+                       cpu.mem[P.EV_VRDY_LO] | (cpu.mem[P.EV_VRDY_HI] << 8))
                 sco = s16(cpu.mem[EV_SCO_LO], cpu.mem[EV_SCO_HI])
-                esco, emh, eho, etr, ebur, est, erd = py_leaf(b, nb, orient2, col, offa, offb)
-                exp = (emh, eho, etr, ebur, est, erd)
+                esco, emh, eho, etr, ebur, est, erd, evr = py_leaf(b, nb, orient2, col, offa, offb)
+                exp = (emh, eho, etr, ebur, est, erd, evr)
                 tested += 1
                 if got != exp:
                     term_fail += 1

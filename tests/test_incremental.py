@@ -181,6 +181,38 @@ def readiness_ext_delta(b, nb, offa, offb, base_rdy):
     return base_rdy + d
 
 
+def _vir_vrun2(b, o):
+    """Vertical-only readiness of one virus: vertical same-color run squared."""
+    color = b[o] & 0x0F; r, c = o >> 3, o & 7
+    vr = 1; rr = r - 1
+    while rr >= 0 and _col(b, rr*COLS+c) == color: vr += 1; rr -= 1
+    rr = r + 1
+    while rr < ROWS and _col(b, rr*COLS+c) == color: vr += 1; rr += 1
+    return vr * vr
+
+
+def g_vreadiness(b):
+    return sum(_vir_vrun2(b, o) for o in range(128)
+               if b[o] != EMPTY and (b[o] & 0xF0) == 0xD0)
+
+
+def vreadiness_delta(b, nb, offa, offb, base_vrdy):
+    """Vertical runs change only for same-color viruses vertically CONTIGUOUS to a placed
+    cell (walk up/down through same-color cells from each placed cell)."""
+    affected = set()
+    for off in (offa, offb):
+        c = off & 7; X = nb[off] & 0x0F
+        for step in (-COLS, COLS):
+            o = off + step
+            while 0 <= o < 128 and (o & 7) == c and nb[o] != EMPTY and (nb[o] & 0x0F) == X:
+                if _isvir(nb, o): affected.add(o)
+                o += step
+    d = 0
+    for o in affected:
+        d += _vir_vrun2(nb, o) - _vir_vrun2(b, o)
+    return base_vrdy + d
+
+
 def readiness_delta(b, nb, offa, offb, base_rdy):
     """Only viruses in the placed cells' row/col with the placed color can change their run.
     Recompute those viruses' run^2 on old vs new; sum the deltas. (Non-contiguous ones delta 0.)"""

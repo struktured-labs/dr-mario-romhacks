@@ -357,6 +357,7 @@ EV_RDY_LO, EV_RDY_HI = 0x6112, 0x6113
 EV_SET, EV_VIRFLAG, EV_WIN = 0x6114, 0x6115, 0x6116
 EV_SCO_LO, EV_SCO_HI = 0x6117, 0x6118
 EV_MLO, EV_MHI, EV_PLO, EV_PHI = 0x6119, 0x611A, 0x611B, 0x611C
+EV_VRDY_LO, EV_VRDY_HI = 0x611D, 0x611E   # vertical readiness (weight 12; 0 if unused)
 SQ_LO_ADDR, SQ_HI_ADDR = 0x7A00, 0x7A11      # 17-byte square tables (lo, hi)
 EO_LO, EO_HI = 0xE9, 0xEA                     # term accumulator output (disjoint from RV)
 ET0, ET1, ET2, ET3, ET4, ET5, ET6 = 0xE2, 0xE3, 0xE4, 0xE5, 0xE6, 0xE7, 0xE8
@@ -537,6 +538,7 @@ def emit_combine(a):
     a.ins("LDX_imm", 40); a.jsr("cm_mul"); a.jsr("cm_add")
     t16(EV_BUR_LO, EV_BUR_HI, 30, True)
     t16(EV_RDY_LO, EV_RDY_HI, 4, False)
+    t16(EV_VRDY_LO, EV_VRDY_HI, 12, False)   # vertical-clear pursuit (measured +12.7pp)
     a.ins("RTS")
     a.label("cm_mul")
     a.ins("LDA_imm", 0); a.ins16("STA_abs", EV_PLO); a.ins16("STA_abs", EV_PHI)
