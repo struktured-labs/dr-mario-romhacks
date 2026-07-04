@@ -46,7 +46,7 @@ LASTY2 = 0x6155
 STKX1, STKY1, STK1 = 0x6156, 0x6157, 0x6158   # P1 stagnation: last x/y + stuck-frame count
 STKX2, STKY2, STK2 = 0x6159, 0x615A, 0x615B   # P2 stagnation
 # if a pill sits still this many frames (while not search-frozen), force DOWN to unstick
-STUCK_LIM = 90
+STUCK_LIM = 150       # 2.5s -- steering now pulses so 90 was firing while normal moves were in flight
 # copro window (mapper 100)
 W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5084, 0x5085, 0x5086
 # NES pad bits on $F5 (pressed-this-frame): A=$80 B=$40 Sel=$20 Start=$10 U=$08 D=$04 L=$02 R=$01
@@ -242,17 +242,25 @@ def build_main():
     a.ins16("LDA_abs", STK2); a.ins("CMP_imm", STUCK_LIM); a.br("BCC", "act_p2_n")
     a.ins("LDY_imm", 0x04); a.ins("STY_zp", 0xF6); a.jmp("act_p1")   # stuck: force drop
     a.label("act_p2_n")
-    # steer-then-drop: gravity stays pinned until orient AND column are exact, then drop.
-    # (fixes pills locking mid-rotation/mid-slide -> flipped or misplaced dual-color drops)
+    # steer-then-drop: gravity pinned until orient AND column exact, then drop.
+    # KEY: presses are PULSED via NAV_T window ((NAV_T&$07)<3 = press, else release) so
+    # the game's edge detector ($F5 & ~$F7) re-arms between presses. A continuously-held
+    # value was only being seen as newly-pressed on frame 1, then treated as held forever;
+    # the pill couldn't steer -> stagnation failsafe fired -> mid-board junk drops (bug).
     a.ins16("LDA_abs", 0x03A5); a.ins16("CMP_abs", TGT_O2); a.br("BEQ", "mv_p2")
     a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
     a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xF8)
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.ins("CMP_imm", 3); a.br("BCS", "rel_p2")
     a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF6); a.jmp("act_p1")
+    a.label("rel_p2")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", 0xF6); a.jmp("act_p1")
     a.label("mv_p2")
     a.ins16("LDA_abs", 0x0385); a.ins16("CMP_abs", TGT_C2); a.br("BEQ", "dn_p2")
     a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.ins("CMP_imm", 3); a.br("BCS", "rel_p2m")
     a.ins("LDY_imm", 0x01); a.ins16("LDA_abs", 0x0385); a.ins16("CMP_abs", TGT_C2); a.br("BCC", "st_p2")
     a.ins("LDY_imm", 0x02); a.jmp("st_p2")
+    a.label("rel_p2m"); a.ins("LDY_imm", 0); a.jmp("st_p2")
     a.label("dn_p2"); a.ins("LDY_imm", 0x04)
     a.label("st_p2"); a.ins("STY_zp", 0xF6)
     a.label("act_p1")
@@ -266,12 +274,17 @@ def build_main():
     a.ins16("LDA_abs", 0x0325); a.ins16("CMP_abs", TGT_O1); a.br("BEQ", "mv_p1")
     a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
     a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xF7)
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.ins("CMP_imm", 3); a.br("BCS", "rel_p1")
     a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF5); a.jmp("act_done")
+    a.label("rel_p1")
+    a.ins("LDA_imm", 0); a.ins("STA_zp", 0xF5); a.jmp("act_done")
     a.label("mv_p1")
     a.ins16("LDA_abs", 0x0305); a.ins16("CMP_abs", TGT_C1); a.br("BEQ", "dn_p1")
     a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
+    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x07); a.ins("CMP_imm", 3); a.br("BCS", "rel_p1m")
     a.ins("LDY_imm", 0x01); a.ins16("LDA_abs", 0x0305); a.ins16("CMP_abs", TGT_C1); a.br("BCC", "st_p1")
     a.ins("LDY_imm", 0x02); a.jmp("st_p1")
+    a.label("rel_p1m"); a.ins("LDY_imm", 0); a.jmp("st_p1")
     a.label("dn_p1"); a.ins("LDY_imm", 0x04)
     a.label("st_p1"); a.ins("STY_zp", 0xF5)
     a.label("act_done")
