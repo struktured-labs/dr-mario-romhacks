@@ -47,7 +47,11 @@ STKX1, STKY1, STK1 = 0x6156, 0x6157, 0x6158   # P1 stagnation: last x/y + stuck-
 STKX2, STKY2, STK2 = 0x6159, 0x615A, 0x615B   # P2 stagnation
 WDOG, WRETRY = 0x615C, 0x615D   # search watchdog: ticks-while-ARMED + one-retry latch
 DELAY1, DELAY2 = 0x615E, 0x615F  # post-edge settle: preview/board can update a beat after spawn
-TURN = 0x6160    # fair round-robin serving: whose turn for first dibs when both pending (1=P1,2=P2)
+TURN = 0x6160    # (unused in dual-copro) fair round-robin serving
+# DUAL COPRO: each player has its OWN coprocessor + search state -> no time-sharing.
+# copro1 window $5000-$51FF serves P1; copro2 window $5200-$53FF serves P2.
+ARMED2, WDOG2, WRETRY2 = 0x6161, 0x6162, 0x6163   # P2's independent search state (ARMED/WDOG/WRETRY = P1's)
+W2_BASE = 0x5200
 # if a pill sits still this many frames (while not search-frozen), force DOWN to unstick
 STUCK_LIM = 60        # 1s -- continuous holds again; if truly stuck kick fast to unpark
 # copro window (mapper 100)
@@ -143,15 +147,13 @@ def build_main(level=11, speed=1):
     a.ins16("LDA_abs", 0x0386); a.ins16("STA_abs", LASTY2)
 
     # ---- stagnation detect: pill not moving while not search-frozen -> count up ----
-    def stagnate(px, py, sx, sy, cnt, freeze_which, pend, tag):
+    def stagnate(px, py, sx, sy, cnt, armed, pend, tag):
         a.ins16("LDA_abs", px); a.ins16("CMP_abs", sx); a.br("BNE", f"mvd_{tag}")
         a.ins16("LDA_abs", py); a.ins16("CMP_abs", sy); a.br("BNE", f"mvd_{tag}")
-        # unchanged. Skip while PENDING (legit frozen, waiting for its time-shared search --
-        # else a starved player's waiting pill force-drops in the spawn center -> fast topout)
-        # and while being searched. Only a genuinely wedged pill should force-drop.
+        # Skip while PENDING (waiting for its search -> would force-drop in the spawn center)
+        # or while being SEARCHED (frozen). Only a genuinely wedged pill should force-drop.
         a.ins16("LDA_abs", pend); a.br("BNE", f"sk_{tag}")
-        a.ins16("LDA_abs", ARMED); a.br("BEQ", f"cnt_{tag}")
-        a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", freeze_which); a.br("BEQ", f"sk_{tag}")
+        a.ins16("LDA_abs", armed); a.br("BNE", f"sk_{tag}")
         a.label(f"cnt_{tag}")
         a.ins16("INC_abs", cnt)
         a.jmp(f"sk_{tag}")
@@ -160,66 +162,52 @@ def build_main(level=11, speed=1):
         a.ins16("LDA_abs", px); a.ins16("STA_abs", sx)
         a.ins16("LDA_abs", py); a.ins16("STA_abs", sy)
         a.label(f"sk_{tag}")
-    stagnate(0x0305, 0x0306, STKX1, STKY1, STK1, 1, PEND1, "s1")
-    stagnate(0x0385, 0x0386, STKX2, STKY2, STK2, 2, PEND2, "s2")
+    stagnate(0x0305, 0x0306, STKX1, STKY1, STK1, ARMED, PEND1, "s1")
+    stagnate(0x0385, 0x0386, STKX2, STKY2, STK2, ARMED2, PEND2, "s2")
 
-    # ---- search WATCHDOG: a real search finishes in ~90 hook ticks (~0.3s); if ARMED
-    # persists ~200 ticks the handshake wedged. Without this, d_hold pins the served
-    # player's gravity forever AND stagnation is gated off -> the observed hovering pill.
-    # Trip: abandon (ARMED=0). First trip per pill: re-queue the search (PEND). Second:
-    # fail open (gravity + failsafe resume; stale targets are fine).
-    a.ins16("LDA_abs", ARMED); a.br("BNE", "wd_armed")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", WDOG); a.jmp("wd_done")
-    a.label("wd_armed")
-    a.ins16("INC_abs", WDOG)
-    a.ins16("LDA_abs", WDOG); a.ins("CMP_imm", 200); a.br("BCS", "wd_trip")
-    a.jmp("wd_done")
-    a.label("wd_trip")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED); a.ins16("STA_abs", WDOG)
-    a.ins16("LDA_abs", WRETRY); a.br("BNE", "wd_done")      # already retried: fail open
-    a.ins("LDA_imm", 1); a.ins16("STA_abs", WRETRY)
-    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 2); a.br("BEQ", "wd_rq2")
-    a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND1); a.jmp("wd_done")
-    a.label("wd_rq2")
-    a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND2)
-    a.label("wd_done")
-
-    # ---- FPGA search state machine ----
-    a.ins16("LDA_abs", ARMED); a.br("BNE", "d_busy")        # nothing in flight -> maybe start one
-    a.jmp("d_start")
-    a.label("d_busy")
-    a.ins16("LDA_abs", W_DONE); a.br("BNE", "d_pub")        # got a result -> publish
-    a.jmp("d_hold")                                          # still searching -> hold serving player
-
-    a.label("d_pub")
-    a.ins16("LDA_abs", W_COL)                                # store best col to WHICH's target
-    a.ins16("LDX_abs", WHICH); a.ins("CPX_imm", 2); a.br("BEQ", "pub_c2")
-    a.ins16("STA_abs", TGT_C1); a.jmp("pub_o")
-    a.label("pub_c2"); a.ins16("STA_abs", TGT_C2)
-    a.label("pub_o")
-    a.ins16("LDA_abs", W_OR); a.ins("CMP_imm", 0xFF); a.br("BNE", "pub_map")
-    a.ins("LDA_imm", 3); a.jmp("pub_st")                    # topout: col 3, orient 3
-    a.label("pub_map")                                      # orient4 -> $03A5 {0:3,1:1,2:0,3:2}
-    a.ins("CMP_imm", 0); a.br("BNE", "pm1"); a.ins("LDA_imm", 3); a.jmp("pub_st")
-    a.label("pm1"); a.ins("CMP_imm", 1); a.br("BNE", "pm2"); a.ins("LDA_imm", 1); a.jmp("pub_st")
-    a.label("pm2"); a.ins("CMP_imm", 2); a.br("BNE", "pm3"); a.ins("LDA_imm", 0); a.jmp("pub_st")
-    a.label("pm3"); a.ins("LDA_imm", 2)
-    a.label("pub_st")
-    a.ins16("LDX_abs", WHICH); a.ins("CPX_imm", 2); a.br("BEQ", "pub_o2")
-    a.ins16("STA_abs", TGT_O1); a.jmp("pub_done")
-    a.label("pub_o2"); a.ins16("STA_abs", TGT_O2)
-    a.label("pub_done")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", ARMED)
-    a.jmp("d_start_now")                                    # immediately try to start the other
-
-    a.label("d_hold")
-    # freeze the served player's gravity + inputs (the other player keeps acting via `act`)
-    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 2); a.br("BEQ", "hold_p2")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
-    a.ins("STA_zp", 0xF5); a.ins("STA_zp", 0xF7); a.jmp("act")
-    a.label("hold_p2")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
-    a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act")
+    # ---- DUAL-COPRO search: each player drives its OWN coprocessor; both run in parallel.
+    # No time-sharing => no WHICH / fair-serving / pending-wait. handle() emitted per player.
+    def handle(idx, wbase, board_src, colsrcs, armed, wdog, wretry, pend, delay, tgt_c, tgt_o):
+        wgo, wdone, wcol, wor = wbase + 0x84, wbase + 0x84, wbase + 0x85, wbase + 0x86
+        L = f"h{idx}"
+        a.ins16("LDA_abs", delay); a.br("BEQ", f"{L}_dz"); a.ins16("DEC_abs", delay)   # settle timer
+        a.label(f"{L}_dz")
+        a.ins16("LDA_abs", armed); a.br("BEQ", f"{L}_start")     # not searching -> maybe start
+        a.ins16("LDA_abs", wdone); a.br("BEQ", f"{L}_search")    # DONE==0 -> still searching
+        # publish result: best_col + orient4 -> game orient map {0xFF/0:3, 1:1, 2:0, 3:2}
+        a.ins16("LDA_abs", wcol); a.ins16("STA_abs", tgt_c)
+        a.ins16("LDA_abs", wor); a.ins("CMP_imm", 0xFF); a.br("BNE", f"{L}_map")
+        a.ins("LDA_imm", 3); a.jmp(f"{L}_pst")
+        a.label(f"{L}_map")
+        a.ins("CMP_imm", 0); a.br("BNE", f"{L}_m1"); a.ins("LDA_imm", 3); a.jmp(f"{L}_pst")
+        a.label(f"{L}_m1"); a.ins("CMP_imm", 1); a.br("BNE", f"{L}_m2"); a.ins("LDA_imm", 1); a.jmp(f"{L}_pst")
+        a.label(f"{L}_m2"); a.ins("CMP_imm", 2); a.br("BNE", f"{L}_m3"); a.ins("LDA_imm", 0); a.jmp(f"{L}_pst")
+        a.label(f"{L}_m3"); a.ins("LDA_imm", 2)
+        a.label(f"{L}_pst"); a.ins16("STA_abs", tgt_o)
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", armed); a.ins16("STA_abs", wdog)
+        a.jmp(f"{L}_done")
+        a.label(f"{L}_search")           # watchdog: abandon if wedged ~200 ticks, re-queue once
+        a.ins16("INC_abs", wdog); a.ins16("LDA_abs", wdog); a.ins("CMP_imm", 200); a.br("BCC", f"{L}_done")
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", armed); a.ins16("STA_abs", wdog)
+        a.ins16("LDA_abs", wretry); a.br("BNE", f"{L}_done")
+        a.ins("LDA_imm", 1); a.ins16("STA_abs", wretry); a.ins16("STA_abs", pend)
+        a.jmp(f"{L}_done")
+        a.label(f"{L}_start")            # start a search: upload board+colors to THIS copro, GO
+        a.ins16("LDA_abs", pend); a.br("BEQ", f"{L}_done")
+        a.ins16("LDA_abs", delay); a.br("BNE", f"{L}_done")
+        a.ins("LDX_imm", 0)
+        a.label(f"{L}_cp")
+        a.ins16("LDA_absX", board_src); a.ins16("STA_absX", wbase)
+        a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", f"{L}_cp")
+        for k, src in enumerate(colsrcs):
+            a.ins16("LDA_abs", src); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", wbase + 0x80 + k)
+        a.ins16("STA_abs", wgo)          # GO: write to +$84 pulses copro reset, clears DONE
+        a.ins("LDA_imm", 1); a.ins16("STA_abs", armed)
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", pend); a.ins16("STA_abs", wretry)
+        a.label(f"{L}_done")
+    handle(1, 0x5000, 0x0400, [0x0301, 0x0302, 0x031A, 0x031B], ARMED, WDOG, WRETRY, PEND1, DELAY1, TGT_C1, TGT_O1)
+    handle(2, W2_BASE, 0x0500, [0x0381, 0x0382, 0x039A, 0x039B], ARMED2, WDOG2, WRETRY2, PEND2, DELAY2, TGT_C2, TGT_O2)
+    a.jmp("act")
 
     # freeze QUEUED players too: a pill whose search hasn't run yet must not fall unguided
     # (time-sharing wait was letting pills drop 2-4 rows before their target arrived ->
@@ -233,70 +221,16 @@ def build_main(level=11, speed=1):
     a.label("fp_done")
     a.ins("RTS")
 
-    a.label("d_start")
-    a.label("d_start_now")
-    # decrement settle timers
-    a.ins16("LDA_abs", DELAY1); a.br("BEQ", "dly1_z"); a.ins16("DEC_abs", DELAY1)
-    a.label("dly1_z")
-    a.ins16("LDA_abs", DELAY2); a.br("BEQ", "dly2_z"); a.ins16("DEC_abs", DELAY2)
-    a.label("dly2_z")
-    # FAIR round-robin: TURN gets first dibs; if not ready, try the other; else act.
-    # (was "P2 first if both" -> starved P1 during P2's active streaks -> P1 cleared ~half of P2)
-    a.ins16("LDA_abs", TURN); a.ins("CMP_imm", 1); a.br("BEQ", "pri_p1first")
-    # P2 first
-    a.ins16("LDA_abs", PEND2); a.br("BEQ", "p2f_t1")
-    a.ins16("LDA_abs", DELAY2); a.br("BNE", "p2f_t1")
-    a.jmp("start_p2")
-    a.label("p2f_t1")
-    a.ins16("LDA_abs", PEND1); a.br("BEQ", "no_start")
-    a.ins16("LDA_abs", DELAY1); a.br("BNE", "no_start")
-    a.jmp("start_p1")
-    # P1 first
-    a.label("pri_p1first")
-    a.ins16("LDA_abs", PEND1); a.br("BEQ", "p1f_t2")
-    a.ins16("LDA_abs", DELAY1); a.br("BNE", "p1f_t2")
-    a.jmp("start_p1")
-    a.label("p1f_t2")
-    a.ins16("LDA_abs", PEND2); a.br("BEQ", "no_start")
-    a.ins16("LDA_abs", DELAY2); a.br("BNE", "no_start")
-    a.jmp("start_p2")
-    a.label("no_start")
-    a.jmp("act")
-
-    a.label("start_p2")
-    a.ins("LDX_imm", 0)
-    a.label("cp2")
-    a.ins16("LDA_absX", 0x0500); a.ins16("STA_absX", W_BOARD)
-    a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", "cp2")
-    for src, dst in [(0x0381, W_CA), (0x0382, W_CA + 1), (0x039A, W_CA + 2), (0x039B, W_CA + 3)]:
-        a.ins16("LDA_abs", src); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", dst)
-    a.ins16("STA_abs", W_GO)
-    a.ins("LDA_imm", 2); a.ins16("STA_abs", WHICH)
-    a.ins("LDA_imm", 1); a.ins16("STA_abs", ARMED)
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", PEND2)
-    a.ins("LDA_imm", 1); a.ins16("STA_abs", TURN)          # P1 gets next dibs
-    a.jmp("act")
-
-    a.label("start_p1")
-    a.ins("LDX_imm", 0)
-    a.label("cp1")
-    a.ins16("LDA_absX", 0x0400); a.ins16("STA_absX", W_BOARD)
-    a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", "cp1")
-    for src, dst in [(0x0301, W_CA), (0x0302, W_CA + 1), (0x031A, W_CA + 2), (0x031B, W_CA + 3)]:
-        a.ins16("LDA_abs", src); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", dst)
-    a.ins16("STA_abs", W_GO)
-    a.ins("LDA_imm", 1); a.ins16("STA_abs", WHICH)
-    a.ins("LDA_imm", 1); a.ins16("STA_abs", ARMED)
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", PEND1)
-    a.ins("LDA_imm", 2); a.ins16("STA_abs", TURN)          # P2 gets next dibs
-    a.jmp("act")
+    # (time-shared d_start / start_p1 / start_p2 removed: handle() above starts each player's
+    #  search on its own copro.)
 
     # ---- act: steer BOTH players toward their published targets ----
     a.label("act")
     a.jsr("freeze_pending")
     # P2 first (only if we're not currently freezing it)
-    a.ins16("LDA_abs", ARMED); a.br("BEQ", "act_p2")
-    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 2); a.br("BEQ", "act_p1")
+    a.ins16("LDA_abs", ARMED2); a.br("BEQ", "act_p2")      # not searching P2 -> steer it
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)       # searching P2 -> freeze + skip steer
+    a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
     a.label("act_p2")
     a.ins16("LDA_abs", STK2); a.ins("CMP_imm", STUCK_LIM); a.br("BCC", "act_p2_n")
     a.ins("LDY_imm", 0x04); a.ins("STY_zp", 0xF6); a.jmp("act_p1")   # stuck: force drop
@@ -317,8 +251,9 @@ def build_main(level=11, speed=1):
     a.label("st_p2"); a.ins("STY_zp", 0xF6)
     a.label("act_p1")
     # skip P1 acting if we're currently searching for P1
-    a.ins16("LDA_abs", ARMED); a.br("BEQ", "act_p1_go")
-    a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", 1); a.br("BEQ", "act_done")
+    a.ins16("LDA_abs", ARMED); a.br("BEQ", "act_p1_go")    # not searching P1 -> steer it
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)       # searching P1 -> freeze + skip steer
+    a.ins("STA_zp", 0xF5); a.ins("STA_zp", 0xF7); a.jmp("act_done")
     a.label("act_p1_go")
     a.ins16("LDA_abs", STK1); a.ins("CMP_imm", STUCK_LIM); a.br("BCC", "act_p1_n")
     a.ins("LDY_imm", 0x04); a.ins("STY_zp", 0xF5); a.jmp("act_done")  # stuck: force drop
