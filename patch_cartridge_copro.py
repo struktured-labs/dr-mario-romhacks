@@ -47,6 +47,7 @@ STKX1, STKY1, STK1 = 0x6156, 0x6157, 0x6158   # P1 stagnation: last x/y + stuck-
 STKX2, STKY2, STK2 = 0x6159, 0x615A, 0x615B   # P2 stagnation
 WDOG, WRETRY = 0x615C, 0x615D   # search watchdog: ticks-while-ARMED + one-retry latch
 DELAY1, DELAY2 = 0x615E, 0x615F  # post-edge settle: preview/board can update a beat after spawn
+TURN = 0x6160    # fair round-robin serving: whose turn for first dibs when both pending (1=P1,2=P2)
 # if a pill sits still this many frames (while not search-frozen), force DOWN to unstick
 STUCK_LIM = 60        # 1s -- continuous holds again; if truly stuck kick fast to unpark
 # copro window (mapper 100)
@@ -55,7 +56,7 @@ W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5084, 0x508
 B_SEL, B_START, B_LEFT, B_RIGHT = 0x20, 0x10, 0x02, 0x01
 
 
-def build_main():
+def build_main(level=11, speed=1):
     a = Asm6502(UNIT1_CPU)
 
     # ================= per-frame entry =================
@@ -69,6 +70,7 @@ def build_main():
     a.ins("LDA_imm", 3)                                     # sane targets pre-first-publish
     a.ins16("STA_abs", TGT_C1); a.ins16("STA_abs", TGT_O1)
     a.ins16("STA_abs", TGT_C2); a.ins16("STA_abs", TGT_O2)
+    a.ins("LDA_imm", 2); a.ins16("STA_abs", TURN)          # fair-serve round-robin seed
     a.label("inited")
     a.ins16("INC_abs", NAV_T)                               # tick every hook call (autonav only ticked in menus)
     a.ins16("LDA_abs", 0x0046); a.ins("CMP_imm", 0x04); a.br("BNE", "not_play")
@@ -110,10 +112,11 @@ def build_main():
     a.jsr(0xFF30)                                           # hack's toggle: 1P->2P->VS-CPU
     a.ins("RTS")
     a.label("an_lvl")
-    a.ins("LDA_imm", 11)
+    a.ins("LDA_imm", level)
     a.ins16("STA_abs", 0x0316)                              # P1 level
     a.ins16("STA_abs", 0x0396)                              # P2 level (+$80 struct offset)
     a.ins("STA_zp", 0x96)                                   # live cursor (cosmetic)
+    a.ins("LDA_imm", speed); a.ins("STA_zp", 0x45)         # force game speed (0=LOW,1=MED,2=HI)
     a.label("an_start")
     a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 4); a.br("BCC", "an_st_go")
     a.ins("RTS")
@@ -140,10 +143,13 @@ def build_main():
     a.ins16("LDA_abs", 0x0386); a.ins16("STA_abs", LASTY2)
 
     # ---- stagnation detect: pill not moving while not search-frozen -> count up ----
-    def stagnate(px, py, sx, sy, cnt, freeze_which, tag):
+    def stagnate(px, py, sx, sy, cnt, freeze_which, pend, tag):
         a.ins16("LDA_abs", px); a.ins16("CMP_abs", sx); a.br("BNE", f"mvd_{tag}")
         a.ins16("LDA_abs", py); a.ins16("CMP_abs", sy); a.br("BNE", f"mvd_{tag}")
-        # unchanged; only count when this player is NOT deliberately frozen by a search
+        # unchanged. Skip while PENDING (legit frozen, waiting for its time-shared search --
+        # else a starved player's waiting pill force-drops in the spawn center -> fast topout)
+        # and while being searched. Only a genuinely wedged pill should force-drop.
+        a.ins16("LDA_abs", pend); a.br("BNE", f"sk_{tag}")
         a.ins16("LDA_abs", ARMED); a.br("BEQ", f"cnt_{tag}")
         a.ins16("LDA_abs", WHICH); a.ins("CMP_imm", freeze_which); a.br("BEQ", f"sk_{tag}")
         a.label(f"cnt_{tag}")
@@ -154,8 +160,8 @@ def build_main():
         a.ins16("LDA_abs", px); a.ins16("STA_abs", sx)
         a.ins16("LDA_abs", py); a.ins16("STA_abs", sy)
         a.label(f"sk_{tag}")
-    stagnate(0x0305, 0x0306, STKX1, STKY1, STK1, 1, "s1")
-    stagnate(0x0385, 0x0386, STKX2, STKY2, STK2, 2, "s2")
+    stagnate(0x0305, 0x0306, STKX1, STKY1, STK1, 1, PEND1, "s1")
+    stagnate(0x0385, 0x0386, STKX2, STKY2, STK2, 2, PEND2, "s2")
 
     # ---- search WATCHDOG: a real search finishes in ~90 hook ticks (~0.3s); if ARMED
     # persists ~200 ticks the handshake wedged. Without this, d_hold pins the served
@@ -234,14 +240,26 @@ def build_main():
     a.label("dly1_z")
     a.ins16("LDA_abs", DELAY2); a.br("BEQ", "dly2_z"); a.ins16("DEC_abs", DELAY2)
     a.label("dly2_z")
-    # priority: whichever is pending AND settled (P2 first if both)
-    a.ins16("LDA_abs", PEND2); a.br("BEQ", "try_p1")
-    a.ins16("LDA_abs", DELAY2); a.br("BNE", "try_p1")
+    # FAIR round-robin: TURN gets first dibs; if not ready, try the other; else act.
+    # (was "P2 first if both" -> starved P1 during P2's active streaks -> P1 cleared ~half of P2)
+    a.ins16("LDA_abs", TURN); a.ins("CMP_imm", 1); a.br("BEQ", "pri_p1first")
+    # P2 first
+    a.ins16("LDA_abs", PEND2); a.br("BEQ", "p2f_t1")
+    a.ins16("LDA_abs", DELAY2); a.br("BNE", "p2f_t1")
     a.jmp("start_p2")
-    a.label("try_p1")
+    a.label("p2f_t1")
     a.ins16("LDA_abs", PEND1); a.br("BEQ", "no_start")
     a.ins16("LDA_abs", DELAY1); a.br("BNE", "no_start")
     a.jmp("start_p1")
+    # P1 first
+    a.label("pri_p1first")
+    a.ins16("LDA_abs", PEND1); a.br("BEQ", "p1f_t2")
+    a.ins16("LDA_abs", DELAY1); a.br("BNE", "p1f_t2")
+    a.jmp("start_p1")
+    a.label("p1f_t2")
+    a.ins16("LDA_abs", PEND2); a.br("BEQ", "no_start")
+    a.ins16("LDA_abs", DELAY2); a.br("BNE", "no_start")
+    a.jmp("start_p2")
     a.label("no_start")
     a.jmp("act")
 
@@ -256,6 +274,7 @@ def build_main():
     a.ins("LDA_imm", 2); a.ins16("STA_abs", WHICH)
     a.ins("LDA_imm", 1); a.ins16("STA_abs", ARMED)
     a.ins("LDA_imm", 0); a.ins16("STA_abs", PEND2)
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", TURN)          # P1 gets next dibs
     a.jmp("act")
 
     a.label("start_p1")
@@ -269,6 +288,7 @@ def build_main():
     a.ins("LDA_imm", 1); a.ins16("STA_abs", WHICH)
     a.ins("LDA_imm", 1); a.ins16("STA_abs", ARMED)
     a.ins("LDA_imm", 0); a.ins16("STA_abs", PEND1)
+    a.ins("LDA_imm", 2); a.ins16("STA_abs", TURN)          # P2 gets next dibs
     a.jmp("act")
 
     # ---- act: steer BOTH players toward their published targets ----
@@ -338,7 +358,14 @@ def build_wrapper(main_cpu):
 
 
 def main():
-    unit1, labels = build_main()
+    import os
+    global OUT
+    level = int(os.environ.get("DRLEVEL", "11"))
+    speed = int(os.environ.get("DRSPEED", "1"))
+    if level != 11 or speed != 1:
+        OUT = f"drmario_copro_L{level}s{speed}.nes"
+    unit1, labels = build_main(level, speed)
+    print(f"LEVEL={level} SPEED={speed} -> {OUT}")
     main_cpu = UNIT1_CPU + labels["main"]
     print(f"unit-1 main: {len(unit1)} B at ${UNIT1_CPU:04X}; main=${main_cpu:04X}")
     bank = bytearray(b"\x00" * 0x4000)
