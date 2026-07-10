@@ -10,6 +10,7 @@ VCoproDrMario::VCoproDrMario(VerilatedContext* _vcontextp__, const char* _vcname
     : VerilatedModel{*_vcontextp__}
     , vlSymsp{new VCoproDrMario__Syms(contextp(), _vcname__, this)}
     , clk{vlSymsp->TOP.clk}
+    , clk_cpu{vlSymsp->TOP.clk_cpu}
     , ce{vlSymsp->TOP.ce}
     , enable{vlSymsp->TOP.enable}
     , prg_read{vlSymsp->TOP.prg_read}

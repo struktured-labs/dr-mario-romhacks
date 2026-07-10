@@ -19,7 +19,8 @@
 // Proven in simulation (fpga/copro in dr-mario-mods): handshake 6/6 vs the py65 machine,
 // 13-23M copro clocks per pill -> ~0.15-0.35s at 85.9MHz.
 module CoproDrMario(
-	input         clk,        // core master clock (copro runs on this, no CE)
+	input         clk,        // host/bridge clock (NES system clock ~21.5MHz)
+	input         clk_cpu,    // coprocessor clock (clk85 ~85.9MHz): 6502 + ROM + RAM port A
 	input         ce,         // M2 (game-CPU cycle enable) for host-side sampling
 	input         enable,     // me[100]
 	input  [15:0] prg_ain,
@@ -36,13 +37,15 @@ assign copro_sel = enable && (prg_ain[15:9] == 7'b0101_000);   // $5000-$51FF
 wire [15:0] AB;
 wire  [7:0] DO;
 wire        WE;
-reg   [4:0] rst_cnt = 5'h1F;    // parked in reset until first GO
+reg   [4:0] rst_cnt = 5'h1F;    // parked in reset until first GO (host clk domain)
 reg         parked  = 1'b1;
-wire        cpu_rst = (rst_cnt != 0) || parked;
+wire        cpu_rst_src = (rst_cnt != 0) || parked;
+reg         rst_m = 1'b1, cpu_rst = 1'b1;
+always @(posedge clk_cpu) begin rst_m <= cpu_rst_src; cpu_rst <= rst_m; end
 wire  [7:0] DI;
 
 copro6502 cpu6502(
-	.clk(clk), .reset(cpu_rst), .AB(AB), .DI(DI), .DO(DO), .WE(WE),
+	.clk(clk_cpu), .reset(cpu_rst), .AB(AB), .DI(DI), .DO(DO), .WE(WE),
 	.IRQ(1'b0), .NMI(1'b0), .RDY(1'b1)
 );
 
@@ -58,7 +61,7 @@ wire [11:0] a_addr   = a_ram_st ? {4'h8, AB[7:0]} : AB[11:0];
 reg [7:0] rom [0:16383];
 initial $readmemh("copro_rom.hex", rom);
 reg [7:0] rom_q;
-always @(posedge clk) rom_q <= rom[AB[13:0]];
+always @(posedge clk_cpu) rom_q <= rom[AB[13:0]];
 
 // ------------------------------------------------------------------ 4KB TDP work RAM
 // Port A: coprocessor. Port B: host bridge. Explicit altsyncram via the core's dpram
@@ -67,7 +70,7 @@ always @(posedge clk) rom_q <= rom[AB[13:0]];
 // Neither side reads an address it is writing in the same cycle, so RDW mode is moot.
 wire [7:0] ram_a_q, ram_b_q;
 dpram #(.widthad_a(12), .width_a(8)) wram (
-	.clock_a  (clk),
+	.clock_a  (clk_cpu),
 	.address_a(a_addr),
 	.data_a   (DO),
 	.wren_a   (WE && !cpu_rst && a_ram),
@@ -81,7 +84,7 @@ dpram #(.widthad_a(12), .width_a(8)) wram (
 
 // registered DI mux (data + selects all registered -> DI valid 1 cycle after AB, as Arlet expects)
 reg sel_ram_d, sel_rom_d, sel_vec_d, ab0_d;
-always @(posedge clk) begin
+always @(posedge clk_cpu) begin
 	sel_ram_d <= a_ram; sel_rom_d <= a_rom; sel_vec_d <= a_vec; ab0_d <= AB[0];
 end
 assign DI = sel_vec_d ? (ab0_d ? 8'hBF : 8'h80) :

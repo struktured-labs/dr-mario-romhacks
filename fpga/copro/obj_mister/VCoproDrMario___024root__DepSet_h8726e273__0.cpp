@@ -34,10 +34,13 @@ void VCoproDrMario___024root___eval_triggers__act(VCoproDrMario___024root* vlSel
     VL_DEBUG_IF(VL_DBG_MSGF("+    VCoproDrMario___024root___eval_triggers__act\n"); );
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Body
-    vlSelfRef.__VactTriggered.set(0U, ((IData)(vlSelfRef.clk) 
+    vlSelfRef.__VactTriggered.set(0U, ((IData)(vlSelfRef.clk_cpu) 
+                                       & (~ (IData)(vlSelfRef.__Vtrigprevexpr___TOP__clk_cpu__0))));
+    vlSelfRef.__VactTriggered.set(1U, ((IData)(vlSelfRef.clk) 
                                        & (~ (IData)(vlSelfRef.__Vtrigprevexpr___TOP__clk__0))));
-    vlSelfRef.__VactTriggered.set(1U, ((IData)(vlSelfRef.CoproDrMario__DOT__cpu_rst) 
+    vlSelfRef.__VactTriggered.set(2U, ((IData)(vlSelfRef.CoproDrMario__DOT__cpu_rst) 
                                        & (~ (IData)(vlSelfRef.__Vtrigprevexpr___TOP__CoproDrMario__DOT__cpu_rst__0))));
+    vlSelfRef.__Vtrigprevexpr___TOP__clk_cpu__0 = vlSelfRef.clk_cpu;
     vlSelfRef.__Vtrigprevexpr___TOP__clk__0 = vlSelfRef.clk;
     vlSelfRef.__Vtrigprevexpr___TOP__CoproDrMario__DOT__cpu_rst__0 
         = vlSelfRef.CoproDrMario__DOT__cpu_rst;

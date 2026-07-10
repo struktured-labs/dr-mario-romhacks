@@ -29,6 +29,7 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario VL_NOT_FINAL : public Verilated
     // The application code writes and reads these signals to
     // propagate new values into/out from the Verilated model.
     VL_IN8(&clk,0,0);
+    VL_IN8(&clk_cpu,0,0);
     VL_IN8(&ce,0,0);
     VL_IN8(&enable,0,0);
     VL_IN8(&prg_read,0,0);

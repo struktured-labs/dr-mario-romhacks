@@ -61,6 +61,8 @@ WDOG_HI_LIM = 56                  # timeout = 56*256 = 14336 ticks ~= 4min (FULL
 # Derived once per match from NAV_T; ride the color uploads' HIGH nibbles (firmware masks &$0F
 # and extracts SEED=(CB&$F0)|(CA>>4); seed 0 = jitter off).
 SEED1, SEED2, TMPSEED = 0x6167, 0x6168, 0x6169
+VSEEN1, VSEEN2 = 0x616A, 0x616B   # count-was-nonzero-this-match latches (gate the auto-advance:
+                                  # in 1P/demo contexts the unused P2 count reads 0 -> START-spam)
 import os as _os
 USE_SEEDS = _os.environ.get("DRSEED", "1") != "0"   # DRSEED=0 -> seeds stay 0 = deterministic mirror
 VCOUNT_P1, VCOUNT_P2 = 0x0324, 0x03A4   # remaining virus counts (0 => that player cleared -> STAGE CLEAR)
@@ -87,6 +89,7 @@ def build_main(level=11, speed=1):
     a.ins16("STA_abs", ARMED2); a.ins16("STA_abs", WDOG2); a.ins16("STA_abs", WRETRY2)
     a.ins16("STA_abs", WDOGH1); a.ins16("STA_abs", WDOGH2)
     a.ins16("STA_abs", SEED1); a.ins16("STA_abs", SEED2)
+    a.ins16("STA_abs", VSEEN1); a.ins16("STA_abs", VSEEN2)
     a.ins("LDA_imm", 3)                                     # sane targets pre-first-publish
     a.ins16("STA_abs", TGT_C1); a.ins16("STA_abs", TGT_O1)
     a.ins16("STA_abs", TGT_C2); a.ins16("STA_abs", TGT_O2)
@@ -98,8 +101,11 @@ def build_main(level=11, speed=1):
     # of halting. Gated by MATCH_ACTIVE (set once play dispatched) so boot-init count==0 can't
     # false-trigger (which would wreck the boot state machine). ----
     a.ins16("LDA_abs", MATCH_ACTIVE); a.br("BEQ", "fc_no")
-    a.ins16("LDA_abs", VCOUNT_P1); a.br("BEQ", "fc_clear")
+    a.ins16("LDA_abs", VCOUNT_P1); a.br("BNE", "fc_chk2")
+    a.ins16("LDA_abs", VSEEN1); a.br("BNE", "fc_clear")     # P1==0 counts only if it was ever >0
+    a.label("fc_chk2")
     a.ins16("LDA_abs", VCOUNT_P2); a.br("BNE", "fc_no")
+    a.ins16("LDA_abs", VSEEN2); a.br("BEQ", "fc_no")
     a.label("fc_clear")                                     # full clear -> own the frame (skip normal dispatch)
     a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 4); a.br("BCS", "fc_ret")
     a.ins("LDA_imm", B_START); a.ins("STA_zp", 0xF5)        # inject START to dismiss STAGE CLEAR
@@ -114,10 +120,19 @@ def build_main(level=11, speed=1):
         a.ins("EOR_imm", 0xA4); a.ins16("STA_abs", SEED2)       # bit0 kept -> both odd, distinct
         a.label("ga_on")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", MATCH_ACTIVE)   # play started -> arm full-clear detect
+    a.ins16("LDA_abs", VCOUNT_P1); a.br("BEQ", "ga_v2"); a.ins("LDA_imm", 1); a.ins16("STA_abs", VSEEN1)
+    a.label("ga_v2")
+    a.ins16("LDA_abs", VCOUNT_P2); a.br("BEQ", "ga_vd"); a.ins("LDA_imm", 1); a.ins16("STA_abs", VSEEN2)
+    a.label("ga_vd")
     a.jmp("dispatch")
     a.label("not_play")
     a.ins("CMP_imm", 0x08); a.br("BNE", "menus")
-    a.ins("RTS")                                            # intro/init: hands off
+    # intro mode ONLY happens at power-on/reset: re-arm the autonav (PRG-RAM persists across
+    # soft core relaunches, so the NAV_MAGIC one-time init does NOT re-run -> stale NAV_T killed
+    # the nav and the title idled into attract mode). Zeroing here makes every boot nav cleanly.
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T); a.ins16("STA_abs", MATCH_ACTIVE)
+    a.ins16("STA_abs", VSEEN1); a.ins16("STA_abs", VSEEN2)
+    a.ins("RTS")                                            # intro/init: hands off otherwise
     a.label("menus")
     a.jsr("autonav")
     a.ins("LDA_zp", 0x04); a.br("BEQ", "m_done")

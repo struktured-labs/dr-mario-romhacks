@@ -24,6 +24,8 @@ VL_ATTR_COLD void VCoproDrMario___024root___eval_static__TOP(VCoproDrMario___024
     // Body
     vlSelfRef.CoproDrMario__DOT__rst_cnt = 0x1fU;
     vlSelfRef.CoproDrMario__DOT__parked = 1U;
+    vlSelfRef.CoproDrMario__DOT__rst_m = 1U;
+    vlSelfRef.CoproDrMario__DOT__cpu_rst = 1U;
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__C = 0U;
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__Z = 0U;
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__I = 0U;
@@ -42,6 +44,7 @@ VL_ATTR_COLD void VCoproDrMario___024root___eval_initial(VCoproDrMario___024root
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Body
     VCoproDrMario___024root___eval_initial__TOP(vlSelf);
+    vlSelfRef.__Vtrigprevexpr___TOP__clk_cpu__0 = vlSelfRef.clk_cpu;
     vlSelfRef.__Vtrigprevexpr___TOP__clk__0 = vlSelfRef.clk;
     vlSelfRef.__Vtrigprevexpr___TOP__CoproDrMario__DOT__cpu_rst__0 
         = vlSelfRef.CoproDrMario__DOT__cpu_rst;
@@ -196,8 +199,6 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__PC_inc 
         = VCoproDrMario__ConstPool__TABLE_hafeef89d_0
         [__Vtableidx1];
-    vlSelfRef.CoproDrMario__DOT__cpu_rst = ((0U != (IData)(vlSelfRef.CoproDrMario__DOT__rst_cnt)) 
-                                            | (IData)(vlSelfRef.CoproDrMario__DOT__parked));
     __Vtableidx8 = ((((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__N) 
                       << 6U) | ((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__V) 
                                 << 5U)) | (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__C) 
@@ -830,10 +831,13 @@ VL_ATTR_COLD void VCoproDrMario___024root___dump_triggers__act(VCoproDrMario___0
         VL_DBG_MSGF("         No triggers active\n");
     }
     if ((1ULL & vlSelfRef.__VactTriggered.word(0U))) {
-        VL_DBG_MSGF("         'act' region trigger index 0 is active: @(posedge clk)\n");
+        VL_DBG_MSGF("         'act' region trigger index 0 is active: @(posedge clk_cpu)\n");
     }
     if ((2ULL & vlSelfRef.__VactTriggered.word(0U))) {
-        VL_DBG_MSGF("         'act' region trigger index 1 is active: @(posedge CoproDrMario.cpu_rst)\n");
+        VL_DBG_MSGF("         'act' region trigger index 1 is active: @(posedge clk)\n");
+    }
+    if ((4ULL & vlSelfRef.__VactTriggered.word(0U))) {
+        VL_DBG_MSGF("         'act' region trigger index 2 is active: @(posedge CoproDrMario.cpu_rst)\n");
     }
 }
 #endif  // VL_DEBUG
@@ -849,10 +853,13 @@ VL_ATTR_COLD void VCoproDrMario___024root___dump_triggers__nba(VCoproDrMario___0
         VL_DBG_MSGF("         No triggers active\n");
     }
     if ((1ULL & vlSelfRef.__VnbaTriggered.word(0U))) {
-        VL_DBG_MSGF("         'nba' region trigger index 0 is active: @(posedge clk)\n");
+        VL_DBG_MSGF("         'nba' region trigger index 0 is active: @(posedge clk_cpu)\n");
     }
     if ((2ULL & vlSelfRef.__VnbaTriggered.word(0U))) {
-        VL_DBG_MSGF("         'nba' region trigger index 1 is active: @(posedge CoproDrMario.cpu_rst)\n");
+        VL_DBG_MSGF("         'nba' region trigger index 1 is active: @(posedge clk)\n");
+    }
+    if ((4ULL & vlSelfRef.__VnbaTriggered.word(0U))) {
+        VL_DBG_MSGF("         'nba' region trigger index 2 is active: @(posedge CoproDrMario.cpu_rst)\n");
     }
 }
 #endif  // VL_DEBUG
@@ -864,6 +871,7 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Body
     vlSelf->clk = VL_RAND_RESET_I(1);
+    vlSelf->clk_cpu = VL_RAND_RESET_I(1);
     vlSelf->ce = VL_RAND_RESET_I(1);
     vlSelf->enable = VL_RAND_RESET_I(1);
     vlSelf->prg_ain = VL_RAND_RESET_I(16);
@@ -876,6 +884,7 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->CoproDrMario__DOT__DO = VL_RAND_RESET_I(8);
     vlSelf->CoproDrMario__DOT__rst_cnt = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__parked = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__rst_m = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__cpu_rst = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__DI = VL_RAND_RESET_I(8);
     vlSelf->CoproDrMario__DOT__a_ram = VL_RAND_RESET_I(1);
@@ -961,7 +970,15 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     for (int __Vi0 = 0; __Vi0 < 4096; ++__Vi0) {
         vlSelf->CoproDrMario__DOT__wram__DOT__mem[__Vi0] = VL_RAND_RESET_I(8);
     }
+    vlSelf->__Vdly__CoproDrMario__DOT__rst_cnt = VL_RAND_RESET_I(5);
     vlSelf->__Vdly__CoproDrMario__DOT__cpu6502__DOT__state = VL_RAND_RESET_I(6);
+    vlSelf->__VdlyVal__CoproDrMario__DOT__wram__DOT__mem__v0 = VL_RAND_RESET_I(8);
+    vlSelf->__VdlyDim0__CoproDrMario__DOT__wram__DOT__mem__v0 = VL_RAND_RESET_I(12);
+    vlSelf->__VdlySet__CoproDrMario__DOT__wram__DOT__mem__v0 = 0;
+    vlSelf->__VdlyVal__CoproDrMario__DOT__wram__DOT__mem__v1 = VL_RAND_RESET_I(8);
+    vlSelf->__VdlyDim0__CoproDrMario__DOT__wram__DOT__mem__v1 = VL_RAND_RESET_I(12);
+    vlSelf->__VdlySet__CoproDrMario__DOT__wram__DOT__mem__v1 = 0;
+    vlSelf->__Vtrigprevexpr___TOP__clk_cpu__0 = VL_RAND_RESET_I(1);
     vlSelf->__Vtrigprevexpr___TOP__clk__0 = VL_RAND_RESET_I(1);
     vlSelf->__Vtrigprevexpr___TOP__CoproDrMario__DOT__cpu_rst__0 = VL_RAND_RESET_I(1);
 }

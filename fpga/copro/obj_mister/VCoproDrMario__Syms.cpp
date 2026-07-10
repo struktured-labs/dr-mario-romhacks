@@ -18,7 +18,7 @@ VCoproDrMario__Syms::VCoproDrMario__Syms(VerilatedContext* contextp, const char*
     , TOP{this, namep}
 {
         // Check resources
-        Verilated::stackCheck(173);
+        Verilated::stackCheck(155);
     // Configure time unit / time precision
     _vm_contextp__->timeunit(-12);
     _vm_contextp__->timeprecision(-12);

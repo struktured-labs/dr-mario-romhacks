@@ -9,7 +9,7 @@
 static VCoproDrMario* t;
 static long clocks = 0;
 
-static void tick() { t->clk = 0; t->eval(); t->clk = 1; t->eval(); clocks++; }
+static void tick() { t->clk = 0; t->clk_cpu = 0; t->eval(); t->clk = 1; t->clk_cpu = 1; t->eval(); clocks++; }
 
 // one NES CPU cycle = 48 master clocks, ce high on exactly one of them
 static void nes_cycle(int addr, int data, bool we) {
