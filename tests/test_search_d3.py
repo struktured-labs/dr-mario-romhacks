@@ -26,7 +26,10 @@ from test_readiness_ext import emit_readiness_ext, emit_walk
 from test_vrdy import emit_vrdy
 import nes_d3_golden as G3
 
-LIVE, WORK1, CUR, WORK2 = 0x0500, 0x0600, 0x0700, 0x0800
+# HW CONSTRAINT (CoproDrMario.sv folds 4KB wram): copro $6100-$61FF == $0800-$08FF are the
+# SAME bytes -> the $08xx page is FORBIDDEN (aliases EV_*/S_*/results/DONE state). WORK2
+# lives at $0B00 (TK/TK1/pills end at $0A7F).
+LIVE, WORK1, CUR, WORK2 = 0x0500, 0x0600, 0x0700, 0x0B00
 WIN = 30000
 NPILLS, SHIFT = 8, 3     # expectimax pill count (power of 2 -> /NPILLS = >>SHIFT); test overrides to 2,1
 # TK candidate arrays (index 0..count-1, count<=32): ply2 rank (per ply1 candidate)

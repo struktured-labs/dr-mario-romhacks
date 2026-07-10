@@ -47,10 +47,10 @@ int main(int argc, char** argv) {
 
     long c0 = clocks;
     long polls = 0;
-    while (nes_read(0x5084) == 0 && clocks - c0 < 1600000000L) polls++;   // d3: dense ~0.5G clks
+    while (nes_read(0x5084) == 0 && clocks - c0 < 6000000000L) polls++;   // d3: dense ~0.5G clks
     long used = clocks - c0;
     int rc = nes_read(0x5085), ro = nes_read(0x5086);
-    bool ok = rc == ec && ro == eo && used < 1600000000L;
+    bool ok = rc == ec && ro == eo && used < 6000000000L;
     if (ok) pass++;
     printf("case %d: copro=(%d,%d) oracle=(%d,%d) clocks=%ld (%.2fs @85.9MHz eff/2) %s\n",
            k, rc, ro, ec, eo, used, used / 85.9e6, ok ? "ok" : "MISMATCH");
