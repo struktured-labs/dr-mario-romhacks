@@ -55,12 +55,14 @@ TURN = 0x6160    # (unused in dual-copro) fair round-robin serving
 ARMED2, WDOG2, WRETRY2 = 0x6161, 0x6162, 0x6163   # P2's independent search state (ARMED/WDOG/WRETRY = P1's)
 MATCH_ACTIVE = 0x6164   # set once play is dispatched; gates the full-clear STAGE-CLEAR auto-advance
 WDOGH1, WDOGH2 = 0x6165, 0x6166   # watchdog HIGH bytes: depth-3 searches run seconds, not frames
-WDOG_HI_LIM = 16                  # timeout = 16*256 = 4096 ticks ~= 68s (worst d3 first pill ~45s:
-                                  # 832M instr x ~4.6 clk/instr @85.9MHz on the dense 48-virus board)
+WDOG_HI_LIM = 56                  # timeout = 56*256 = 14336 ticks ~= 4min (FULL-ply1 d3 first pill
+                                  # ~95s measured-scaled on the dense 48-virus board; 2.5x margin)
 # per-copro tie-break seeds (same eval, different near-tie resolution -> desyncs mirror play).
 # Derived once per match from NAV_T; ride the color uploads' HIGH nibbles (firmware masks &$0F
 # and extracts SEED=(CB&$F0)|(CA>>4); seed 0 = jitter off).
 SEED1, SEED2, TMPSEED = 0x6167, 0x6168, 0x6169
+import os as _os
+USE_SEEDS = _os.environ.get("DRSEED", "1") != "0"   # DRSEED=0 -> seeds stay 0 = deterministic mirror
 VCOUNT_P1, VCOUNT_P2 = 0x0324, 0x03A4   # remaining virus counts (0 => that player cleared -> STAGE CLEAR)
 W2_BASE = 0x5200
 # if a pill sits still this many frames (while not search-frozen), force DOWN to unstick
@@ -106,10 +108,11 @@ def build_main(level=11, speed=1):
     a.ins16("LDA_abs", 0x0046); a.ins("CMP_imm", 0x04); a.br("BNE", "not_play")
     a.ins("LDA_zp", 0x04); a.br("BNE", "go_ai"); a.ins("RTS")
     a.label("go_ai")
-    a.ins16("LDA_abs", MATCH_ACTIVE); a.br("BNE", "ga_on")  # first play frame of this match:
-    a.ins16("LDA_abs", NAV_T); a.ins("ORA_imm", 0x01); a.ins16("STA_abs", SEED1)   # root seed
-    a.ins("EOR_imm", 0xA4); a.ins16("STA_abs", SEED2)       # bit0 kept -> both odd, distinct
-    a.label("ga_on")
+    if USE_SEEDS:
+        a.ins16("LDA_abs", MATCH_ACTIVE); a.br("BNE", "ga_on")  # first play frame of this match:
+        a.ins16("LDA_abs", NAV_T); a.ins("ORA_imm", 0x01); a.ins16("STA_abs", SEED1)   # root seed
+        a.ins("EOR_imm", 0xA4); a.ins16("STA_abs", SEED2)       # bit0 kept -> both odd, distinct
+        a.label("ga_on")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", MATCH_ACTIVE)   # play started -> arm full-clear detect
     a.jmp("dispatch")
     a.label("not_play")

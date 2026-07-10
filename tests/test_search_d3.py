@@ -48,6 +48,10 @@ TK1_KL, TK1_KH, TK1_O, TK1_C = 0x0A00, 0x0A20, 0x0A40, 0x0A60
 
 THIRD = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1)]   # 9 minus (2,2), /8=shift
 RESOLVE_LBL = "resolve_capped"   # TARGETED (deploy config, isolation 12/12); "resolve_capped_full" for full
+TOPK1 = 32   # ply1 keep-width; 32 = FULL (T1C <= 30). MEASURED (isolation 2026-07-10):
+             # topk1=8 = 70% clears vs FULL = 91% (n=24, FW model) -- the depth-1 Pass-0 key
+             # under-ranks setup moves; ply1 pruning is NOT quality-safe at depth-3. Cost:
+             # dense first pill ~95s @85.9MHz (declines fast as viruses die).
 
 
 def build():
@@ -124,7 +128,7 @@ def _emit_search_d3(a):
     # ---- select loop: top-8 of TK1, full ply2+expectimax treatment for each ----
     a.ins("LDA_imm", 0); a.ins("STA_zp", D_J1)
     a.label("s_loop")
-    a.ins("LDA_zp", D_J1); a.ins("CMP_imm", 8); a.br("BCC", "s_c1"); a.jmp("o_done"); a.label("s_c1")
+    a.ins("LDA_zp", D_J1); a.ins("CMP_imm", TOPK1); a.br("BCC", "s_c1"); a.jmp("o_done"); a.label("s_c1")
     a.ins("LDA_zp", D_J1); a.ins("CMP_zp", D_T1C); a.br("BCC", "s_c2"); a.jmp("o_done"); a.label("s_c2")
     # first-max scan of TK1 (stable: strict > only)
     a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_MKL); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_MKH)
@@ -360,7 +364,9 @@ def main():
         ca, cb = rng.randint(1, 3), rng.randint(1, 3); na, nb_ = rng.randint(1, 3), rng.randint(1, 3)
         seed = 0 if t < N // 2 else rng.randint(1, 255)   # half regression, half seeded
         nes = faithful_to_nes(fb)
-        gk = G3.decide_d3(list(nes), ca - 1, cb - 1, na - 1, nb_ - 1, topk1=8, topk2=8,
+        # NB: golden topk1 must equal the 6502 TOPK1 (even "full"=32 keeps the 6502's
+        # descending-key selection order for tie-breaks -- do NOT pass topk1=0 here)
+        gk = G3.decide_d3(list(nes), ca - 1, cb - 1, na - 1, nb_ - 1, topk1=TOPK1, topk2=8,
                           third=THIRD_T, seed=seed)
         cpu = Cpu(); cpu.load(0x8000, code); cpu.set_board(nes)
         for i in range(17):

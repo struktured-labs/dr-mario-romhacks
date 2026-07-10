@@ -89,7 +89,7 @@ def main():
     with open(os.path.join(HERE, "copro_rom.hex"), "w") as f:
         f.write("\n".join("%02x" % x for x in rom) + "\n")
     print(f"copro_rom.hex written: d3 search={clen}B stub={slen}B rom={len(rom)}B "
-          f"(topk1=8 topk2=8 pills={D3.NPILLS} resolve={D3.RESOLVE_LBL} WIN={D3.WIN})")
+          f"(topk1={D3.TOPK1} topk2=8 pills={D3.NPILLS} resolve={D3.RESOLVE_LBL} WIN={D3.WIN})")
 
     _code, labels = D3.build()
     search_ep = 0x8000 + labels["search"]
@@ -114,7 +114,7 @@ def main():
     cpu.mem[S_CA] = cA; cpu.mem[S_CB] = cB; cpu.mem[S_NA] = nA; cpu.mem[S_NB] = nB
     cpu.call(search_ep, max_steps=MAX_STEPS)
     got = (cpu.mem[D_BC], cpu.mem[D_BO]) if cpu.mem[D_BO] != 0xFF else None
-    exp = G3.decide_d3(b, cA, cB, nA, nB, topk1=8, topk2=8, third=THIRD)
+    exp = G3.decide_d3(b, cA, cB, nA, nB, topk1=D3.TOPK1, topk2=8, third=THIRD)
     ok = got == exp
     fails += 0 if ok else 1
     print(f"  direct-call: got={got} exp={exp}  {'OK' if ok else 'FAIL'}")
@@ -135,7 +135,7 @@ def main():
         if cpu2.mem[DONE] == 1:
             reached = True; break
     got2 = (cpu2.mem[S_BEST_C], cpu2.mem[S_BEST_O])
-    exp2 = G3.decide_d3(b, cA, cB, nA, nB, topk1=8, topk2=8, third=THIRD)
+    exp2 = G3.decide_d3(b, cA, cB, nA, nB, topk1=D3.TOPK1, topk2=8, third=THIRD)
     tables_ok = all(cpu2.mem[PILLA + i] == img[PILL_ROM + i] for i in range(16))
     ok2 = reached and tables_ok and exp2 is not None and got2 == exp2
     fails += 0 if ok2 else 1
