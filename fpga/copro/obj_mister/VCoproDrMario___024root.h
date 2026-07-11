@@ -33,7 +33,6 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         CData/*0:0*/ CoproDrMario__DOT__rst_m;
         CData/*7:0*/ CoproDrMario__DOT__DI;
         CData/*0:0*/ CoproDrMario__DOT__a_ram;
-        CData/*0:0*/ CoproDrMario__DOT__lev_wr_board;
         CData/*0:0*/ CoproDrMario__DOT__lev_start;
         CData/*0:0*/ CoproDrMario__DOT__lev_wr_arg;
         CData/*2:0*/ CoproDrMario__DOT__lev_enc;
@@ -80,9 +79,9 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__CO;
         CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__NMI_edge;
         CData/*1:0*/ CoproDrMario__DOT__cpu6502__DOT__regsel;
+        CData/*7:0*/ CoproDrMario__DOT__cpu6502__DOT__P;
     };
     struct {
-        CData/*7:0*/ CoproDrMario__DOT__cpu6502__DOT__P;
         CData/*5:0*/ CoproDrMario__DOT__cpu6502__DOT__state;
         CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__PC_inc;
         CData/*1:0*/ CoproDrMario__DOT__cpu6502__DOT__src_reg;
@@ -146,9 +145,9 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         CData/*7:0*/ CoproDrMario__DOT__leafeval__DOT__spawn;
         CData/*7:0*/ CoproDrMario__DOT__leafeval__DOT__setup;
         CData/*0:0*/ CoproDrMario__DOT__leafeval__DOT__anyvir;
+        CData/*0:0*/ CoproDrMario__DOT__leafeval__DOT__seen;
     };
     struct {
-        CData/*0:0*/ CoproDrMario__DOT__leafeval__DOT__seen;
         CData/*4:0*/ CoproDrMario__DOT__leafeval__DOT__fillcnt;
         CData/*6:0*/ CoproDrMario__DOT__leafeval__DOT__vo;
         CData/*3:0*/ CoproDrMario__DOT__leafeval__DOT__v_r;
@@ -213,10 +212,10 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         VlUnpacked<CData/*0:0*/, 128> CoproDrMario__DOT__leafeval__DOT__vir_of;
         VlUnpacked<CData/*7:0*/, 4096> CoproDrMario__DOT__wram__DOT__mem;
     };
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell;
     VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w2;
     VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w1;
     VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_live;
+    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell;
     VlTriggerVec<1> __VstlTriggered;
     VlTriggerVec<1> __VicoTriggered;
     VlTriggerVec<3> __VactTriggered;

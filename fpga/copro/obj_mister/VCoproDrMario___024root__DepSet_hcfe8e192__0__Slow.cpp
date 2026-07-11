@@ -2067,10 +2067,6 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
                                                           == 
                                                           (0xf8U 
                                                            & (IData)(vlSelfRef.CoproDrMario__DOT__AB)))));
-    vlSelfRef.CoproDrMario__DOT__lev_wr_board = ((~ 
-                                                  ((IData)(vlSelfRef.CoproDrMario__DOT__AB) 
-                                                   >> 7U)) 
-                                                 & (IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2));
     vlSelfRef.CoproDrMario__DOT__lev_start = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2) 
                                               & (0xf8U 
                                                  == 
@@ -2217,7 +2213,6 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->CoproDrMario__DOT__DI = VL_RAND_RESET_I(8);
     vlSelf->CoproDrMario__DOT__a_ram = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__a_addr = VL_RAND_RESET_I(12);
-    vlSelf->CoproDrMario__DOT__lev_wr_board = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__lev_start = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__lev_wr_arg = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__lev_enc = VL_RAND_RESET_I(3);

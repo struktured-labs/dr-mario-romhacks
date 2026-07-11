@@ -36,17 +36,11 @@ module LeafEval(
 	output reg [15:0] imm
 );
 
-// board register files: CUR (evaluated/mutated) + 3 snapshot slots
+// board register files: CUR (evaluated/mutated) + 3 snapshot slots.
+// NOTE: written ONLY inside the main FSM always block (single driver for Quartus);
+// window writes are folded in there via `wr`.
 reg [2:0] bcell [0:127] /*verilator public_flat_rd*/;
 reg [2:0] s_live [0:127], s_w1 [0:127], s_w2 [0:127];
-always @(posedge clk) if (wr) begin
-	case (wslot)
-		2'd0: bcell[waddr]  <= wdata;
-		2'd1: s_live[waddr] <= wdata;
-		2'd2: s_w1[waddr]   <= wdata;
-		2'd3: s_w2[waddr]   <= wdata;
-	endcase
-end
 
 wire [1:0] col_of  [0:127];
 wire       occ_of  [0:127];
@@ -115,6 +109,13 @@ always @(posedge clk) begin
 	if (rst) begin
 		st <= S_IDLE; done <= 1'b0;
 	end else begin
+		if (wr)
+			case (wslot)
+				2'd0: bcell[waddr]  <= wdata;
+				2'd1: s_live[waddr] <= wdata;
+				2'd2: s_w1[waddr]   <= wdata;
+				2'd3: s_w2[waddr]   <= wdata;
+			endcase
 		case (st)
 		S_IDLE: if (start || cmd_go) begin
 			done <= 1'b0;

@@ -105,10 +105,10 @@ class alignas(VL_CACHE_LINE_BYTES) VLeafEval___024root final : public VerilatedM
         VlUnpacked<CData/*0:0*/, 128> LeafEval__DOT__occ_of;
         VlUnpacked<CData/*0:0*/, 128> LeafEval__DOT__vir_of;
     };
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__bcell;
     VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__s_w2;
     VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__s_w1;
     VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__s_live;
+    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__bcell;
     VlTriggerVec<1> __VstlTriggered;
     VlTriggerVec<1> __VactTriggered;
     VlTriggerVec<1> __VnbaTriggered;
