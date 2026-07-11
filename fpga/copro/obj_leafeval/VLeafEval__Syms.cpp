@@ -18,7 +18,7 @@ VLeafEval__Syms::VLeafEval__Syms(VerilatedContext* contextp, const char* namep, 
     , TOP{this, namep}
 {
         // Check resources
-        Verilated::stackCheck(96);
+        Verilated::stackCheck(204);
     // Configure time unit / time precision
     _vm_contextp__->timeunit(-12);
     _vm_contextp__->timeprecision(-12);
@@ -29,6 +29,7 @@ VLeafEval__Syms::VLeafEval__Syms(VerilatedContext* contextp, const char* namep, 
     __Vscope_LeafEval.configure(this, name(), "LeafEval", "LeafEval", "<null>", 0, VerilatedScope::SCOPE_OTHER);
     // Setup export functions
     for (int __Vfinal = 0; __Vfinal < 2; ++__Vfinal) {
+        __Vscope_LeafEval.varInsert(__Vfinal,"bcell", &(TOP.LeafEval__DOT__bcell), false, VLVT_UINT8,VLVD_NODIR|VLVF_PUB_RD,2 ,2,0 ,0,127);
         __Vscope_LeafEval.varInsert(__Vfinal,"buried", &(TOP.LeafEval__DOT__buried), false, VLVT_UINT16,VLVD_NODIR|VLVF_PUB_RD,1 ,9,0);
         __Vscope_LeafEval.varInsert(__Vfinal,"holes", &(TOP.LeafEval__DOT__holes), false, VLVT_UINT8,VLVD_NODIR|VLVF_PUB_RD,1 ,7,0);
         __Vscope_LeafEval.varInsert(__Vfinal,"maxh", &(TOP.LeafEval__DOT__maxh), false, VLVT_UINT8,VLVD_NODIR|VLVF_PUB_RD,1 ,4,0);

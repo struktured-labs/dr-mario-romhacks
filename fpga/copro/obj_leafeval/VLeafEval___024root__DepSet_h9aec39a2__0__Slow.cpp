@@ -2038,12 +2038,33 @@ VL_ATTR_COLD void VLeafEval___024root___ctor_var_reset(VLeafEval___024root* vlSe
     vlSelf->wr = VL_RAND_RESET_I(1);
     vlSelf->waddr = VL_RAND_RESET_I(7);
     vlSelf->wdata = VL_RAND_RESET_I(3);
+    vlSelf->wslot = VL_RAND_RESET_I(2);
     vlSelf->start = VL_RAND_RESET_I(1);
+    vlSelf->cmd = VL_RAND_RESET_I(4);
+    vlSelf->cmd_go = VL_RAND_RESET_I(1);
+    vlSelf->a_sl = VL_RAND_RESET_I(2);
+    vlSelf->a_o4 = VL_RAND_RESET_I(2);
+    vlSelf->a_col = VL_RAND_RESET_I(3);
+    vlSelf->a_ca = VL_RAND_RESET_I(2);
+    vlSelf->a_cb = VL_RAND_RESET_I(2);
     vlSelf->done = VL_RAND_RESET_I(1);
     vlSelf->sco = VL_RAND_RESET_I(16);
     vlSelf->win = VL_RAND_RESET_I(1);
+    vlSelf->legal = VL_RAND_RESET_I(1);
+    vlSelf->rv_cells = VL_RAND_RESET_I(6);
+    vlSelf->rv_vir = VL_RAND_RESET_I(4);
+    vlSelf->imm = VL_RAND_RESET_I(16);
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->LeafEval__DOT__bcell[__Vi0] = VL_RAND_RESET_I(3);
+    }
+    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
+        vlSelf->LeafEval__DOT__s_live[__Vi0] = VL_RAND_RESET_I(3);
+    }
+    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
+        vlSelf->LeafEval__DOT__s_w1[__Vi0] = VL_RAND_RESET_I(3);
+    }
+    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
+        vlSelf->LeafEval__DOT__s_w2[__Vi0] = VL_RAND_RESET_I(3);
     }
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->LeafEval__DOT__col_of[__Vi0] = VL_RAND_RESET_I(2);
@@ -2055,6 +2076,22 @@ VL_ATTR_COLD void VLeafEval___024root___ctor_var_reset(VLeafEval___024root* vlSe
         vlSelf->LeafEval__DOT__vir_of[__Vi0] = VL_RAND_RESET_I(1);
     }
     vlSelf->LeafEval__DOT__st = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__node_leaf = VL_RAND_RESET_I(1);
+    vlSelf->LeafEval__DOT__fo1 = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__fwp = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__off_a = VL_RAND_RESET_I(7);
+    vlSelf->LeafEval__DOT__off_b = VL_RAND_RESET_I(7);
+    VL_RAND_RESET_W(128, vlSelf->LeafEval__DOT__markb);
+    vlSelf->LeafEval__DOT__li = VL_RAND_RESET_I(2);
+    vlSelf->LeafEval__DOT__soff = VL_RAND_RESET_I(8);
+    vlSelf->LeafEval__DOT__sstep = VL_RAND_RESET_I(4);
+    vlSelf->LeafEval__DOT__scnt = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__srun = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__smcol = VL_RAND_RESET_I(2);
+    vlSelf->LeafEval__DOT__srstart = VL_RAND_RESET_I(8);
+    vlSelf->LeafEval__DOT__fwp2 = VL_RAND_RESET_I(7);
+    vlSelf->LeafEval__DOT__gdest = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__anyclear = VL_RAND_RESET_I(1);
     vlSelf->LeafEval__DOT__wc = VL_RAND_RESET_I(4);
     vlSelf->LeafEval__DOT__wr_ = VL_RAND_RESET_I(4);
     vlSelf->LeafEval__DOT__maxh = VL_RAND_RESET_I(5);
@@ -2080,6 +2117,11 @@ VL_ATTR_COLD void VLeafEval___024root___ctor_var_reset(VLeafEval___024root* vlSe
     vlSelf->LeafEval__DOT__span_hi = VL_RAND_RESET_I(5);
     vlSelf->LeafEval__DOT__vspan_lo = VL_RAND_RESET_I(5);
     vlSelf->LeafEval__DOT__vspan_hi = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__i = VL_RAND_RESET_I(32);
+    vlSelf->LeafEval__DOT__fo2b__DOT__fom = VL_RAND_RESET_I(5);
+    vlSelf->LeafEval__DOT__scan__DOT__brk = VL_RAND_RESET_I(1);
+    vlSelf->LeafEval__DOT__scan__DOT__c_ = VL_RAND_RESET_I(2);
+    vlSelf->LeafEval__DOT__grv__DOT__t = VL_RAND_RESET_I(3);
     vlSelf->LeafEval__DOT__fin__DOT__hq = VL_RAND_RESET_I(9);
     vlSelf->LeafEval__DOT__fin__DOT__vq = VL_RAND_RESET_I(9);
     vlSelf->LeafEval__DOT__fin__DOT__mx = VL_RAND_RESET_I(9);

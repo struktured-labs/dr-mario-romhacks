@@ -34,10 +34,22 @@ class alignas(VL_CACHE_LINE_BYTES) VLeafEval VL_NOT_FINAL : public VerilatedMode
     VL_IN8(&wr,0,0);
     VL_IN8(&waddr,6,0);
     VL_IN8(&wdata,2,0);
+    VL_IN8(&wslot,1,0);
     VL_IN8(&start,0,0);
+    VL_IN8(&cmd,3,0);
+    VL_IN8(&cmd_go,0,0);
+    VL_IN8(&a_sl,1,0);
+    VL_IN8(&a_o4,1,0);
+    VL_IN8(&a_col,2,0);
+    VL_IN8(&a_ca,1,0);
+    VL_IN8(&a_cb,1,0);
     VL_OUT8(&done,0,0);
     VL_OUT8(&win,0,0);
+    VL_OUT8(&legal,0,0);
+    VL_OUT8(&rv_cells,5,0);
+    VL_OUT8(&rv_vir,3,0);
     VL_OUT16(&sco,15,0);
+    VL_OUT16(&imm,15,0);
 
     // CELLS
     // Public to allow access to /* verilator public */ items.

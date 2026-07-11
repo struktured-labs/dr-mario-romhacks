@@ -18,7 +18,7 @@ VCoproDrMario__Syms::VCoproDrMario__Syms(VerilatedContext* contextp, const char*
     , TOP{this, namep}
 {
         // Check resources
-        Verilated::stackCheck(233);
+        Verilated::stackCheck(337);
     // Configure time unit / time precision
     _vm_contextp__->timeunit(-12);
     _vm_contextp__->timeprecision(-12);
@@ -29,6 +29,7 @@ VCoproDrMario__Syms::VCoproDrMario__Syms(VerilatedContext* contextp, const char*
     __Vscope_CoproDrMario__leafeval.configure(this, name(), "CoproDrMario.leafeval", "leafeval", "<null>", 0, VerilatedScope::SCOPE_OTHER);
     // Setup export functions
     for (int __Vfinal = 0; __Vfinal < 2; ++__Vfinal) {
+        __Vscope_CoproDrMario__leafeval.varInsert(__Vfinal,"bcell", &(TOP.CoproDrMario__DOT__leafeval__DOT__bcell), false, VLVT_UINT8,VLVD_NODIR|VLVF_PUB_RD,2 ,2,0 ,0,127);
         __Vscope_CoproDrMario__leafeval.varInsert(__Vfinal,"buried", &(TOP.CoproDrMario__DOT__leafeval__DOT__buried), false, VLVT_UINT16,VLVD_NODIR|VLVF_PUB_RD,1 ,9,0);
         __Vscope_CoproDrMario__leafeval.varInsert(__Vfinal,"holes", &(TOP.CoproDrMario__DOT__leafeval__DOT__holes), false, VLVT_UINT8,VLVD_NODIR|VLVF_PUB_RD,1 ,7,0);
         __Vscope_CoproDrMario__leafeval.varInsert(__Vfinal,"maxh", &(TOP.CoproDrMario__DOT__leafeval__DOT__maxh), false, VLVT_UINT8,VLVD_NODIR|VLVF_PUB_RD,1 ,4,0);

@@ -73,6 +73,42 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     __Vdly__LeafEval__DOT__seen = 0;
     CData/*4:0*/ __Vdly__LeafEval__DOT__fillcnt;
     __Vdly__LeafEval__DOT__fillcnt = 0;
+    CData/*0:0*/ __Vdly__LeafEval__DOT__node_leaf;
+    __Vdly__LeafEval__DOT__node_leaf = 0;
+    CData/*5:0*/ __Vdly__rv_cells;
+    __Vdly__rv_cells = 0;
+    CData/*3:0*/ __Vdly__rv_vir;
+    __Vdly__rv_vir = 0;
+    VlWide<4>/*127:0*/ __Vdly__LeafEval__DOT__markb;
+    VL_ZERO_W(128, __Vdly__LeafEval__DOT__markb);
+    CData/*0:0*/ __Vdly__LeafEval__DOT__anyclear;
+    __Vdly__LeafEval__DOT__anyclear = 0;
+    CData/*4:0*/ __Vdly__LeafEval__DOT__fwp;
+    __Vdly__LeafEval__DOT__fwp = 0;
+    CData/*4:0*/ __Vdly__LeafEval__DOT__fo1;
+    __Vdly__LeafEval__DOT__fo1 = 0;
+    CData/*6:0*/ __Vdly__LeafEval__DOT__off_b;
+    __Vdly__LeafEval__DOT__off_b = 0;
+    CData/*6:0*/ __Vdly__LeafEval__DOT__off_a;
+    __Vdly__LeafEval__DOT__off_a = 0;
+    CData/*1:0*/ __Vdly__LeafEval__DOT__li;
+    __Vdly__LeafEval__DOT__li = 0;
+    CData/*3:0*/ __Vdly__LeafEval__DOT__sstep;
+    __Vdly__LeafEval__DOT__sstep = 0;
+    CData/*4:0*/ __Vdly__LeafEval__DOT__scnt;
+    __Vdly__LeafEval__DOT__scnt = 0;
+    CData/*4:0*/ __Vdly__LeafEval__DOT__srun;
+    __Vdly__LeafEval__DOT__srun = 0;
+    CData/*1:0*/ __Vdly__LeafEval__DOT__smcol;
+    __Vdly__LeafEval__DOT__smcol = 0;
+    CData/*7:0*/ __Vdly__LeafEval__DOT__soff;
+    __Vdly__LeafEval__DOT__soff = 0;
+    CData/*7:0*/ __Vdly__LeafEval__DOT__srstart;
+    __Vdly__LeafEval__DOT__srstart = 0;
+    CData/*6:0*/ __Vdly__LeafEval__DOT__fwp2;
+    __Vdly__LeafEval__DOT__fwp2 = 0;
+    CData/*4:0*/ __Vdly__LeafEval__DOT__gdest;
+    __Vdly__LeafEval__DOT__gdest = 0;
     CData/*6:0*/ __Vdly__LeafEval__DOT__vo;
     __Vdly__LeafEval__DOT__vo = 0;
     CData/*4:0*/ __Vdly__LeafEval__DOT__run_h;
@@ -93,8 +129,50 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     __VdlyVal__LeafEval__DOT__bcell__v0 = 0;
     CData/*6:0*/ __VdlyDim0__LeafEval__DOT__bcell__v0;
     __VdlyDim0__LeafEval__DOT__bcell__v0 = 0;
-    CData/*0:0*/ __VdlySet__LeafEval__DOT__bcell__v0;
-    __VdlySet__LeafEval__DOT__bcell__v0 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__s_w2__v0;
+    __VdlyVal__LeafEval__DOT__s_w2__v0 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__s_w2__v0;
+    __VdlyDim0__LeafEval__DOT__s_w2__v0 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__s_w1__v0;
+    __VdlyVal__LeafEval__DOT__s_w1__v0 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__s_w1__v0;
+    __VdlyDim0__LeafEval__DOT__s_w1__v0 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__s_live__v0;
+    __VdlyVal__LeafEval__DOT__s_live__v0 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__s_live__v0;
+    __VdlyDim0__LeafEval__DOT__s_live__v0 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__bcell__v1;
+    __VdlyVal__LeafEval__DOT__bcell__v1 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__bcell__v1;
+    __VdlyDim0__LeafEval__DOT__bcell__v1 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__s_live__v1;
+    __VdlyVal__LeafEval__DOT__s_live__v1 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__s_live__v1;
+    __VdlyDim0__LeafEval__DOT__s_live__v1 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__s_w1__v1;
+    __VdlyVal__LeafEval__DOT__s_w1__v1 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__s_w1__v1;
+    __VdlyDim0__LeafEval__DOT__s_w1__v1 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__s_w2__v1;
+    __VdlyVal__LeafEval__DOT__s_w2__v1 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__s_w2__v1;
+    __VdlyDim0__LeafEval__DOT__s_w2__v1 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__bcell__v2;
+    __VdlyVal__LeafEval__DOT__bcell__v2 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__bcell__v2;
+    __VdlyDim0__LeafEval__DOT__bcell__v2 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__bcell__v3;
+    __VdlyVal__LeafEval__DOT__bcell__v3 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__bcell__v3;
+    __VdlyDim0__LeafEval__DOT__bcell__v3 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__bcell__v4;
+    __VdlyDim0__LeafEval__DOT__bcell__v4 = 0;
+    CData/*2:0*/ __VdlyVal__LeafEval__DOT__bcell__v5;
+    __VdlyVal__LeafEval__DOT__bcell__v5 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__bcell__v5;
+    __VdlyDim0__LeafEval__DOT__bcell__v5 = 0;
+    CData/*6:0*/ __VdlyDim0__LeafEval__DOT__bcell__v6;
+    __VdlyDim0__LeafEval__DOT__bcell__v6 = 0;
     // Body
     __Vdly__LeafEval__DOT__st = vlSelfRef.LeafEval__DOT__st;
     __Vdly__LeafEval__DOT__maxh = vlSelfRef.LeafEval__DOT__maxh;
@@ -111,6 +189,27 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     __Vdly__LeafEval__DOT__wr_ = vlSelfRef.LeafEval__DOT__wr_;
     __Vdly__LeafEval__DOT__seen = vlSelfRef.LeafEval__DOT__seen;
     __Vdly__LeafEval__DOT__fillcnt = vlSelfRef.LeafEval__DOT__fillcnt;
+    __Vdly__LeafEval__DOT__node_leaf = vlSelfRef.LeafEval__DOT__node_leaf;
+    __Vdly__rv_cells = vlSelfRef.rv_cells;
+    __Vdly__rv_vir = vlSelfRef.rv_vir;
+    __Vdly__LeafEval__DOT__markb[0U] = vlSelfRef.LeafEval__DOT__markb[0U];
+    __Vdly__LeafEval__DOT__markb[1U] = vlSelfRef.LeafEval__DOT__markb[1U];
+    __Vdly__LeafEval__DOT__markb[2U] = vlSelfRef.LeafEval__DOT__markb[2U];
+    __Vdly__LeafEval__DOT__markb[3U] = vlSelfRef.LeafEval__DOT__markb[3U];
+    __Vdly__LeafEval__DOT__anyclear = vlSelfRef.LeafEval__DOT__anyclear;
+    __Vdly__LeafEval__DOT__fwp = vlSelfRef.LeafEval__DOT__fwp;
+    __Vdly__LeafEval__DOT__fo1 = vlSelfRef.LeafEval__DOT__fo1;
+    __Vdly__LeafEval__DOT__off_b = vlSelfRef.LeafEval__DOT__off_b;
+    __Vdly__LeafEval__DOT__off_a = vlSelfRef.LeafEval__DOT__off_a;
+    __Vdly__LeafEval__DOT__li = vlSelfRef.LeafEval__DOT__li;
+    __Vdly__LeafEval__DOT__sstep = vlSelfRef.LeafEval__DOT__sstep;
+    __Vdly__LeafEval__DOT__scnt = vlSelfRef.LeafEval__DOT__scnt;
+    __Vdly__LeafEval__DOT__srun = vlSelfRef.LeafEval__DOT__srun;
+    __Vdly__LeafEval__DOT__smcol = vlSelfRef.LeafEval__DOT__smcol;
+    __Vdly__LeafEval__DOT__soff = vlSelfRef.LeafEval__DOT__soff;
+    __Vdly__LeafEval__DOT__srstart = vlSelfRef.LeafEval__DOT__srstart;
+    __Vdly__LeafEval__DOT__fwp2 = vlSelfRef.LeafEval__DOT__fwp2;
+    __Vdly__LeafEval__DOT__gdest = vlSelfRef.LeafEval__DOT__gdest;
     __Vdly__LeafEval__DOT__run_h = vlSelfRef.LeafEval__DOT__run_h;
     __Vdly__LeafEval__DOT__run_v = vlSelfRef.LeafEval__DOT__run_v;
     __Vdly__LeafEval__DOT__p = vlSelfRef.LeafEval__DOT__p;
@@ -119,25 +218,917 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     __Vdly__LeafEval__DOT__vspan_lo = vlSelfRef.LeafEval__DOT__vspan_lo;
     __Vdly__LeafEval__DOT__vspan_hi = vlSelfRef.LeafEval__DOT__vspan_hi;
     __Vdly__LeafEval__DOT__vo = vlSelfRef.LeafEval__DOT__vo;
-    __VdlySet__LeafEval__DOT__bcell__v0 = 0U;
     if (vlSelfRef.wr) {
-        __VdlyVal__LeafEval__DOT__bcell__v0 = vlSelfRef.wdata;
-        __VdlyDim0__LeafEval__DOT__bcell__v0 = vlSelfRef.waddr;
-        __VdlySet__LeafEval__DOT__bcell__v0 = 1U;
+        if ((2U & (IData)(vlSelfRef.wslot))) {
+            if ((1U & (IData)(vlSelfRef.wslot))) {
+                __VdlyVal__LeafEval__DOT__s_w2__v0 
+                    = vlSelfRef.wdata;
+                __VdlyDim0__LeafEval__DOT__s_w2__v0 
+                    = vlSelfRef.waddr;
+                vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_w2.enqueue(__VdlyVal__LeafEval__DOT__s_w2__v0, (IData)(__VdlyDim0__LeafEval__DOT__s_w2__v0));
+            }
+        }
+    }
+    if (vlSelfRef.wr) {
+        if ((2U & (IData)(vlSelfRef.wslot))) {
+            if ((1U & (~ (IData)(vlSelfRef.wslot)))) {
+                __VdlyVal__LeafEval__DOT__s_w1__v0 
+                    = vlSelfRef.wdata;
+                __VdlyDim0__LeafEval__DOT__s_w1__v0 
+                    = vlSelfRef.waddr;
+                vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_w1.enqueue(__VdlyVal__LeafEval__DOT__s_w1__v0, (IData)(__VdlyDim0__LeafEval__DOT__s_w1__v0));
+            }
+        }
+    }
+    if (vlSelfRef.wr) {
+        if ((1U & (~ ((IData)(vlSelfRef.wslot) >> 1U)))) {
+            if ((1U & (IData)(vlSelfRef.wslot))) {
+                __VdlyVal__LeafEval__DOT__s_live__v0 
+                    = vlSelfRef.wdata;
+                __VdlyDim0__LeafEval__DOT__s_live__v0 
+                    = vlSelfRef.waddr;
+                vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_live.enqueue(__VdlyVal__LeafEval__DOT__s_live__v0, (IData)(__VdlyDim0__LeafEval__DOT__s_live__v0));
+            }
+        }
+    }
+    if (vlSelfRef.wr) {
+        if ((1U & (~ ((IData)(vlSelfRef.wslot) >> 1U)))) {
+            if ((1U & (~ (IData)(vlSelfRef.wslot)))) {
+                __VdlyVal__LeafEval__DOT__bcell__v0 
+                    = vlSelfRef.wdata;
+                __VdlyDim0__LeafEval__DOT__bcell__v0 
+                    = vlSelfRef.waddr;
+                vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.enqueue(__VdlyVal__LeafEval__DOT__bcell__v0, (IData)(__VdlyDim0__LeafEval__DOT__bcell__v0));
+            }
+        }
     }
     if (vlSelfRef.rst) {
         __Vdly__LeafEval__DOT__st = 0U;
         vlSelfRef.done = 0U;
     } else if (((((((((0U == (IData)(vlSelfRef.LeafEval__DOT__st)) 
-                      | (1U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                     | (2U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                    | (3U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                   | (4U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                  | (5U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                 | (6U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                | (7U == (IData)(vlSelfRef.LeafEval__DOT__st)))) {
+                      | (0x11U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                     | (0x12U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                    | (0x13U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                   | (0x14U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                  | (0x15U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                 | (0x16U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                | (0x17U == (IData)(vlSelfRef.LeafEval__DOT__st)))) {
         if ((0U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
-            if (vlSelfRef.start) {
+            if (((IData)(vlSelfRef.start) | (IData)(vlSelfRef.cmd_go))) {
+                vlSelfRef.done = 0U;
+                if (((IData)(vlSelfRef.start) | (1U 
+                                                 == (IData)(vlSelfRef.cmd)))) {
+                    __Vdly__LeafEval__DOT__maxh = 0U;
+                    __Vdly__LeafEval__DOT__holes = 0U;
+                    __Vdly__LeafEval__DOT__toprisk = 0U;
+                    __Vdly__LeafEval__DOT__spawn = 0U;
+                    __Vdly__LeafEval__DOT__setup = 0U;
+                    __Vdly__LeafEval__DOT__pollution = 0U;
+                    __Vdly__LeafEval__DOT__buried = 0U;
+                    __Vdly__LeafEval__DOT__rdy_ext = 0U;
+                    __Vdly__LeafEval__DOT__vrdy = 0U;
+                    __Vdly__LeafEval__DOT__anyvir = 0U;
+                    __Vdly__LeafEval__DOT__wc = 0U;
+                    __Vdly__LeafEval__DOT__wr_ = 0U;
+                    __Vdly__LeafEval__DOT__seen = 0U;
+                    __Vdly__LeafEval__DOT__fillcnt = 0U;
+                    __Vdly__LeafEval__DOT__st = 1U;
+                } else if (((2U == (IData)(vlSelfRef.cmd)) 
+                            | (3U == (IData)(vlSelfRef.cmd)))) {
+                    __Vdly__LeafEval__DOT__st = 0x11U;
+                } else if ((4U == (IData)(vlSelfRef.cmd))) {
+                    __Vdly__LeafEval__DOT__node_leaf = 1U;
+                    vlSelfRef.legal = 0U;
+                    __Vdly__rv_cells = 0U;
+                    __Vdly__rv_vir = 0U;
+                    vlSelfRef.imm = 0U;
+                    __Vdly__LeafEval__DOT__markb[0U] = 0U;
+                    __Vdly__LeafEval__DOT__markb[1U] = 0U;
+                    __Vdly__LeafEval__DOT__markb[2U] = 0U;
+                    __Vdly__LeafEval__DOT__markb[3U] = 0U;
+                    __Vdly__LeafEval__DOT__anyclear = 0U;
+                    __Vdly__LeafEval__DOT__fwp = 0U;
+                    __Vdly__LeafEval__DOT__st = 0x12U;
+                }
+            }
+        } else if ((0x11U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            if ((2U == (IData)(vlSelfRef.cmd))) {
+                vlSelfRef.LeafEval__DOT__i = 0U;
+                while (VL_GTS_III(32, 0x80U, vlSelfRef.LeafEval__DOT__i)) {
+                    __VdlyVal__LeafEval__DOT__bcell__v1 
+                        = ((1U == (IData)(vlSelfRef.a_sl))
+                            ? vlSelfRef.LeafEval__DOT__s_live
+                           [(0x7fU & vlSelfRef.LeafEval__DOT__i)]
+                            : ((2U == (IData)(vlSelfRef.a_sl))
+                                ? vlSelfRef.LeafEval__DOT__s_w1
+                               [(0x7fU & vlSelfRef.LeafEval__DOT__i)]
+                                : vlSelfRef.LeafEval__DOT__s_w2
+                               [(0x7fU & vlSelfRef.LeafEval__DOT__i)]));
+                    __VdlyDim0__LeafEval__DOT__bcell__v1 
+                        = (0x7fU & vlSelfRef.LeafEval__DOT__i);
+                    vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.enqueue(__VdlyVal__LeafEval__DOT__bcell__v1, (IData)(__VdlyDim0__LeafEval__DOT__bcell__v1));
+                    vlSelfRef.LeafEval__DOT__i = ((IData)(1U) 
+                                                  + vlSelfRef.LeafEval__DOT__i);
+                }
+            } else {
+                vlSelfRef.LeafEval__DOT__i = 0U;
+                while (VL_GTS_III(32, 0x80U, vlSelfRef.LeafEval__DOT__i)) {
+                    if ((1U == (IData)(vlSelfRef.a_sl))) {
+                        __VdlyVal__LeafEval__DOT__s_live__v1 
+                            = vlSelfRef.LeafEval__DOT__bcell
+                            [(0x7fU & vlSelfRef.LeafEval__DOT__i)];
+                        __VdlyDim0__LeafEval__DOT__s_live__v1 
+                            = (0x7fU & vlSelfRef.LeafEval__DOT__i);
+                        vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_live.enqueue(__VdlyVal__LeafEval__DOT__s_live__v1, (IData)(__VdlyDim0__LeafEval__DOT__s_live__v1));
+                    } else if ((2U == (IData)(vlSelfRef.a_sl))) {
+                        __VdlyVal__LeafEval__DOT__s_w1__v1 
+                            = vlSelfRef.LeafEval__DOT__bcell
+                            [(0x7fU & vlSelfRef.LeafEval__DOT__i)];
+                        __VdlyDim0__LeafEval__DOT__s_w1__v1 
+                            = (0x7fU & vlSelfRef.LeafEval__DOT__i);
+                        vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_w1.enqueue(__VdlyVal__LeafEval__DOT__s_w1__v1, (IData)(__VdlyDim0__LeafEval__DOT__s_w1__v1));
+                    } else {
+                        __VdlyVal__LeafEval__DOT__s_w2__v1 
+                            = vlSelfRef.LeafEval__DOT__bcell
+                            [(0x7fU & vlSelfRef.LeafEval__DOT__i)];
+                        __VdlyDim0__LeafEval__DOT__s_w2__v1 
+                            = (0x7fU & vlSelfRef.LeafEval__DOT__i);
+                        vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_w2.enqueue(__VdlyVal__LeafEval__DOT__s_w2__v1, (IData)(__VdlyDim0__LeafEval__DOT__s_w2__v1));
+                    }
+                    vlSelfRef.LeafEval__DOT__i = ((IData)(1U) 
+                                                  + vlSelfRef.LeafEval__DOT__i);
+                }
+            }
+            vlSelfRef.done = 1U;
+            __Vdly__LeafEval__DOT__st = 0U;
+        } else if ((0x12U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            if (((0x10U == (IData)(vlSelfRef.LeafEval__DOT__fwp)) 
+                 | vlSelfRef.LeafEval__DOT__occ_of[
+                 ((0x78U & ((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                            << 3U)) | (IData)(vlSelfRef.a_col))])) {
+                __Vdly__LeafEval__DOT__fo1 = vlSelfRef.LeafEval__DOT__fwp;
+                if ((2U & (IData)(vlSelfRef.a_o4))) {
+                    if ((7U == (IData)(vlSelfRef.a_col))) {
+                        vlSelfRef.done = 1U;
+                        __Vdly__LeafEval__DOT__st = 0U;
+                    } else {
+                        __Vdly__LeafEval__DOT__st = 0x13U;
+                    }
+                } else if ((2U <= (IData)(vlSelfRef.LeafEval__DOT__fwp))) {
+                    __Vdly__LeafEval__DOT__off_b = 
+                        ((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                                    - (IData)(1U)) 
+                                   << 3U)) | (IData)(vlSelfRef.a_col));
+                    vlSelfRef.legal = 1U;
+                    __Vdly__LeafEval__DOT__st = 0x14U;
+                    __Vdly__LeafEval__DOT__off_a = 
+                        ((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                                    - (IData)(2U)) 
+                                   << 3U)) | (IData)(vlSelfRef.a_col));
+                } else {
+                    vlSelfRef.done = 1U;
+                    __Vdly__LeafEval__DOT__st = 0U;
+                }
+                __Vdly__LeafEval__DOT__fwp = 0U;
+            } else {
+                __Vdly__LeafEval__DOT__fwp = (0x1fU 
+                                              & ((IData)(1U) 
+                                                 + (IData)(vlSelfRef.LeafEval__DOT__fwp)));
+            }
+        } else if ((0x13U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            if (((0x10U == (IData)(vlSelfRef.LeafEval__DOT__fwp)) 
+                 | vlSelfRef.LeafEval__DOT__occ_of[
+                 ((0x78U & ((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                            << 3U)) | (7U & ((IData)(1U) 
+                                             + (IData)(vlSelfRef.a_col))))])) {
+                vlSelfRef.LeafEval__DOT__fo2b__DOT__fom 
+                    = (((IData)(vlSelfRef.LeafEval__DOT__fo1) 
+                        < (IData)(vlSelfRef.LeafEval__DOT__fwp))
+                        ? (IData)(vlSelfRef.LeafEval__DOT__fo1)
+                        : (IData)(vlSelfRef.LeafEval__DOT__fwp));
+                if ((1U <= (IData)(vlSelfRef.LeafEval__DOT__fo2b__DOT__fom))) {
+                    __Vdly__LeafEval__DOT__off_a = 
+                        ((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__fo2b__DOT__fom) 
+                                    - (IData)(1U)) 
+                                   << 3U)) | (IData)(vlSelfRef.a_col));
+                    vlSelfRef.legal = 1U;
+                    __Vdly__LeafEval__DOT__st = 0x14U;
+                    __Vdly__LeafEval__DOT__off_b = 
+                        ((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__fo2b__DOT__fom) 
+                                    - (IData)(1U)) 
+                                   << 3U)) | (7U & 
+                                              ((IData)(1U) 
+                                               + (IData)(vlSelfRef.a_col))));
+                } else {
+                    vlSelfRef.done = 1U;
+                    __Vdly__LeafEval__DOT__st = 0U;
+                }
+            } else {
+                __Vdly__LeafEval__DOT__fwp = (0x1fU 
+                                              & ((IData)(1U) 
+                                                 + (IData)(vlSelfRef.LeafEval__DOT__fwp)));
+            }
+        } else if ((0x14U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            __VdlyDim0__LeafEval__DOT__bcell__v2 = vlSelfRef.LeafEval__DOT__off_a;
+            __VdlyVal__LeafEval__DOT__bcell__v2 = (
+                                                   (1U 
+                                                    & (IData)(vlSelfRef.a_o4))
+                                                    ? (IData)(vlSelfRef.a_cb)
+                                                    : (IData)(vlSelfRef.a_ca));
+            vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.enqueue(__VdlyVal__LeafEval__DOT__bcell__v2, (IData)(__VdlyDim0__LeafEval__DOT__bcell__v2));
+            __VdlyVal__LeafEval__DOT__bcell__v3 = (
+                                                   (1U 
+                                                    & (IData)(vlSelfRef.a_o4))
+                                                    ? (IData)(vlSelfRef.a_ca)
+                                                    : (IData)(vlSelfRef.a_cb));
+            __Vdly__LeafEval__DOT__li = 0U;
+            __Vdly__LeafEval__DOT__st = 0x15U;
+            __Vdly__LeafEval__DOT__sstep = 1U;
+            __Vdly__LeafEval__DOT__scnt = 8U;
+            __Vdly__LeafEval__DOT__srun = 0U;
+            __Vdly__LeafEval__DOT__smcol = 0U;
+            __VdlyDim0__LeafEval__DOT__bcell__v3 = vlSelfRef.LeafEval__DOT__off_b;
+            vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.enqueue(__VdlyVal__LeafEval__DOT__bcell__v3, (IData)(__VdlyDim0__LeafEval__DOT__bcell__v3));
+            __Vdly__LeafEval__DOT__soff = (0x78U & (IData)(vlSelfRef.LeafEval__DOT__off_a));
+        } else if ((0x15U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            vlSelfRef.LeafEval__DOT__scan__DOT__c_ 
+                = vlSelfRef.LeafEval__DOT__col_of[(0x7fU 
+                                                   & (IData)(vlSelfRef.LeafEval__DOT__soff))];
+            vlSelfRef.LeafEval__DOT__scan__DOT__brk 
+                = ((0U == (IData)(vlSelfRef.LeafEval__DOT__scan__DOT__c_)) 
+                   | ((IData)(vlSelfRef.LeafEval__DOT__scan__DOT__c_) 
+                      != (IData)(vlSelfRef.LeafEval__DOT__smcol)));
+            if (((IData)(vlSelfRef.LeafEval__DOT__scan__DOT__brk) 
+                 & (4U <= (IData)(vlSelfRef.LeafEval__DOT__srun)))) {
+                vlSelfRef.LeafEval__DOT__i = 0x10U;
+                if ((0U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & (IData)(vlSelfRef.LeafEval__DOT__srstart))));
+                }
+                if ((1U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + (IData)(vlSelfRef.LeafEval__DOT__sstep)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + (IData)(vlSelfRef.LeafEval__DOT__sstep)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + (IData)(vlSelfRef.LeafEval__DOT__sstep)))));
+                }
+                if ((2U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 1U)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 1U)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 1U)))));
+                }
+                if ((3U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(3U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(3U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(3U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((4U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 2U)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 2U)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 2U)))));
+                }
+                if ((5U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(5U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(5U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(5U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((6U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(6U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(6U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(6U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((7U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(7U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(7U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(7U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((8U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 3U)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 3U)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 3U)))));
+                }
+                if ((9U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(9U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(9U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(9U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xaU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xaU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xaU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xaU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xbU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xbU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xbU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xbU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xcU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xcU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xcU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xcU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xdU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xdU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xdU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xdU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xeU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xeU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xeU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xeU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xfU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xfU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xfU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xfU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+            }
+            if ((0U == (IData)(vlSelfRef.LeafEval__DOT__scan__DOT__c_))) {
+                __Vdly__LeafEval__DOT__srun = 0U;
+                __Vdly__LeafEval__DOT__smcol = 0U;
+            } else if (((IData)(vlSelfRef.LeafEval__DOT__scan__DOT__c_) 
+                        != (IData)(vlSelfRef.LeafEval__DOT__smcol))) {
+                __Vdly__LeafEval__DOT__smcol = vlSelfRef.LeafEval__DOT__scan__DOT__c_;
+                __Vdly__LeafEval__DOT__srstart = vlSelfRef.LeafEval__DOT__soff;
+                __Vdly__LeafEval__DOT__srun = 1U;
+            } else {
+                __Vdly__LeafEval__DOT__srun = (0x1fU 
+                                               & ((IData)(1U) 
+                                                  + (IData)(vlSelfRef.LeafEval__DOT__srun)));
+            }
+            if ((1U == (IData)(vlSelfRef.LeafEval__DOT__scnt))) {
+                __Vdly__LeafEval__DOT__st = 0x16U;
+            } else {
+                __Vdly__LeafEval__DOT__soff = (0xffU 
+                                               & ((IData)(vlSelfRef.LeafEval__DOT__soff) 
+                                                  + (IData)(vlSelfRef.LeafEval__DOT__sstep)));
+                __Vdly__LeafEval__DOT__scnt = (0x1fU 
+                                               & ((IData)(vlSelfRef.LeafEval__DOT__scnt) 
+                                                  - (IData)(1U)));
+            }
+        } else if ((0x16U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            if ((4U <= (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                vlSelfRef.LeafEval__DOT__i = 0x10U;
+                if ((0U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & (IData)(vlSelfRef.LeafEval__DOT__srstart))));
+                }
+                if ((1U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + (IData)(vlSelfRef.LeafEval__DOT__sstep)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + (IData)(vlSelfRef.LeafEval__DOT__sstep)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + (IData)(vlSelfRef.LeafEval__DOT__sstep)))));
+                }
+                if ((2U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 1U)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 1U)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 1U)))));
+                }
+                if ((3U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(3U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(3U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(3U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((4U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 2U)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 2U)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 2U)))));
+                }
+                if ((5U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(5U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(5U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(5U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((6U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(6U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(6U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(6U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((7U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(7U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(7U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(7U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((8U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 3U)) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 3U)) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     VL_SHIFTL_III(7,32,32, (IData)(vlSelfRef.LeafEval__DOT__sstep), 3U)))));
+                }
+                if ((9U < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(9U) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(9U) * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(9U) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xaU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xaU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xaU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xaU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xbU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xbU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xbU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xbU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xcU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xcU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xcU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xcU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xdU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xdU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xdU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xdU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xeU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xeU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xeU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xeU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+                if ((0xfU < (IData)(vlSelfRef.LeafEval__DOT__srun))) {
+                    __Vdly__LeafEval__DOT__markb[(3U 
+                                                  & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                      + 
+                                                      ((IData)(0xfU) 
+                                                       * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                                     >> 5U))] 
+                        = (__Vdly__LeafEval__DOT__markb[
+                           (3U & (((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                   + ((IData)(0xfU) 
+                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))) 
+                                  >> 5U))] | ((IData)(1U) 
+                                              << (0x1fU 
+                                                  & ((IData)(vlSelfRef.LeafEval__DOT__srstart) 
+                                                     + 
+                                                     ((IData)(0xfU) 
+                                                      * (IData)(vlSelfRef.LeafEval__DOT__sstep))))));
+                }
+            }
+            __Vdly__LeafEval__DOT__smcol = 0U;
+            __Vdly__LeafEval__DOT__srun = 0U;
+            if ((0U == (IData)(vlSelfRef.LeafEval__DOT__li))) {
+                __Vdly__LeafEval__DOT__soff = (7U & (IData)(vlSelfRef.LeafEval__DOT__off_a));
+                __Vdly__LeafEval__DOT__sstep = 8U;
+                __Vdly__LeafEval__DOT__scnt = 0x10U;
+                __Vdly__LeafEval__DOT__li = 1U;
+                __Vdly__LeafEval__DOT__st = 0x15U;
+            } else if ((1U == (IData)(vlSelfRef.LeafEval__DOT__li))) {
+                __Vdly__LeafEval__DOT__soff = (0x78U 
+                                               & (IData)(vlSelfRef.LeafEval__DOT__off_b));
+                __Vdly__LeafEval__DOT__sstep = 1U;
+                __Vdly__LeafEval__DOT__scnt = 8U;
+                __Vdly__LeafEval__DOT__li = 2U;
+                __Vdly__LeafEval__DOT__st = 0x15U;
+            } else if ((2U == (IData)(vlSelfRef.LeafEval__DOT__li))) {
+                __Vdly__LeafEval__DOT__soff = (7U & (IData)(vlSelfRef.LeafEval__DOT__off_b));
+                __Vdly__LeafEval__DOT__sstep = 8U;
+                __Vdly__LeafEval__DOT__scnt = 0x10U;
+                __Vdly__LeafEval__DOT__li = 3U;
+                __Vdly__LeafEval__DOT__st = 0x15U;
+            } else {
+                __Vdly__LeafEval__DOT__fwp2 = 0U;
+                __Vdly__LeafEval__DOT__st = 0x17U;
+            }
+        } else {
+            if ((1U & (vlSelfRef.LeafEval__DOT__markb[
+                       ((IData)(vlSelfRef.LeafEval__DOT__fwp2) 
+                        >> 5U)] >> (0x1fU & (IData)(vlSelfRef.LeafEval__DOT__fwp2))))) {
+                __Vdly__rv_cells = (0x3fU & ((IData)(1U) 
+                                             + (IData)(vlSelfRef.rv_cells)));
+                if (vlSelfRef.LeafEval__DOT__vir_of
+                    [vlSelfRef.LeafEval__DOT__fwp2]) {
+                    __Vdly__rv_vir = (0xfU & ((IData)(1U) 
+                                              + (IData)(vlSelfRef.rv_vir)));
+                }
+                __VdlyDim0__LeafEval__DOT__bcell__v4 
+                    = vlSelfRef.LeafEval__DOT__fwp2;
+                vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.enqueue(0U, (IData)(__VdlyDim0__LeafEval__DOT__bcell__v4));
+                __Vdly__LeafEval__DOT__anyclear = 1U;
+            }
+            if ((0x7fU == (IData)(vlSelfRef.LeafEval__DOT__fwp2))) {
+                __Vdly__LeafEval__DOT__wc = 0U;
+                __Vdly__LeafEval__DOT__gdest = 0xfU;
+                __Vdly__LeafEval__DOT__fwp = 0xfU;
+                __Vdly__LeafEval__DOT__st = (((IData)(vlSelfRef.LeafEval__DOT__anyclear) 
+                                              | (vlSelfRef.LeafEval__DOT__markb[3U] 
+                                                 >> 0x1fU))
+                                              ? 0x18U
+                                              : 0x19U);
+            } else {
+                __Vdly__LeafEval__DOT__fwp2 = (0x7fU 
+                                               & ((IData)(1U) 
+                                                  + (IData)(vlSelfRef.LeafEval__DOT__fwp2)));
+            }
+        }
+    } else if (((((((((0x18U == (IData)(vlSelfRef.LeafEval__DOT__st)) 
+                      | (0x19U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                     | (1U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                    | (2U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                   | (3U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                  | (4U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                 | (5U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                | (6U == (IData)(vlSelfRef.LeafEval__DOT__st)))) {
+        if ((0x18U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            vlSelfRef.LeafEval__DOT__grv__DOT__t = 
+                vlSelfRef.LeafEval__DOT__bcell[((0x78U 
+                                                 & ((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                                                    << 3U)) 
+                                                | (7U 
+                                                   & (IData)(vlSelfRef.LeafEval__DOT__wc)))];
+            if ((0U != (IData)(vlSelfRef.LeafEval__DOT__grv__DOT__t))) {
+                if ((4U & (IData)(vlSelfRef.LeafEval__DOT__grv__DOT__t))) {
+                    __Vdly__LeafEval__DOT__gdest = 
+                        (0x1fU & ((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                                  - (IData)(1U)));
+                } else {
+                    if (((IData)(vlSelfRef.LeafEval__DOT__gdest) 
+                         != (IData)(vlSelfRef.LeafEval__DOT__fwp))) {
+                        __VdlyVal__LeafEval__DOT__bcell__v5 
+                            = vlSelfRef.LeafEval__DOT__grv__DOT__t;
+                        __VdlyDim0__LeafEval__DOT__bcell__v5 
+                            = ((0x78U & ((IData)(vlSelfRef.LeafEval__DOT__gdest) 
+                                         << 3U)) | 
+                               (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)));
+                        vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.enqueue(__VdlyVal__LeafEval__DOT__bcell__v5, (IData)(__VdlyDim0__LeafEval__DOT__bcell__v5));
+                        __VdlyDim0__LeafEval__DOT__bcell__v6 
+                            = ((0x78U & ((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                                         << 3U)) | 
+                               (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)));
+                        vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.enqueue(0U, (IData)(__VdlyDim0__LeafEval__DOT__bcell__v6));
+                    }
+                    __Vdly__LeafEval__DOT__gdest = 
+                        (0x1fU & ((IData)(vlSelfRef.LeafEval__DOT__gdest) 
+                                  - (IData)(1U)));
+                }
+            }
+            if ((0U == (IData)(vlSelfRef.LeafEval__DOT__fwp))) {
+                if ((7U == (IData)(vlSelfRef.LeafEval__DOT__wc))) {
+                    __Vdly__LeafEval__DOT__st = 0x19U;
+                } else {
+                    __Vdly__LeafEval__DOT__wc = (0xfU 
+                                                 & ((IData)(1U) 
+                                                    + (IData)(vlSelfRef.LeafEval__DOT__wc)));
+                    __Vdly__LeafEval__DOT__gdest = 0xfU;
+                    __Vdly__LeafEval__DOT__fwp = 0xfU;
+                }
+            } else {
+                __Vdly__LeafEval__DOT__fwp = (0x1fU 
+                                              & ((IData)(vlSelfRef.LeafEval__DOT__fwp) 
+                                                 - (IData)(1U)));
+            }
+        } else if ((0x19U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            vlSelfRef.imm = (0xffffU & (((IData)(0xb4U) 
+                                         * (IData)(vlSelfRef.rv_vir)) 
+                                        + ((IData)(0xaU) 
+                                           * (IData)(vlSelfRef.rv_cells))));
+            if (vlSelfRef.LeafEval__DOT__node_leaf) {
                 __Vdly__LeafEval__DOT__maxh = 0U;
                 __Vdly__LeafEval__DOT__holes = 0U;
                 __Vdly__LeafEval__DOT__toprisk = 0U;
@@ -152,8 +1143,10 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
                 __Vdly__LeafEval__DOT__wr_ = 0U;
                 __Vdly__LeafEval__DOT__seen = 0U;
                 __Vdly__LeafEval__DOT__fillcnt = 0U;
-                vlSelfRef.done = 0U;
                 __Vdly__LeafEval__DOT__st = 1U;
+            } else {
+                vlSelfRef.done = 1U;
+                __Vdly__LeafEval__DOT__st = 0U;
             }
         } else if ((1U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
             if (vlSelfRef.LeafEval__DOT__occ_of[(((IData)(vlSelfRef.LeafEval__DOT__wr_) 
@@ -286,52 +1279,53 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
                 __Vdly__LeafEval__DOT__span_hi = vlSelfRef.LeafEval__DOT__p;
                 __Vdly__LeafEval__DOT__st = 6U;
             }
-        } else if ((6U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
-            if (((7U != (IData)(vlSelfRef.LeafEval__DOT__span_hi)) 
-                 & ((~ vlSelfRef.LeafEval__DOT__occ_of
-                     [(((IData)(vlSelfRef.LeafEval__DOT__v_r) 
-                        << 3U) | (7U & ((IData)(1U) 
-                                        + (IData)(vlSelfRef.LeafEval__DOT__span_hi))))]) 
-                    | (vlSelfRef.LeafEval__DOT__col_of
-                       [(((IData)(vlSelfRef.LeafEval__DOT__v_r) 
-                          << 3U) | (7U & ((IData)(1U) 
-                                          + (IData)(vlSelfRef.LeafEval__DOT__span_hi))))] 
-                       == (IData)(vlSelfRef.LeafEval__DOT__v_col))))) {
-                __Vdly__LeafEval__DOT__span_hi = (0x1fU 
-                                                  & ((IData)(1U) 
-                                                     + (IData)(vlSelfRef.LeafEval__DOT__span_hi)));
-            } else {
-                __Vdly__LeafEval__DOT__p = vlSelfRef.LeafEval__DOT__v_r;
-                __Vdly__LeafEval__DOT__st = 7U;
-            }
-        } else if ((((0U != (IData)(vlSelfRef.LeafEval__DOT__p)) 
-                     & vlSelfRef.LeafEval__DOT__occ_of
-                     [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__p) 
-                                  - (IData)(1U)) << 3U)) 
-                       | (IData)(vlSelfRef.LeafEval__DOT__v_c))]) 
-                    & (vlSelfRef.LeafEval__DOT__col_of
-                       [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__p) 
-                                    - (IData)(1U)) 
-                                   << 3U)) | (IData)(vlSelfRef.LeafEval__DOT__v_c))] 
-                       == (IData)(vlSelfRef.LeafEval__DOT__v_col)))) {
-            __Vdly__LeafEval__DOT__run_v = (0x1fU & 
-                                            ((IData)(1U) 
-                                             + (IData)(vlSelfRef.LeafEval__DOT__run_v)));
-            __Vdly__LeafEval__DOT__p = (0x1fU & ((IData)(vlSelfRef.LeafEval__DOT__p) 
-                                                 - (IData)(1U)));
+        } else if (((7U != (IData)(vlSelfRef.LeafEval__DOT__span_hi)) 
+                    & ((~ vlSelfRef.LeafEval__DOT__occ_of
+                        [(((IData)(vlSelfRef.LeafEval__DOT__v_r) 
+                           << 3U) | (7U & ((IData)(1U) 
+                                           + (IData)(vlSelfRef.LeafEval__DOT__span_hi))))]) 
+                       | (vlSelfRef.LeafEval__DOT__col_of
+                          [(((IData)(vlSelfRef.LeafEval__DOT__v_r) 
+                             << 3U) | (7U & ((IData)(1U) 
+                                             + (IData)(vlSelfRef.LeafEval__DOT__span_hi))))] 
+                          == (IData)(vlSelfRef.LeafEval__DOT__v_col))))) {
+            __Vdly__LeafEval__DOT__span_hi = (0x1fU 
+                                              & ((IData)(1U) 
+                                                 + (IData)(vlSelfRef.LeafEval__DOT__span_hi)));
         } else {
-            __Vdly__LeafEval__DOT__vspan_lo = vlSelfRef.LeafEval__DOT__p;
-            __Vdly__LeafEval__DOT__st = 8U;
+            __Vdly__LeafEval__DOT__p = vlSelfRef.LeafEval__DOT__v_r;
+            __Vdly__LeafEval__DOT__st = 7U;
         }
-    } else if (((((((((8U == (IData)(vlSelfRef.LeafEval__DOT__st)) 
-                      | (9U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                     | (0xaU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                    | (0xbU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                   | (0xcU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                  | (0xdU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                 | (0xeU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
-                | (0xfU == (IData)(vlSelfRef.LeafEval__DOT__st)))) {
-        if ((8U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+    } else if (((((((((7U == (IData)(vlSelfRef.LeafEval__DOT__st)) 
+                      | (8U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                     | (9U == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                    | (0xaU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                   | (0xbU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                  | (0xcU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                 | (0xdU == (IData)(vlSelfRef.LeafEval__DOT__st))) 
+                | (0xeU == (IData)(vlSelfRef.LeafEval__DOT__st)))) {
+        if ((7U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+            if ((((0U != (IData)(vlSelfRef.LeafEval__DOT__p)) 
+                  & vlSelfRef.LeafEval__DOT__occ_of
+                  [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__p) 
+                               - (IData)(1U)) << 3U)) 
+                    | (IData)(vlSelfRef.LeafEval__DOT__v_c))]) 
+                 & (vlSelfRef.LeafEval__DOT__col_of
+                    [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__p) 
+                                 - (IData)(1U)) << 3U)) 
+                      | (IData)(vlSelfRef.LeafEval__DOT__v_c))] 
+                    == (IData)(vlSelfRef.LeafEval__DOT__v_col)))) {
+                __Vdly__LeafEval__DOT__run_v = (0x1fU 
+                                                & ((IData)(1U) 
+                                                   + (IData)(vlSelfRef.LeafEval__DOT__run_v)));
+                __Vdly__LeafEval__DOT__p = (0x1fU & 
+                                            ((IData)(vlSelfRef.LeafEval__DOT__p) 
+                                             - (IData)(1U)));
+            } else {
+                __Vdly__LeafEval__DOT__vspan_lo = vlSelfRef.LeafEval__DOT__p;
+                __Vdly__LeafEval__DOT__st = 8U;
+            }
+        } else if ((8U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
             if (((0U != (IData)(vlSelfRef.LeafEval__DOT__vspan_lo)) 
                  & ((~ vlSelfRef.LeafEval__DOT__occ_of
                      [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__vspan_lo) 
@@ -482,7 +1476,7 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
                                     = (0x1ffU & ((IData)(__Vfunc_LeafEval__DOT__sq__3__n) 
                                                  * (IData)(__Vfunc_LeafEval__DOT__sq__3__n)));
                             }(), (IData)(__Vfunc_LeafEval__DOT__sq__3__Vfuncout)))));
-        } else if ((0xeU == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+        } else {
             vlSelfRef.LeafEval__DOT__suh__DOT__c0 = 
                 vlSelfRef.LeafEval__DOT__col_of[(((IData)(vlSelfRef.LeafEval__DOT__wr_) 
                                                   << 3U) 
@@ -571,100 +1565,93 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
                                              ((IData)(1U) 
                                               + (IData)(vlSelfRef.LeafEval__DOT__wc)));
             }
-        } else {
-            vlSelfRef.LeafEval__DOT__suv__DOT__c0 = 
-                vlSelfRef.LeafEval__DOT__col_of[(((IData)(vlSelfRef.LeafEval__DOT__wr_) 
-                                                  << 3U) 
+        }
+    } else if ((0xfU == (IData)(vlSelfRef.LeafEval__DOT__st))) {
+        vlSelfRef.LeafEval__DOT__suv__DOT__c0 = vlSelfRef.LeafEval__DOT__col_of
+            [(((IData)(vlSelfRef.LeafEval__DOT__wr_) 
+               << 3U) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))];
+        if ((((0U != (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)) 
+              & (vlSelfRef.LeafEval__DOT__col_of[((0x78U 
+                                                   & (((IData)(1U) 
+                                                       + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
+                                                      << 3U)) 
+                                                  | (7U 
+                                                     & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                 == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0))) 
+             & (vlSelfRef.LeafEval__DOT__col_of[((0x78U 
+                                                  & (((IData)(2U) 
+                                                      + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
+                                                     << 3U)) 
                                                  | (7U 
-                                                    & (IData)(vlSelfRef.LeafEval__DOT__wc)))];
-            if ((((0U != (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)) 
-                  & (vlSelfRef.LeafEval__DOT__col_of
+                                                    & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)))) {
+            vlSelfRef.LeafEval__DOT__suv__DOT__t = 
+                (((vlSelfRef.LeafEval__DOT__vir_of[
+                   (((IData)(vlSelfRef.LeafEval__DOT__wr_) 
+                     << 3U) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                   & (vlSelfRef.LeafEval__DOT__col_of
+                      [(((IData)(vlSelfRef.LeafEval__DOT__wr_) 
+                         << 3U) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                      == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0))) 
+                  | (vlSelfRef.LeafEval__DOT__vir_of
                      [((0x78U & (((IData)(1U) + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
                                  << 3U)) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                     == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0))) 
-                 & (vlSelfRef.LeafEval__DOT__col_of
+                     & (vlSelfRef.LeafEval__DOT__col_of
+                        [((0x78U & (((IData)(1U) + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
+                                    << 3U)) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                        == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)))) 
+                 | (vlSelfRef.LeafEval__DOT__vir_of
                     [((0x78U & (((IData)(2U) + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
                                 << 3U)) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                    == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)))) {
+                    & (vlSelfRef.LeafEval__DOT__col_of
+                       [((0x78U & (((IData)(2U) + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
+                                   << 3U)) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                       == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0))));
+            if (((~ (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__t)) 
+                 & (0U != (IData)(vlSelfRef.LeafEval__DOT__wr_)))) {
                 vlSelfRef.LeafEval__DOT__suv__DOT__t 
-                    = (((vlSelfRef.LeafEval__DOT__vir_of
-                         [(((IData)(vlSelfRef.LeafEval__DOT__wr_) 
-                            << 3U) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                         & (vlSelfRef.LeafEval__DOT__col_of
-                            [(((IData)(vlSelfRef.LeafEval__DOT__wr_) 
-                               << 3U) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                            == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0))) 
-                        | (vlSelfRef.LeafEval__DOT__vir_of
-                           [((0x78U & (((IData)(1U) 
-                                        + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
-                                       << 3U)) | (7U 
-                                                  & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                           & (vlSelfRef.LeafEval__DOT__col_of
-                              [((0x78U & (((IData)(1U) 
-                                           + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
-                                          << 3U)) | 
-                                (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                              == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)))) 
-                       | (vlSelfRef.LeafEval__DOT__vir_of
-                          [((0x78U & (((IData)(2U) 
+                    = (vlSelfRef.LeafEval__DOT__vir_of
+                       [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__wr_) 
+                                    - (IData)(1U)) 
+                                   << 3U)) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                       & (vlSelfRef.LeafEval__DOT__col_of
+                          [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__wr_) 
+                                       - (IData)(1U)) 
+                                      << 3U)) | (7U 
+                                                 & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                          == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)));
+            }
+            if (((~ (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__t)) 
+                 & (0xdU > (IData)(vlSelfRef.LeafEval__DOT__wr_)))) {
+                vlSelfRef.LeafEval__DOT__suv__DOT__t 
+                    = (vlSelfRef.LeafEval__DOT__vir_of
+                       [((0x78U & (((IData)(3U) + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
+                                   << 3U)) | (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
+                       & (vlSelfRef.LeafEval__DOT__col_of
+                          [((0x78U & (((IData)(3U) 
                                        + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
                                       << 3U)) | (7U 
                                                  & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                          & (vlSelfRef.LeafEval__DOT__col_of
-                             [((0x78U & (((IData)(2U) 
-                                          + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
-                                         << 3U)) | 
-                               (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                             == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0))));
-                if (((~ (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__t)) 
-                     & (0U != (IData)(vlSelfRef.LeafEval__DOT__wr_)))) {
-                    vlSelfRef.LeafEval__DOT__suv__DOT__t 
-                        = (vlSelfRef.LeafEval__DOT__vir_of
-                           [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__wr_) 
-                                        - (IData)(1U)) 
-                                       << 3U)) | (7U 
-                                                  & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                           & (vlSelfRef.LeafEval__DOT__col_of
-                              [((0x78U & (((IData)(vlSelfRef.LeafEval__DOT__wr_) 
-                                           - (IData)(1U)) 
-                                          << 3U)) | 
-                                (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                              == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)));
-                }
-                if (((~ (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__t)) 
-                     & (0xdU > (IData)(vlSelfRef.LeafEval__DOT__wr_)))) {
-                    vlSelfRef.LeafEval__DOT__suv__DOT__t 
-                        = (vlSelfRef.LeafEval__DOT__vir_of
-                           [((0x78U & (((IData)(3U) 
-                                        + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
-                                       << 3U)) | (7U 
-                                                  & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                           & (vlSelfRef.LeafEval__DOT__col_of
-                              [((0x78U & (((IData)(3U) 
-                                           + (IData)(vlSelfRef.LeafEval__DOT__wr_)) 
-                                          << 3U)) | 
-                                (7U & (IData)(vlSelfRef.LeafEval__DOT__wc)))] 
-                              == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)));
-                }
-                if (vlSelfRef.LeafEval__DOT__suv__DOT__t) {
-                    __Vdly__LeafEval__DOT__setup = 
-                        (0xffU & ((IData)(1U) + (IData)(vlSelfRef.LeafEval__DOT__setup)));
-                }
+                          == (IData)(vlSelfRef.LeafEval__DOT__suv__DOT__c0)));
             }
-            if ((0xdU == (IData)(vlSelfRef.LeafEval__DOT__wr_))) {
-                __Vdly__LeafEval__DOT__wr_ = 0U;
-                if ((7U == (IData)(vlSelfRef.LeafEval__DOT__wc))) {
-                    __Vdly__LeafEval__DOT__st = 0x10U;
-                } else {
-                    __Vdly__LeafEval__DOT__wc = (0xfU 
-                                                 & ((IData)(1U) 
-                                                    + (IData)(vlSelfRef.LeafEval__DOT__wc)));
-                }
+            if (vlSelfRef.LeafEval__DOT__suv__DOT__t) {
+                __Vdly__LeafEval__DOT__setup = (0xffU 
+                                                & ((IData)(1U) 
+                                                   + (IData)(vlSelfRef.LeafEval__DOT__setup)));
+            }
+        }
+        if ((0xdU == (IData)(vlSelfRef.LeafEval__DOT__wr_))) {
+            __Vdly__LeafEval__DOT__wr_ = 0U;
+            if ((7U == (IData)(vlSelfRef.LeafEval__DOT__wc))) {
+                __Vdly__LeafEval__DOT__st = 0x10U;
             } else {
-                __Vdly__LeafEval__DOT__wr_ = (0xfU 
-                                              & ((IData)(1U) 
-                                                 + (IData)(vlSelfRef.LeafEval__DOT__wr_)));
+                __Vdly__LeafEval__DOT__wc = (0xfU & 
+                                             ((IData)(1U) 
+                                              + (IData)(vlSelfRef.LeafEval__DOT__wc)));
             }
+        } else {
+            __Vdly__LeafEval__DOT__wr_ = (0xfU & ((IData)(1U) 
+                                                  + (IData)(vlSelfRef.LeafEval__DOT__wr_)));
         }
     } else if ((0x10U == (IData)(vlSelfRef.LeafEval__DOT__st))) {
         vlSelfRef.sco = (0xffffU & ((((((((((IData)(0x1388U) 
@@ -692,10 +1679,6 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     } else {
         __Vdly__LeafEval__DOT__st = 0U;
     }
-    if (__VdlySet__LeafEval__DOT__bcell__v0) {
-        vlSelfRef.LeafEval__DOT__bcell[__VdlyDim0__LeafEval__DOT__bcell__v0] 
-            = __VdlyVal__LeafEval__DOT__bcell__v0;
-    }
     vlSelfRef.LeafEval__DOT__st = __Vdly__LeafEval__DOT__st;
     vlSelfRef.LeafEval__DOT__maxh = __Vdly__LeafEval__DOT__maxh;
     vlSelfRef.LeafEval__DOT__holes = __Vdly__LeafEval__DOT__holes;
@@ -711,6 +1694,27 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     vlSelfRef.LeafEval__DOT__wr_ = __Vdly__LeafEval__DOT__wr_;
     vlSelfRef.LeafEval__DOT__seen = __Vdly__LeafEval__DOT__seen;
     vlSelfRef.LeafEval__DOT__fillcnt = __Vdly__LeafEval__DOT__fillcnt;
+    vlSelfRef.LeafEval__DOT__node_leaf = __Vdly__LeafEval__DOT__node_leaf;
+    vlSelfRef.rv_cells = __Vdly__rv_cells;
+    vlSelfRef.rv_vir = __Vdly__rv_vir;
+    vlSelfRef.LeafEval__DOT__markb[0U] = __Vdly__LeafEval__DOT__markb[0U];
+    vlSelfRef.LeafEval__DOT__markb[1U] = __Vdly__LeafEval__DOT__markb[1U];
+    vlSelfRef.LeafEval__DOT__markb[2U] = __Vdly__LeafEval__DOT__markb[2U];
+    vlSelfRef.LeafEval__DOT__markb[3U] = __Vdly__LeafEval__DOT__markb[3U];
+    vlSelfRef.LeafEval__DOT__anyclear = __Vdly__LeafEval__DOT__anyclear;
+    vlSelfRef.LeafEval__DOT__fwp = __Vdly__LeafEval__DOT__fwp;
+    vlSelfRef.LeafEval__DOT__fo1 = __Vdly__LeafEval__DOT__fo1;
+    vlSelfRef.LeafEval__DOT__off_b = __Vdly__LeafEval__DOT__off_b;
+    vlSelfRef.LeafEval__DOT__off_a = __Vdly__LeafEval__DOT__off_a;
+    vlSelfRef.LeafEval__DOT__li = __Vdly__LeafEval__DOT__li;
+    vlSelfRef.LeafEval__DOT__sstep = __Vdly__LeafEval__DOT__sstep;
+    vlSelfRef.LeafEval__DOT__scnt = __Vdly__LeafEval__DOT__scnt;
+    vlSelfRef.LeafEval__DOT__srun = __Vdly__LeafEval__DOT__srun;
+    vlSelfRef.LeafEval__DOT__smcol = __Vdly__LeafEval__DOT__smcol;
+    vlSelfRef.LeafEval__DOT__soff = __Vdly__LeafEval__DOT__soff;
+    vlSelfRef.LeafEval__DOT__srstart = __Vdly__LeafEval__DOT__srstart;
+    vlSelfRef.LeafEval__DOT__fwp2 = __Vdly__LeafEval__DOT__fwp2;
+    vlSelfRef.LeafEval__DOT__gdest = __Vdly__LeafEval__DOT__gdest;
     vlSelfRef.LeafEval__DOT__run_h = __Vdly__LeafEval__DOT__run_h;
     vlSelfRef.LeafEval__DOT__run_v = __Vdly__LeafEval__DOT__run_v;
     vlSelfRef.LeafEval__DOT__p = __Vdly__LeafEval__DOT__p;
@@ -718,7 +1722,14 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     vlSelfRef.LeafEval__DOT__span_hi = __Vdly__LeafEval__DOT__span_hi;
     vlSelfRef.LeafEval__DOT__vspan_lo = __Vdly__LeafEval__DOT__vspan_lo;
     vlSelfRef.LeafEval__DOT__vspan_hi = __Vdly__LeafEval__DOT__vspan_hi;
+    vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_live.commit(vlSelfRef.LeafEval__DOT__s_live);
+    vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_w1.commit(vlSelfRef.LeafEval__DOT__s_w1);
+    vlSelfRef.__VdlyCommitQueueLeafEval__DOT__s_w2.commit(vlSelfRef.LeafEval__DOT__s_w2);
     vlSelfRef.LeafEval__DOT__vo = __Vdly__LeafEval__DOT__vo;
+    vlSelfRef.__VdlyCommitQueueLeafEval__DOT__bcell.commit(vlSelfRef.LeafEval__DOT__bcell);
+    vlSelfRef.LeafEval__DOT__v_c = (7U & (IData)(vlSelfRef.LeafEval__DOT__vo));
+    vlSelfRef.LeafEval__DOT__v_r = (0xfU & ((IData)(vlSelfRef.LeafEval__DOT__vo) 
+                                            >> 3U));
     vlSelfRef.LeafEval__DOT__occ_of[0U] = (0U != (3U 
                                                   & vlSelfRef.LeafEval__DOT__bcell
                                                   [0U]));
@@ -2593,9 +3604,6 @@ VL_INLINE_OPT void VLeafEval___024root___nba_sequent__TOP__0(VLeafEval___024root
     vlSelfRef.LeafEval__DOT__col_of[0x7fU] = (3U & 
                                               vlSelfRef.LeafEval__DOT__bcell
                                               [0x7fU]);
-    vlSelfRef.LeafEval__DOT__v_c = (7U & (IData)(vlSelfRef.LeafEval__DOT__vo));
-    vlSelfRef.LeafEval__DOT__v_r = (0xfU & ((IData)(vlSelfRef.LeafEval__DOT__vo) 
-                                            >> 3U));
     vlSelfRef.LeafEval__DOT__v_col = vlSelfRef.LeafEval__DOT__col_of
         [vlSelfRef.LeafEval__DOT__vo];
 }
@@ -2703,7 +3711,23 @@ void VLeafEval___024root___eval_debug_assertions(VLeafEval___024root* vlSelf) {
         Verilated::overWidthError("waddr");}
     if (VL_UNLIKELY((vlSelfRef.wdata & 0xf8U))) {
         Verilated::overWidthError("wdata");}
+    if (VL_UNLIKELY((vlSelfRef.wslot & 0xfcU))) {
+        Verilated::overWidthError("wslot");}
     if (VL_UNLIKELY((vlSelfRef.start & 0xfeU))) {
         Verilated::overWidthError("start");}
+    if (VL_UNLIKELY((vlSelfRef.cmd & 0xf0U))) {
+        Verilated::overWidthError("cmd");}
+    if (VL_UNLIKELY((vlSelfRef.cmd_go & 0xfeU))) {
+        Verilated::overWidthError("cmd_go");}
+    if (VL_UNLIKELY((vlSelfRef.a_sl & 0xfcU))) {
+        Verilated::overWidthError("a_sl");}
+    if (VL_UNLIKELY((vlSelfRef.a_o4 & 0xfcU))) {
+        Verilated::overWidthError("a_o4");}
+    if (VL_UNLIKELY((vlSelfRef.a_col & 0xf8U))) {
+        Verilated::overWidthError("a_col");}
+    if (VL_UNLIKELY((vlSelfRef.a_ca & 0xfcU))) {
+        Verilated::overWidthError("a_ca");}
+    if (VL_UNLIKELY((vlSelfRef.a_cb & 0xfcU))) {
+        Verilated::overWidthError("a_cb");}
 }
 #endif  // VL_DEBUG

@@ -14,10 +14,22 @@ VLeafEval::VLeafEval(VerilatedContext* _vcontextp__, const char* _vcname__)
     , wr{vlSymsp->TOP.wr}
     , waddr{vlSymsp->TOP.waddr}
     , wdata{vlSymsp->TOP.wdata}
+    , wslot{vlSymsp->TOP.wslot}
     , start{vlSymsp->TOP.start}
+    , cmd{vlSymsp->TOP.cmd}
+    , cmd_go{vlSymsp->TOP.cmd_go}
+    , a_sl{vlSymsp->TOP.a_sl}
+    , a_o4{vlSymsp->TOP.a_o4}
+    , a_col{vlSymsp->TOP.a_col}
+    , a_ca{vlSymsp->TOP.a_ca}
+    , a_cb{vlSymsp->TOP.a_cb}
     , done{vlSymsp->TOP.done}
     , win{vlSymsp->TOP.win}
+    , legal{vlSymsp->TOP.legal}
+    , rv_cells{vlSymsp->TOP.rv_cells}
+    , rv_vir{vlSymsp->TOP.rv_vir}
     , sco{vlSymsp->TOP.sco}
+    , imm{vlSymsp->TOP.imm}
     , rootp{&(vlSymsp->TOP)}
 {
     // Register model with the context

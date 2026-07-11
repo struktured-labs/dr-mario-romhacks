@@ -49,8 +49,12 @@ TK1_KL, TK1_KH, TK1_O, TK1_C = 0x0A00, 0x0A20, 0x0A40, 0x0A60
 
 THIRD = [(0, 1), (1, 2), (2, 0), (1, 1)]   # stratified 4-pill subset (3 mixed + 1 double), /4=shift
 RESOLVE_LBL = "resolve_capped"   # TARGETED (deploy config, isolation 12/12); "resolve_capped_full" for full
-USE_ACCEL = False                # True: leaf via the LeafEval RTL block at $70xx (deploy);
+USE_ACCEL = False                # True: leaf via the LeafEval RTL block at $70xx
+USE_ENGINE = False               # True: FULL BoardEngine (copies/land/resolve/leaf all RTL)
 LEV_BOARD, LEV_SCO, LEV_WIN_R, LEV_GO = 0x7000, 0x70F0, 0x70F2, 0x70F8
+LEV_A_O4, LEV_A_COL, LEV_A_CA, LEV_A_CB, LEV_A_SL = 0x70E0, 0x70E1, 0x70E2, 0x70E3, 0x70E4
+LEV_LEGAL, LEV_RVC, LEV_RVV, LEV_IMM = 0x70E8, 0x70E9, 0x70EA, 0x70EB
+LEV_WSLOT, LEV_CMD = 0x70F3, 0x70F4
 TOPK1 = 32   # ply1 keep-width; 32 = FULL (T1C <= 30). MEASURED (isolation 2026-07-10):
              # topk1=8 = 70% clears vs FULL = 91% (n=24, FW model) -- the depth-1 Pass-0 key
              # under-ranks setup moves; ply1 pruning is NOT quality-safe at depth-3. Cost:
@@ -59,6 +63,11 @@ TOPK1 = 32   # ply1 keep-width; 32 = FULL (T1C <= 30). MEASURED (isolation 2026-
 
 def build():
     a = Asm6502(0x8000)
+    if USE_ENGINE:
+        # everything board-related runs in the BoardEngine; the 6502 is pure control
+        _emit_search_d3_engine(a)
+        _emit_expectimax_engine(a)
+        return a.assemble(), a.labels
     # ALL primitives + leaf eval operate on CUR ($0700); LIVE ($0500) is the preserved input.
     import test_pollution, test_readiness_ext, test_vrdy
     P.BOARD = CUR; P.LIVE_BOARD = CUR; P.MARK = 0x0780
@@ -84,6 +93,312 @@ def build():
     _emit_copy(a, "cp_cur_work2", CUR, WORK2)
     _emit_copy(a, "cp_work2_cur", WORK2, CUR)
     return a.assemble(), a.labels
+
+
+_ec = [0]
+
+
+def _e_poll(a):
+    n = _ec[0]; _ec[0] += 1
+    a.label(f"ep{n}"); a.ins16("LDA_abs", LEV_GO); a.br("BEQ", f"ep{n}")
+
+
+def _e_copy(a, sl, to_cur):
+    a.ins("LDA_imm", sl); a.ins16("STA_abs", LEV_A_SL)
+    a.ins("LDA_imm", 2 if to_cur else 3); a.ins16("STA_abs", LEV_CMD)
+    _e_poll(a)
+
+
+def _e_score(a):
+    """(win ? WIN : sco) -> D_V3 from the engine result regs."""
+    n = _ec[0]; _ec[0] += 1
+    a.ins16("LDA_abs", LEV_WIN_R); a.br("BEQ", f"esn{n}")
+    a.ins("LDA_imm", WIN & 0xFF); a.ins("STA_zp", D_V3L)
+    a.ins("LDA_imm", (WIN >> 8) & 0xFF); a.ins("STA_zp", D_V3H); a.jmp(f"esd{n}")
+    a.label(f"esn{n}")
+    a.ins16("LDA_abs", LEV_SCO); a.ins("STA_zp", D_V3L)
+    a.ins16("LDA_abs", LEV_SCO + 1); a.ins("STA_zp", D_V3H)
+    a.label(f"esd{n}")
+
+
+def _e_node(a, o_zp, c_zp, ca_abs, cb_abs):
+    """args from zp orient/col + abs color sources (masked), CMD 4, poll."""
+    a.ins("LDA_zp", o_zp); a.ins16("STA_abs", LEV_A_O4)
+    a.ins("LDA_zp", c_zp); a.ins16("STA_abs", LEV_A_COL)
+    a.ins16("LDA_abs", ca_abs); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", LEV_A_CA)
+    a.ins16("LDA_abs", cb_abs); a.ins("AND_imm", 0x0F); a.ins16("STA_abs", LEV_A_CB)
+    a.ins("LDA_imm", 4); a.ins16("STA_abs", LEV_CMD)
+    _e_poll(a)
+
+
+def _emit_search_d3_engine(a):
+    a.label("search")
+    a.ins("LDA_imm", 0xFF); a.ins("STA_zp", D_BO)
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_BVL); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_BVH)
+    # tie-break seed (same as soft build)
+    a.ins16("LDA_abs", S_CA); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("STA_zp", D_SEED)
+    a.ins16("LDA_abs", S_CB); a.ins("AND_imm", 0xF0); a.ins("ORA_zp", D_SEED); a.ins("STA_zp", D_SEED)
+    # upload LIVE ($0500) -> engine slot 1
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", LEV_WSLOT)
+    a.ins("LDX_imm", 0)
+    a.label("up_l")
+    a.ins16("LDA_absX", LIVE); a.ins16("STA_absX", LEV_BOARD)
+    a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", "up_l")
+    a.ins("LDA_imm", 0); a.ins16("STA_abs", LEV_WSLOT)
+    # ---- Pass 0 ----
+    a.ins("LDA_imm", 0); a.ins("STA_zp", D_T1C); a.ins("STA_zp", D_O1)
+    a.label("p0_o"); a.ins("LDA_imm", 0); a.ins("STA_zp", D_C1)
+    a.label("p0_c")
+    _e_copy(a, 1, True)
+    _e_node(a, D_O1, D_C1, S_CA, S_CB)
+    a.ins16("LDA_abs", LEV_LEGAL); a.br("BNE", "p0_leg"); a.jmp("p0_next")
+    a.label("p0_leg")
+    _e_score(a)
+    a.ins("CLC"); a.ins16("LDA_abs", LEV_IMM); a.ins("ADC_zp", D_V3L); a.ins("STA_zp", D_KL)
+    a.ins16("LDA_abs", LEV_IMM + 1); a.ins("ADC_zp", D_V3H); a.ins("STA_zp", D_KH)
+    a.ins("LDX_zp", D_T1C)
+    a.ins("LDA_zp", D_KL); a.ins16("STA_absX", TK1_KL); a.ins("LDA_zp", D_KH); a.ins16("STA_absX", TK1_KH)
+    a.ins("LDA_zp", D_O1); a.ins16("STA_absX", TK1_O); a.ins("LDA_zp", D_C1); a.ins16("STA_absX", TK1_C)
+    a.ins("INC_zp", D_T1C)
+    a.label("p0_next")
+    a.ins("INC_zp", D_C1); a.ins("LDA_zp", D_C1); a.ins("CMP_imm", 8); a.br("BEQ", "p0_oc"); a.jmp("p0_c")
+    a.label("p0_oc")
+    a.ins("INC_zp", D_O1); a.ins("LDA_zp", D_O1); a.ins("CMP_imm", 4); a.br("BEQ", "p0_done"); a.jmp("p0_o")
+    a.label("p0_done")
+    # ---- select loop ----
+    a.ins("LDA_imm", 0); a.ins("STA_zp", D_J1)
+    a.label("s_loop")
+    a.ins("LDA_zp", D_J1); a.ins("CMP_imm", TOPK1); a.br("BCC", "s_c1"); a.jmp("o_done"); a.label("s_c1")
+    a.ins("LDA_zp", D_J1); a.ins("CMP_zp", D_T1C); a.br("BCC", "s_c2"); a.jmp("o_done"); a.label("s_c2")
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_MKL); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_MKH)
+    a.ins("LDA_imm", 0xFF); a.ins("STA_zp", D_MI)
+    a.ins("LDX_imm", 0)
+    a.label("mx1_loop")
+    a.ins("CPX_zp", D_T1C); a.br("BEQ", "mx1_done")
+    a.ins("LDA_zp", D_MKL); a.ins("SEC"); a.ins16("SBC_absX", TK1_KL)
+    a.ins("LDA_zp", D_MKH); a.ins16("SBC_absX", TK1_KH)
+    a.br("BVC", "mx1_s1"); a.ins("EOR_imm", 0x80); a.label("mx1_s1")
+    a.br("BPL", "mx1_nx")
+    a.ins16("LDA_absX", TK1_KL); a.ins("STA_zp", D_MKL); a.ins16("LDA_absX", TK1_KH); a.ins("STA_zp", D_MKH)
+    a.ins("STX_zp", D_MI)
+    a.label("mx1_nx")
+    a.ins("INX"); a.jmp("mx1_loop")
+    a.label("mx1_done")
+    a.ins("LDX_zp", D_MI)
+    a.ins("LDA_imm", 0x00); a.ins16("STA_absX", TK1_KL); a.ins("LDA_imm", 0x80); a.ins16("STA_absX", TK1_KH)
+    a.ins16("LDA_absX", TK1_O); a.ins("STA_zp", D_O1); a.ins16("LDA_absX", TK1_C); a.ins("STA_zp", D_C1)
+    # replay ply1
+    _e_copy(a, 1, True)
+    _e_node(a, D_O1, D_C1, S_CA, S_CB)
+    a.ins16("LDA_abs", LEV_IMM); a.ins("STA_zp", D_I1L); a.ins16("LDA_abs", LEV_IMM + 1); a.ins("STA_zp", D_I1H)
+    a.ins16("LDA_abs", LEV_WIN_R); a.br("BEQ", "o_nw")
+    a.ins("CLC"); a.ins("LDA_zp", D_I1L); a.ins("ADC_imm", WIN & 0xFF); a.ins("STA_zp", D_V1L)
+    a.ins("LDA_zp", D_I1H); a.ins("ADC_imm", (WIN >> 8) & 0xFF); a.ins("STA_zp", D_V1H)
+    a.jmp("o_cand")
+    a.label("o_nw")
+    _e_copy(a, 2, False)                                   # w1 <- cur
+    a.ins("LDA_imm", 0); a.ins("STA_zp", D_TKC); a.ins("STA_zp", D_O2)
+    a.label("i_outer"); a.ins("LDA_imm", 0); a.ins("STA_zp", D_C2)
+    a.label("i_inner")
+    _e_copy(a, 2, True)                                    # cur <- w1
+    _e_node(a, D_O2, D_C2, S_NA, S_NB)
+    a.ins16("LDA_abs", LEV_LEGAL); a.br("BNE", "i_leg"); a.jmp("i_next")
+    a.label("i_leg")
+    _e_score(a)
+    a.ins("CLC"); a.ins16("LDA_abs", LEV_IMM); a.ins("ADC_zp", D_V3L); a.ins("STA_zp", D_KL)
+    a.ins16("LDA_abs", LEV_IMM + 1); a.ins("ADC_zp", D_V3H); a.ins("STA_zp", D_KH)
+    a.ins("LDX_zp", D_TKC)
+    a.ins("LDA_zp", D_KL); a.ins16("STA_absX", TK_KL); a.ins("LDA_zp", D_KH); a.ins16("STA_absX", TK_KH)
+    a.ins16("LDA_abs", LEV_IMM); a.ins16("STA_absX", TK_IL); a.ins16("LDA_abs", LEV_IMM + 1); a.ins16("STA_absX", TK_IH)
+    a.ins("LDA_zp", D_O2); a.ins16("STA_absX", TK_O); a.ins("LDA_zp", D_C2); a.ins16("STA_absX", TK_C)
+    a.ins("INC_zp", D_TKC)
+    a.label("i_next")
+    a.ins("INC_zp", D_C2); a.ins("LDA_zp", D_C2); a.ins("CMP_imm", 8); a.br("BEQ", "i_oc"); a.jmp("i_inner")
+    a.label("i_oc")
+    a.ins("INC_zp", D_O2); a.ins("LDA_zp", D_O2); a.ins("CMP_imm", 4); a.br("BEQ", "i_done"); a.jmp("i_outer")
+    a.label("i_done")
+    a.ins("LDA_zp", D_TKC); a.br("BNE", "have2")
+    _e_copy(a, 2, True)
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", LEV_CMD); _e_poll(a)      # CMD 1: leaf on CUR
+    _e_score(a)
+    a.ins("CLC"); a.ins("LDA_zp", D_I1L); a.ins("ADC_zp", D_V3L); a.ins("STA_zp", D_V1L)
+    a.ins("LDA_zp", D_I1H); a.ins("ADC_zp", D_V3H); a.ins("STA_zp", D_V1H)
+    a.jmp("o_cand")
+    a.label("have2")
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_B2L); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_B2H)
+    a.ins("LDA_imm", 0); a.ins("STA_zp", D_J)
+    a.label("k_loop")
+    a.ins("LDA_zp", D_J); a.ins("CMP_imm", 8); a.br("BCC", "k_c1"); a.jmp("k_done"); a.label("k_c1")
+    a.ins("LDA_zp", D_J); a.ins("CMP_zp", D_TKC); a.br("BCC", "k_c2"); a.jmp("k_done"); a.label("k_c2")
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_MKL); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_MKH)
+    a.ins("LDA_imm", 0xFF); a.ins("STA_zp", D_MI)
+    a.ins("LDX_imm", 0)
+    a.label("mx_loop")
+    a.ins("CPX_zp", D_TKC); a.br("BEQ", "mx_done")
+    a.ins("LDA_zp", D_MKL); a.ins("SEC"); a.ins16("SBC_absX", TK_KL)
+    a.ins("LDA_zp", D_MKH); a.ins16("SBC_absX", TK_KH)
+    a.br("BVC", "mx_s1"); a.ins("EOR_imm", 0x80); a.label("mx_s1")
+    a.br("BPL", "mx_nx")
+    a.ins16("LDA_absX", TK_KL); a.ins("STA_zp", D_MKL); a.ins16("LDA_absX", TK_KH); a.ins("STA_zp", D_MKH)
+    a.ins("STX_zp", D_MI)
+    a.label("mx_nx")
+    a.ins("INX"); a.jmp("mx_loop")
+    a.label("mx_done")
+    a.ins("LDX_zp", D_MI)
+    a.ins("LDA_imm", 0x00); a.ins16("STA_absX", TK_KL); a.ins("LDA_imm", 0x80); a.ins16("STA_absX", TK_KH)
+    a.ins16("LDA_absX", TK_IL); a.ins("STA_zp", D_I2L); a.ins16("LDA_absX", TK_IH); a.ins("STA_zp", D_I2H)
+    a.ins16("LDA_absX", TK_O); a.ins("STA_zp", D_O2); a.ins16("LDA_absX", TK_C); a.ins("STA_zp", D_C2)
+    _e_copy(a, 2, True)
+    _e_node(a, D_O2, D_C2, S_NA, S_NB)
+    a.ins16("LDA_abs", LEV_WIN_R); a.br("BEQ", "k_ex")
+    a.ins("CLC"); a.ins("LDA_zp", D_I2L); a.ins("ADC_imm", WIN & 0xFF); a.ins("STA_zp", D_V3L)
+    a.ins("LDA_zp", D_I2H); a.ins("ADC_imm", (WIN >> 8) & 0xFF); a.ins("STA_zp", D_V3H)
+    a.jmp("k_haveval")
+    a.label("k_ex")
+    a.jsr("expectimax")
+    a.ins("CLC"); a.ins("LDA_zp", D_I2L); a.ins("ADC_zp", D_EL); a.ins("STA_zp", D_V3L)
+    a.ins("LDA_zp", D_I2H); a.ins("ADC_zp", D_EH); a.ins("STA_zp", D_V3H)
+    a.label("k_haveval")
+    a.ins("LDA_zp", D_B2L); a.ins("SEC"); a.ins("SBC_zp", D_V3L); a.ins("LDA_zp", D_B2H); a.ins("SBC_zp", D_V3H)
+    a.br("BVC", "k_s1"); a.ins("EOR_imm", 0x80); a.label("k_s1"); a.br("BPL", "k_nx")
+    a.ins("LDA_zp", D_V3L); a.ins("STA_zp", D_B2L); a.ins("LDA_zp", D_V3H); a.ins("STA_zp", D_B2H)
+    a.label("k_nx")
+    a.ins("INC_zp", D_J); a.jmp("k_loop")
+    a.label("k_done")
+    a.ins("CLC"); a.ins("LDA_zp", D_I1L); a.ins("ADC_zp", D_B2L); a.ins("STA_zp", D_V1L)
+    a.ins("LDA_zp", D_I1H); a.ins("ADC_zp", D_B2H); a.ins("STA_zp", D_V1H)
+    a.label("o_cand")
+    a.ins("LDA_zp", D_SEED); a.br("BEQ", "o_nj")
+    a.ins("LDA_zp", D_O1); a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ORA_zp", D_C1)
+    a.ins("EOR_zp", D_SEED); a.ins("STA_zp", D_JT)
+    a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("EOR_zp", D_JT); a.ins("AND_imm", 0x03)
+    a.ins("CLC"); a.ins("ADC_zp", D_V1L); a.ins("STA_zp", D_V1L)
+    a.ins("LDA_zp", D_V1H); a.ins("ADC_imm", 0); a.ins("STA_zp", D_V1H)
+    a.label("o_nj")
+    a.ins("LDA_zp", D_BVL); a.ins("SEC"); a.ins("SBC_zp", D_V1L); a.ins("LDA_zp", D_BVH); a.ins("SBC_zp", D_V1H)
+    a.br("BVC", "o_s1"); a.ins("EOR_imm", 0x80); a.label("o_s1"); a.br("BPL", "s_next")
+    a.ins("LDA_zp", D_V1L); a.ins("STA_zp", D_BVL); a.ins("LDA_zp", D_V1H); a.ins("STA_zp", D_BVH)
+    a.ins("LDA_zp", D_C1); a.ins("STA_zp", D_BC); a.ins("LDA_zp", D_O1); a.ins("STA_zp", D_BO)
+    a.label("s_next")
+    a.ins("INC_zp", D_J1); a.jmp("s_loop")
+    a.label("o_done"); a.ins("RTS")
+
+
+def _emit_expectimax_engine(a):
+    a.label("expectimax")
+    _e_copy(a, 3, False)                                   # w2 <- cur
+    a.ins("LDA_imm", 0); a.ins("STA_zp", D_SL); a.ins("STA_zp", D_SM); a.ins("STA_zp", D_SH)
+    a.ins("STA_zp", D_PI)
+    a.label("ex_pill")
+    a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_EBL); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_EBH)
+    a.ins("LDA_imm", 0); a.ins("STA_zp", D_EA); a.ins("STA_zp", D_O3)
+    a.label("ex_o"); a.ins("LDA_imm", 0); a.ins("STA_zp", D_C3)
+    a.label("ex_c")
+    _e_copy(a, 3, True)                                    # cur <- w2
+    a.ins("LDA_zp", D_O3); a.ins16("STA_abs", LEV_A_O4)
+    a.ins("LDA_zp", D_C3); a.ins16("STA_abs", LEV_A_COL)
+    a.ins("LDX_zp", D_PI); a.ins16("LDA_absX", PILLA); a.ins16("STA_abs", LEV_A_CA)
+    a.ins16("LDA_absX", PILLB); a.ins16("STA_abs", LEV_A_CB)
+    a.ins("LDA_imm", 4); a.ins16("STA_abs", LEV_CMD); _e_poll(a)
+    a.ins16("LDA_abs", LEV_LEGAL); a.br("BNE", "ex_leg"); a.jmp("ex_cnext")
+    a.label("ex_leg")
+    a.ins("LDA_imm", 1); a.ins("STA_zp", D_EA)
+    _e_score(a)
+    a.ins("CLC"); a.ins16("LDA_abs", LEV_IMM); a.ins("ADC_zp", D_V3L); a.ins("STA_zp", D_V3L)
+    a.ins16("LDA_abs", LEV_IMM + 1); a.ins("ADC_zp", D_V3H); a.ins("STA_zp", D_V3H)
+    a.ins("LDA_zp", D_EBL); a.ins("SEC"); a.ins("SBC_zp", D_V3L); a.ins("LDA_zp", D_EBH); a.ins("SBC_zp", D_V3H)
+    a.br("BVC", "ex_s1"); a.ins("EOR_imm", 0x80); a.label("ex_s1"); a.br("BPL", "ex_cnext")
+    a.ins("LDA_zp", D_V3L); a.ins("STA_zp", D_EBL); a.ins("LDA_zp", D_V3H); a.ins("STA_zp", D_EBH)
+    a.label("ex_cnext")
+    a.ins("INC_zp", D_C3); a.ins("LDA_zp", D_C3); a.ins("CMP_imm", 8); a.br("BEQ", "ex_ocheck"); a.jmp("ex_c")
+    a.label("ex_ocheck")
+    a.ins("INC_zp", D_O3); a.ins("LDA_zp", D_O3); a.ins("CMP_imm", 4); a.br("BEQ", "ex_odone"); a.jmp("ex_o")
+    a.label("ex_odone")
+    a.ins("LDA_zp", D_EA); a.br("BNE", "ex_term")
+    _e_copy(a, 3, True)
+    a.ins("LDA_imm", 1); a.ins16("STA_abs", LEV_CMD); _e_poll(a)
+    _e_score(a)
+    a.ins("LDA_zp", D_V3L); a.ins("STA_zp", D_EBL); a.ins("LDA_zp", D_V3H); a.ins("STA_zp", D_EBH)
+    a.label("ex_term")
+    a.ins("CLC"); a.ins("LDA_zp", D_SL); a.ins("ADC_zp", D_EBL); a.ins("STA_zp", D_SL)
+    a.ins("LDA_zp", D_SM); a.ins("ADC_zp", D_EBH); a.ins("STA_zp", D_SM)
+    a.ins("LDA_zp", D_EBH); a.br("BPL", "ex_pos")
+    a.ins("LDA_zp", D_SH); a.ins("ADC_imm", 0xFF); a.ins("STA_zp", D_SH); a.jmp("ex_padd")
+    a.label("ex_pos")
+    a.ins("LDA_zp", D_SH); a.ins("ADC_imm", 0x00); a.ins("STA_zp", D_SH)
+    a.label("ex_padd")
+    a.ins("INC_zp", D_PI); a.ins("LDA_zp", D_PI); a.ins("CMP_imm", NPILLS); a.br("BEQ", "ex_div"); a.jmp("ex_pill")
+    a.label("ex_div")
+    for _ in range(SHIFT):
+        a.ins("LDA_zp", D_SH); a.ins("CMP_imm", 0x80)
+        a.ins("ROR_zp", D_SH); a.ins("ROR_zp", D_SM); a.ins("ROR_zp", D_SL)
+    a.ins("LDA_zp", D_SL); a.ins("STA_zp", D_EL); a.ins("LDA_zp", D_SM); a.ins("STA_zp", D_EH)
+    a.ins("RTS")
+
+
+def attach_engine_emu(cpu):
+    """python model of the full BoardEngine at $70xx: slots as NES-byte boards, commands
+    executed via the SAME goldens (_landing/_place/_cap1_targeted/leaf_d3)."""
+    from py65.memory import ObservableMemory
+    from nes_d2_golden import _landing, _place, _virus_count
+    from nes_d3_golden import _cap1_targeted
+    base = cpu.mem
+    obs = ObservableMemory(subject=base)
+    st = {"wslot": 0, "slots": [[0xFF] * 128 for _ in range(4)],
+          "o4": 0, "col": 0, "ca": 0, "cb": 0, "sl": 0}
+
+    def wr_board(addr, value):
+        st["slots"][st["wslot"]][addr - LEV_BOARD] = value & 0xFF
+
+    def wr_wslot(addr, value):
+        st["wslot"] = value & 3
+
+    def wr_arg(addr, value):
+        k = ("o4", "col", "ca", "cb", "sl")[addr - LEV_A_O4]
+        st[k] = value
+
+    def post(legal, cells=0, vir=0, sco=0, win=0):
+        imm = 180 * vir + 10 * cells
+        base[LEV_LEGAL] = legal; base[LEV_RVC] = cells; base[LEV_RVV] = vir
+        base[LEV_IMM] = imm & 0xFF; base[LEV_IMM + 1] = (imm >> 8) & 0xFF
+        base[LEV_SCO] = sco & 0xFF; base[LEV_SCO + 1] = (sco >> 8) & 0xFF
+        base[LEV_WIN_R] = win; base[LEV_GO] = 1
+
+    def leaf_of(b):
+        win = 1 if _virus_count(b) == 0 else 0
+        sco = 0 if win else (G3.leaf_d3(b) & 0xFFFF)
+        return sco, win
+
+    def wr_cmd(addr, value):
+        cmd = value & 0x0F
+        cur = st["slots"][0]
+        if cmd == 2:
+            st["slots"][0] = list(st["slots"][st["sl"] & 3]); base[LEV_GO] = 1
+        elif cmd == 3:
+            st["slots"][st["sl"] & 3] = list(cur); base[LEV_GO] = 1
+        elif cmd == 1:
+            sco, win = leaf_of(cur); post(1, 0, 0, sco, win)
+        elif cmd == 4:
+            o4, col = st["o4"] & 3, st["col"] & 7
+            orient = 0 if o4 < 2 else 1
+            land = _landing(cur, orient, col)
+            if land is None:
+                post(0); return
+            offa, offb = land
+            ca, cb = st["ca"] & 3, st["cb"] & 3
+            ta, tb = (cb, ca) if (o4 & 1) else (ca, cb)
+            nb = _place(cur, offa, offb, ta, tb)
+            cells, vir = _cap1_targeted(nb, offa, offb)
+            st["slots"][0] = nb
+            sco, win = leaf_of(nb)
+            post(1, cells, vir, sco, win)
+
+    obs.subscribe_to_write(range(LEV_BOARD, LEV_BOARD + 128), wr_board)
+    obs.subscribe_to_write([LEV_WSLOT], wr_wslot)
+    obs.subscribe_to_write(range(LEV_A_O4, LEV_A_SL + 1), wr_arg)
+    obs.subscribe_to_write([LEV_CMD], wr_cmd)
+    cpu.mpu.memory = obs
+    cpu.mem = obs
 
 
 def _emit_leaf_accel(a):
@@ -392,9 +707,13 @@ def make_fewlegal(rng, FaithfulBoard):
 def main():
     global NPILLS, SHIFT, USE_ACCEL
     import os
+    global USE_ENGINE
     if os.environ.get("ACCEL"):
         USE_ACCEL = True
         print("ACCEL mode: leaf via emulated LeafEval block")
+    if os.environ.get("ENGINE"):
+        USE_ENGINE = True
+        print("ENGINE mode: full BoardEngine emulated")
     NPILLS, SHIFT = 2, 1                       # fast validation config (deploy uses 8,3)
     THIRD_T = [(0, 1), (1, 2)]
     G3.USE_VRDY = True
@@ -417,7 +736,9 @@ def main():
         gk = G3.decide_d3(list(nes), ca - 1, cb - 1, na - 1, nb_ - 1, topk1=TOPK1, topk2=8,
                           third=THIRD_T, seed=seed)
         cpu = Cpu(); cpu.load(0x8000, code); cpu.set_board(nes)
-        if USE_ACCEL:
+        if USE_ENGINE:
+            attach_engine_emu(cpu)
+        elif USE_ACCEL:
             attach_accel_emu(cpu)
         for i in range(17):
             cpu.mem[sq_a := (P.SQ_LO_ADDR + i)] = sq[i] & 0xFF; cpu.mem[P.SQ_HI_ADDR + i] = sq[i] >> 8

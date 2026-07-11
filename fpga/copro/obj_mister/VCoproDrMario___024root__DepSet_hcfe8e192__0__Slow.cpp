@@ -141,8 +141,8 @@ extern const VlUnpacked<CData/*0:0*/, 512> VCoproDrMario__ConstPool__TABLE_hafee
 extern const VlUnpacked<CData/*0:0*/, 128> VCoproDrMario__ConstPool__TABLE_h2335744c_0;
 extern const VlUnpacked<CData/*0:0*/, 128> VCoproDrMario__ConstPool__TABLE_h3046dbb4_0;
 extern const VlUnpacked<CData/*0:0*/, 8192> VCoproDrMario__ConstPool__TABLE_hc377d77d_0;
-extern const VlUnpacked<CData/*1:0*/, 2048> VCoproDrMario__ConstPool__TABLE_h8ffa5a2b_0;
 extern const VlUnpacked<CData/*3:0*/, 2048> VCoproDrMario__ConstPool__TABLE_h00ffe440_0;
+extern const VlUnpacked<CData/*1:0*/, 2048> VCoproDrMario__ConstPool__TABLE_h8ffa5a2b_0;
 
 VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___024root* vlSelf) {
     (void)vlSelf;  // Prevent unused variable warning
@@ -150,8 +150,6 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
     VL_DEBUG_IF(VL_DBG_MSGF("+    VCoproDrMario___024root___stl_sequent__TOP__0\n"); );
     auto& vlSelfRef = std::ref(*vlSelf).get();
     // Init
-    CData/*0:0*/ CoproDrMario__DOT__WE;
-    CoproDrMario__DOT__WE = 0;
     CData/*7:0*/ CoproDrMario__DOT__cpu6502__DOT__BI;
     CoproDrMario__DOT__cpu6502__DOT__BI = 0;
     CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__CI;
@@ -214,9 +212,12 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__cond_true 
         = VCoproDrMario__ConstPool__TABLE_h2335744c_0
         [__Vtableidx8];
+    vlSelfRef.CoproDrMario__DOT__cpu6502__DOT____Vcellinp__ALU__BCD 
+        = ((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__adc_bcd) 
+           & (0xdU == (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state)));
     __Vtableidx2 = (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__store) 
                      << 6U) | (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state));
-    CoproDrMario__DOT__WE = VCoproDrMario__ConstPool__TABLE_h3046dbb4_0
+    vlSelfRef.CoproDrMario__DOT__WE = VCoproDrMario__ConstPool__TABLE_h3046dbb4_0
         [__Vtableidx2];
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__P = 
         (0x30U | ((((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__N) 
@@ -228,9 +229,6 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
                                          | (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__Z) 
                                              << 1U) 
                                             | (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__C)))));
-    vlSelfRef.CoproDrMario__DOT__cpu6502__DOT____Vcellinp__ALU__BCD 
-        = ((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__adc_bcd) 
-           & (0xdU == (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state)));
     CoproDrMario__DOT__cpu6502__DOT__alu_shift_right 
         = (((0xdU == (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state)) 
             | ((0x24U == (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state)) 
@@ -1145,13 +1143,6 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
         = ((vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
             [0x7fU] >> 2U) & (0U != (3U & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
                                      [0x7fU])));
-    __Vtableidx4 = (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__dst_reg) 
-                     << 9U) | (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__index_y) 
-                                << 8U) | (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__src_reg) 
-                                           << 6U) | (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state))));
-    vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__regsel 
-        = VCoproDrMario__ConstPool__TABLE_h8ffa5a2b_0
-        [__Vtableidx4];
     vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of[0U] 
         = (3U & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
            [0U]);
@@ -1541,6 +1532,13 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
                                   << 6U) | (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state)));
     CoproDrMario__DOT__cpu6502__DOT__alu_op = VCoproDrMario__ConstPool__TABLE_h00ffe440_0
         [__Vtableidx5];
+    __Vtableidx4 = (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__dst_reg) 
+                     << 9U) | (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__index_y) 
+                                << 8U) | (((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__src_reg) 
+                                           << 6U) | (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state))));
+    vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__regsel 
+        = VCoproDrMario__ConstPool__TABLE_h8ffa5a2b_0
+        [__Vtableidx4];
     vlSelfRef.CoproDrMario__DOT__DI = ((IData)(vlSelfRef.CoproDrMario__DOT__sel_vec_d)
                                         ? ((IData)(vlSelfRef.CoproDrMario__DOT__ab0_d)
                                             ? 0xbfU
@@ -1554,15 +1552,15 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
                                                     : 0xffU))));
     vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_3 
         = ((~ (IData)(vlSelfRef.CoproDrMario__DOT__cpu_rst)) 
-           & (IData)(CoproDrMario__DOT__WE));
+           & (IData)(vlSelfRef.CoproDrMario__DOT__WE));
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col 
+        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+        [vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo];
     CoproDrMario__DOT__cpu6502__DOT____VdfgExtracted_hdce86eaa__0 
         = (0x100U | vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__AXYS
            [vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__regsel]);
     CoproDrMario__DOT__cpu6502__DOT__regfile = vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__AXYS
         [vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__regsel];
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col 
-        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-        [vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo];
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__IR = 
         ((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__NMI_edge)
           ? 0U : ((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__IRHOLD_valid)
@@ -2032,6 +2030,18 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
     vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2 
         = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_3) 
            & (0x7000U == (0xff00U & (IData)(vlSelfRef.CoproDrMario__DOT__AB))));
+    vlSelfRef.CoproDrMario__DOT__lev_colenc = ((0U 
+                                                == 
+                                                (3U 
+                                                 & (IData)(vlSelfRef.CoproDrMario__DOT__DO)))
+                                                ? 1U
+                                                : (
+                                                   (1U 
+                                                    == 
+                                                    (3U 
+                                                     & (IData)(vlSelfRef.CoproDrMario__DOT__DO)))
+                                                    ? 2U
+                                                    : 3U));
     CoproDrMario__DOT__cpu6502__DOT__ALU__DOT__temp_logic 
         = ((2U & (IData)(CoproDrMario__DOT__cpu6502__DOT__alu_op))
             ? ((1U & (IData)(CoproDrMario__DOT__cpu6502__DOT__alu_op))
@@ -2051,6 +2061,30 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
                                                 & ((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__AI) 
                                                    >> 1U))));
     }
+    vlSelfRef.CoproDrMario__DOT__lev_wr_arg = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2) 
+                                               & (IData)(
+                                                         (0xe0U 
+                                                          == 
+                                                          (0xf8U 
+                                                           & (IData)(vlSelfRef.CoproDrMario__DOT__AB)))));
+    vlSelfRef.CoproDrMario__DOT__lev_wr_board = ((~ 
+                                                  ((IData)(vlSelfRef.CoproDrMario__DOT__AB) 
+                                                   >> 7U)) 
+                                                 & (IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2));
+    vlSelfRef.CoproDrMario__DOT__lev_start = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2) 
+                                              & (0xf8U 
+                                                 == 
+                                                 (0xffU 
+                                                  & (IData)(vlSelfRef.CoproDrMario__DOT__AB))));
+    vlSelfRef.CoproDrMario__DOT__lev_enc = ((0xffU 
+                                             == (IData)(vlSelfRef.CoproDrMario__DOT__DO))
+                                             ? 0U : 
+                                            (((0xdU 
+                                               == (0xfU 
+                                                   & ((IData)(vlSelfRef.CoproDrMario__DOT__DO) 
+                                                      >> 4U))) 
+                                              << 2U) 
+                                             | (IData)(vlSelfRef.CoproDrMario__DOT__lev_colenc)));
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__ALU__DOT__temp_BI 
         = (0xffU & ((8U & (IData)(CoproDrMario__DOT__cpu6502__DOT__alu_op))
                      ? ((4U & (IData)(CoproDrMario__DOT__cpu6502__DOT__alu_op))
@@ -2175,6 +2209,7 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->copro_sel = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__AB = VL_RAND_RESET_I(16);
     vlSelf->CoproDrMario__DOT__DO = VL_RAND_RESET_I(8);
+    vlSelf->CoproDrMario__DOT__WE = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__rst_cnt = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__parked = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__rst_m = VL_RAND_RESET_I(1);
@@ -2182,9 +2217,24 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->CoproDrMario__DOT__DI = VL_RAND_RESET_I(8);
     vlSelf->CoproDrMario__DOT__a_ram = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__a_addr = VL_RAND_RESET_I(12);
+    vlSelf->CoproDrMario__DOT__lev_wr_board = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__lev_start = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__lev_wr_arg = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__lev_enc = VL_RAND_RESET_I(3);
+    vlSelf->CoproDrMario__DOT__lev_colenc = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__lev_wslot = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__lev_a_o4 = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__lev_a_sl = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__lev_a_ca = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__lev_a_cb = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__lev_a_col = VL_RAND_RESET_I(3);
     vlSelf->CoproDrMario__DOT__lev_done = VL_RAND_RESET_I(1);
-    vlSelf->CoproDrMario__DOT__lev_sco = VL_RAND_RESET_I(16);
     vlSelf->CoproDrMario__DOT__lev_win = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__lev_legal = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__lev_sco = VL_RAND_RESET_I(16);
+    vlSelf->CoproDrMario__DOT__lev_imm = VL_RAND_RESET_I(16);
+    vlSelf->CoproDrMario__DOT__lev_rvc = VL_RAND_RESET_I(6);
+    vlSelf->CoproDrMario__DOT__lev_rvv = VL_RAND_RESET_I(4);
     vlSelf->CoproDrMario__DOT__lev_q = VL_RAND_RESET_I(8);
     for (int __Vi0 = 0; __Vi0 < 16384; ++__Vi0) {
         vlSelf->CoproDrMario__DOT__rom[__Vi0] = VL_RAND_RESET_I(8);
@@ -2270,6 +2320,15 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
         vlSelf->CoproDrMario__DOT__leafeval__DOT__bcell[__Vi0] = VL_RAND_RESET_I(3);
     }
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
+        vlSelf->CoproDrMario__DOT__leafeval__DOT__s_live[__Vi0] = VL_RAND_RESET_I(3);
+    }
+    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
+        vlSelf->CoproDrMario__DOT__leafeval__DOT__s_w1[__Vi0] = VL_RAND_RESET_I(3);
+    }
+    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
+        vlSelf->CoproDrMario__DOT__leafeval__DOT__s_w2[__Vi0] = VL_RAND_RESET_I(3);
+    }
+    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->CoproDrMario__DOT__leafeval__DOT__col_of[__Vi0] = VL_RAND_RESET_I(2);
     }
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
@@ -2279,6 +2338,22 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
         vlSelf->CoproDrMario__DOT__leafeval__DOT__vir_of[__Vi0] = VL_RAND_RESET_I(1);
     }
     vlSelf->CoproDrMario__DOT__leafeval__DOT__st = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__node_leaf = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__fo1 = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__fwp = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__off_a = VL_RAND_RESET_I(7);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__off_b = VL_RAND_RESET_I(7);
+    VL_RAND_RESET_W(128, vlSelf->CoproDrMario__DOT__leafeval__DOT__markb);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__li = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__soff = VL_RAND_RESET_I(8);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__sstep = VL_RAND_RESET_I(4);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__scnt = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__srun = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__smcol = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__srstart = VL_RAND_RESET_I(8);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__fwp2 = VL_RAND_RESET_I(7);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__gdest = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__anyclear = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__wc = VL_RAND_RESET_I(4);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__wr_ = VL_RAND_RESET_I(4);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__maxh = VL_RAND_RESET_I(5);
@@ -2304,6 +2379,11 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->CoproDrMario__DOT__leafeval__DOT__span_hi = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__vspan_lo = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__vspan_hi = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__i = VL_RAND_RESET_I(32);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__fo2b__DOT__fom = VL_RAND_RESET_I(5);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__scan__DOT__brk = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__scan__DOT__c_ = VL_RAND_RESET_I(2);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__grv__DOT__t = VL_RAND_RESET_I(3);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__fin__DOT__hq = VL_RAND_RESET_I(9);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__fin__DOT__vq = VL_RAND_RESET_I(9);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__fin__DOT__mx = VL_RAND_RESET_I(9);
