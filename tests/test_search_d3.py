@@ -33,7 +33,8 @@ import nes_d3_golden as G3
 # lives at $0B00 (TK/TK1/pills end at $0A7F).
 LIVE, WORK1, CUR, WORK2 = 0x0500, 0x0600, 0x0700, 0x0B00
 WIN = 30000
-NPILLS, SHIFT = 8, 3     # expectimax pill count (power of 2 -> /NPILLS = >>SHIFT); test overrides to 2,1
+NPILLS, SHIFT = 4, 2     # expectimax pill count (power of 2 -> /NPILLS = >>SHIFT); test overrides to 2,1
+# 4-pill measured 24/24=100% solo (isoD 2026-07-11) vs 8-pill 22/24 -- half the ply3 cost, free.
 # TK candidate arrays (index 0..count-1, count<=32): ply2 rank (per ply1 candidate)
 TK_KL, TK_KH, TK_O, TK_C, TK_IL, TK_IH = 0x0900, 0x0920, 0x0940, 0x0960, 0x0980, 0x09A0
 PILLA, PILLB = 0x09C0, 0x09C8   # 8-pill table (host-loaded, like SQ)
@@ -46,7 +47,7 @@ TK1_KL, TK1_KH, TK1_O, TK1_C = 0x0A00, 0x0A20, 0x0A40, 0x0A60
  D_EBL, D_EBH, D_EA, D_V3L, D_V3H, D_EL, D_EH, D_V1L, D_V1H, D_J1, D_T1C,
  D_SEED, D_JT) = range(0x40, 0x68)
 
-THIRD = [(0, 0), (0, 1), (0, 2), (1, 0), (1, 1), (1, 2), (2, 0), (2, 1)]   # 9 minus (2,2), /8=shift
+THIRD = [(0, 1), (1, 2), (2, 0), (1, 1)]   # stratified 4-pill subset (3 mixed + 1 double), /4=shift
 RESOLVE_LBL = "resolve_capped"   # TARGETED (deploy config, isolation 12/12); "resolve_capped_full" for full
 TOPK1 = 32   # ply1 keep-width; 32 = FULL (T1C <= 30). MEASURED (isolation 2026-07-10):
              # topk1=8 = 70% clears vs FULL = 91% (n=24, FW model) -- the depth-1 Pass-0 key

@@ -33,7 +33,7 @@ MAX_STEPS = 3_000_000_000
 
 
 def build_image(board, cA, cB, nA, nB):
-    assert (D3.NPILLS, D3.SHIFT) == (8, 3), "deploy config is 8 pills / >>3"
+    assert (D3.NPILLS, D3.SHIFT) == (4, 2), "deploy config is 4 pills / >>2 (isoD 24/24)"
     # copro RAM is ONLY $0000-$0FFF + $6100-$61FF (CoproDrMario.sv): the SQ tables must be
     # read straight from ROM @$B000 (there is no RAM at the py65 tests' $7A00 location).
     # test_vrdy/test_readiness_ext capture the addresses at import -> override those too.
@@ -64,7 +64,7 @@ def build_image(board, cA, cB, nA, nB):
     for i in range(17):
         img[SQ_ROM + i] = (i * i) & 0xFF
         img[SQ_ROM + 17 + i] = (i * i) >> 8
-    for i in range(8):
+    for i in range(len(THIRD)):
         img[PILL_ROM + i] = THIRD[i][0]
         img[PILL_ROM + 8 + i] = THIRD[i][1]
     img[STUB:STUB + len(stub_code)] = stub_code
