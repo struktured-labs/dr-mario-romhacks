@@ -35,6 +35,10 @@ class alignas(VL_CACHE_LINE_BYTES) VLeafEval___024root final : public VerilatedM
         VL_OUT8(legal,0,0);
         VL_OUT8(rv_cells,5,0);
         VL_OUT8(rv_vir,3,0);
+        CData/*6:0*/ LeafEval__DOT__cpw_p;
+        CData/*0:0*/ LeafEval__DOT__sl_cpw;
+        CData/*7:0*/ LeafEval__DOT__sl_qb;
+        CData/*3:0*/ LeafEval__DOT__cmd_l;
         CData/*4:0*/ LeafEval__DOT__st;
         CData/*0:0*/ LeafEval__DOT__node_leaf;
         CData/*4:0*/ LeafEval__DOT__fo1;
@@ -76,17 +80,20 @@ class alignas(VL_CACHE_LINE_BYTES) VLeafEval___024root final : public VerilatedM
         CData/*0:0*/ LeafEval__DOT__scan__DOT__brk;
         CData/*1:0*/ LeafEval__DOT__scan__DOT__c_;
         CData/*2:0*/ LeafEval__DOT__grv__DOT__t;
+    };
+    struct {
         CData/*1:0*/ LeafEval__DOT__suh__DOT__c0;
         CData/*0:0*/ LeafEval__DOT__suh__DOT__t;
         CData/*1:0*/ LeafEval__DOT__suv__DOT__c0;
         CData/*0:0*/ LeafEval__DOT__suv__DOT__t;
-    };
-    struct {
         CData/*0:0*/ __VstlFirstIteration;
+        CData/*0:0*/ __VicoFirstIteration;
         CData/*0:0*/ __Vtrigprevexpr___TOP__clk__0;
         CData/*0:0*/ __VactContinue;
         VL_OUT16(sco,15,0);
         VL_OUT16(imm,15,0);
+        SData/*8:0*/ LeafEval__DOT__sr_addr;
+        SData/*8:0*/ LeafEval__DOT__sl_wa;
         SData/*10:0*/ LeafEval__DOT__pollution;
         SData/*9:0*/ LeafEval__DOT__buried;
         SData/*15:0*/ LeafEval__DOT__rdy_ext;
@@ -95,21 +102,15 @@ class alignas(VL_CACHE_LINE_BYTES) VLeafEval___024root final : public VerilatedM
         SData/*8:0*/ LeafEval__DOT__fin__DOT__vq;
         SData/*8:0*/ LeafEval__DOT__fin__DOT__mx;
         VlWide<4>/*127:0*/ LeafEval__DOT__markb;
-        IData/*31:0*/ LeafEval__DOT__i;
         IData/*31:0*/ __VactIterCount;
         VlUnpacked<CData/*2:0*/, 128> LeafEval__DOT__bcell;
-        VlUnpacked<CData/*2:0*/, 128> LeafEval__DOT__s_live;
-        VlUnpacked<CData/*2:0*/, 128> LeafEval__DOT__s_w1;
-        VlUnpacked<CData/*2:0*/, 128> LeafEval__DOT__s_w2;
         VlUnpacked<CData/*1:0*/, 128> LeafEval__DOT__col_of;
         VlUnpacked<CData/*0:0*/, 128> LeafEval__DOT__occ_of;
         VlUnpacked<CData/*0:0*/, 128> LeafEval__DOT__vir_of;
+        VlUnpacked<CData/*7:0*/, 512> LeafEval__DOT__slotram__DOT__mem;
     };
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__s_w2;
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__s_w1;
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__s_live;
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueLeafEval__DOT__bcell;
     VlTriggerVec<1> __VstlTriggered;
+    VlTriggerVec<1> __VicoTriggered;
     VlTriggerVec<1> __VactTriggered;
     VlTriggerVec<1> __VnbaTriggered;
 

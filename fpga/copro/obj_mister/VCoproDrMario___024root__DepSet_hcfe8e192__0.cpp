@@ -294,6 +294,8 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
     __Vdly__CoproDrMario__DOT__leafeval__DOT__seen = 0;
     CData/*4:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__fillcnt;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__fillcnt = 0;
+    CData/*3:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__cmd_l;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__cmd_l = 0;
     CData/*0:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__node_leaf;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__node_leaf = 0;
     CData/*5:0*/ __Vdly__CoproDrMario__DOT__lev_rvc;
@@ -306,6 +308,12 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
     __Vdly__CoproDrMario__DOT__leafeval__DOT__anyclear = 0;
     CData/*4:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp = 0;
+    CData/*6:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 = 0;
+    CData/*6:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__cpw_p;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__cpw_p = 0;
+    SData/*8:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__sr_addr;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__sr_addr = 0;
     CData/*4:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__fo1;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__fo1 = 0;
     CData/*6:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__off_b;
@@ -326,8 +334,6 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
     __Vdly__CoproDrMario__DOT__leafeval__DOT__soff = 0;
     CData/*7:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__srstart;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__srstart = 0;
-    CData/*6:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2;
-    __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 = 0;
     CData/*4:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__gdest;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__gdest = 0;
     CData/*6:0*/ __Vdly__CoproDrMario__DOT__leafeval__DOT__vo;
@@ -352,54 +358,48 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
     __VdlyDim0__CoproDrMario__DOT__cpu6502__DOT__AXYS__v0 = 0;
     CData/*0:0*/ __VdlySet__CoproDrMario__DOT__cpu6502__DOT__AXYS__v0;
     __VdlySet__CoproDrMario__DOT__cpu6502__DOT__AXYS__v0 = 0;
-    CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v0;
-    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v0 = 0;
-    CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v0;
-    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v0 = 0;
-    CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v0;
-    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v0 = 0;
-    CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v0;
-    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v0 = 0;
-    CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v0;
-    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v0 = 0;
-    CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v0;
-    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v0 = 0;
     CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v0;
     __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v0 = 0;
     CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v0;
     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v0 = 0;
+    CData/*0:0*/ __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v0;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v0 = 0;
     CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v1;
     __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v1 = 0;
     CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v1;
     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v1 = 0;
-    CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v1;
-    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v1 = 0;
-    CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v1;
-    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v1 = 0;
-    CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v1;
-    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v1 = 0;
-    CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v1;
-    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v1 = 0;
-    CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v1;
-    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v1 = 0;
-    CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v1;
-    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v1 = 0;
+    CData/*0:0*/ __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v1;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v1 = 0;
     CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v2;
     __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v2 = 0;
     CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v2;
     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v2 = 0;
+    CData/*0:0*/ __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v2;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v2 = 0;
     CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v3;
     __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v3 = 0;
     CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v3;
     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v3 = 0;
+    CData/*0:0*/ __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v3;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v3 = 0;
     CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v4;
     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v4 = 0;
+    CData/*0:0*/ __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v4;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v4 = 0;
     CData/*2:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v5;
     __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v5 = 0;
     CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v5;
     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v5 = 0;
+    CData/*0:0*/ __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v5;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v5 = 0;
     CData/*6:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v6;
     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v6 = 0;
+    CData/*7:0*/ __VdlyVal__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0;
+    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0 = 0;
+    SData/*8:0*/ __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0;
+    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0 = 0;
+    CData/*0:0*/ __VdlySet__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0 = 0;
     // Body
     __VdlySet__CoproDrMario__DOT__cpu6502__DOT__AXYS__v0 = 0U;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__st = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st;
@@ -429,6 +429,8 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__seen;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__fillcnt 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fillcnt;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__cmd_l 
+        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cmd_l;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__node_leaf 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__node_leaf;
     __Vdly__CoproDrMario__DOT__lev_rvc = vlSelfRef.CoproDrMario__DOT__lev_rvc;
@@ -444,6 +446,10 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
     __Vdly__CoproDrMario__DOT__leafeval__DOT__anyclear 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__anyclear;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 
+        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__sr_addr 
+        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sr_addr;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__fo1 = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fo1;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__off_b 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_b;
@@ -462,8 +468,6 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__soff;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__srstart 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srstart;
-    __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 
-        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__gdest 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__gdest;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__run_h 
@@ -479,7 +483,16 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_lo;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__vspan_hi 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_hi;
+    __Vdly__CoproDrMario__DOT__leafeval__DOT__cpw_p 
+        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cpw_p;
     __Vdly__CoproDrMario__DOT__leafeval__DOT__vo = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v0 = 0U;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v1 = 0U;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v2 = 0U;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v3 = 0U;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v4 = 0U;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v5 = 0U;
+    __VdlySet__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0 = 0U;
     if (((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_3) 
          & (IData)(vlSelfRef.CoproDrMario__DOT__a_ram))) {
         vlSelfRef.__VdlyVal__CoproDrMario__DOT__wram__DOT__mem__v0 
@@ -517,6 +530,18 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
         __VdlyDim0__CoproDrMario__DOT__cpu6502__DOT__AXYS__v0 
             = vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__regsel;
         __VdlySet__CoproDrMario__DOT__cpu6502__DOT__AXYS__v0 = 1U;
+    }
+    if ((((IData)(vlSelfRef.CoproDrMario__DOT__lev_wr_board) 
+          & (0U != (IData)(vlSelfRef.CoproDrMario__DOT__lev_wslot))) 
+         | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_cpw))) {
+        __VdlyVal__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0 
+            = ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_cpw)
+                ? vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
+               [vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cpw_p]
+                : (IData)(vlSelfRef.CoproDrMario__DOT__lev_enc));
+        __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0 
+            = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_wa;
+        __VdlySet__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0 = 1U;
     }
     vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__cond_code 
         = (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__IR) 
@@ -851,45 +876,24 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
     if (vlSelfRef.CoproDrMario__DOT__cpu_rst) {
         __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0U;
         vlSelfRef.CoproDrMario__DOT__lev_done = 0U;
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_cpw = 0U;
     } else {
-        if (((~ ((IData)(vlSelfRef.CoproDrMario__DOT__AB) 
-                 >> 7U)) & (IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2))) {
-            if ((2U & (IData)(vlSelfRef.CoproDrMario__DOT__lev_wslot))) {
-                if ((1U & (IData)(vlSelfRef.CoproDrMario__DOT__lev_wslot))) {
-                    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v0 
-                        = vlSelfRef.CoproDrMario__DOT__lev_enc;
-                    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v0 
-                        = (0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__AB));
-                    vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w2.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v0, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v0));
-                } else {
-                    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v0 
-                        = vlSelfRef.CoproDrMario__DOT__lev_enc;
-                    __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v0 
-                        = (0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__AB));
-                    vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w1.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v0, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v0));
-                }
-            } else if ((1U & (IData)(vlSelfRef.CoproDrMario__DOT__lev_wslot))) {
-                __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v0 
-                    = vlSelfRef.CoproDrMario__DOT__lev_enc;
-                __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v0 
-                    = (0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__AB));
-                vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_live.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v0, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v0));
-            } else {
-                __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v0 
-                    = vlSelfRef.CoproDrMario__DOT__lev_enc;
-                __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v0 
-                    = (0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__AB));
-                vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v0, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v0));
-            }
+        if (((IData)(vlSelfRef.CoproDrMario__DOT__lev_wr_board) 
+             & (0U == (IData)(vlSelfRef.CoproDrMario__DOT__lev_wslot)))) {
+            __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v0 
+                = vlSelfRef.CoproDrMario__DOT__lev_enc;
+            __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v0 
+                = (0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__AB));
+            __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v0 = 1U;
         }
         if (((((((((0U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)) 
                    | (0x11U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                  | (0x12U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                 | (0x13U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                | (0x14U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-               | (0x15U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-              | (0x16U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-             | (0x17U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)))) {
+                  | (0x1cU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                 | (0x1aU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                | (0x1bU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+               | (0x12U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+              | (0x13U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+             | (0x14U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)))) {
             if ((0U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 if (((IData)(vlSelfRef.CoproDrMario__DOT__lev_start) 
                      | ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2) 
@@ -914,6 +918,8 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                         __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 1U;
                     } else if (((2U == (0xfU & (IData)(vlSelfRef.CoproDrMario__DOT__DO))) 
                                 | (3U == (0xfU & (IData)(vlSelfRef.CoproDrMario__DOT__DO))))) {
+                        __Vdly__CoproDrMario__DOT__leafeval__DOT__cmd_l 
+                            = (0xfU & (IData)(vlSelfRef.CoproDrMario__DOT__DO));
                         __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0x11U;
                     } else if ((4U == (0xfU & (IData)(vlSelfRef.CoproDrMario__DOT__DO)))) {
                         __Vdly__CoproDrMario__DOT__leafeval__DOT__node_leaf = 1U;
@@ -931,55 +937,45 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     }
                 }
             } else if ((0x11U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
-                if ((2U == (0xfU & (IData)(vlSelfRef.CoproDrMario__DOT__DO)))) {
-                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i = 0U;
-                    while (VL_GTS_III(32, 0x80U, vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)) {
-                        __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v1 
-                            = ((1U == (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_sl))
-                                ? vlSelfRef.CoproDrMario__DOT__leafeval__DOT__s_live
-                               [(0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)]
-                                : ((2U == (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_sl))
-                                    ? vlSelfRef.CoproDrMario__DOT__leafeval__DOT__s_w1
-                                   [(0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)]
-                                    : vlSelfRef.CoproDrMario__DOT__leafeval__DOT__s_w2
-                                   [(0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)]));
-                        __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v1 
-                            = (0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i);
-                        vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v1, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v1));
-                        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i 
-                            = ((IData)(1U) + vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i);
-                    }
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 = 0U;
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__cpw_p = 0U;
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__sr_addr 
+                    = ((IData)(vlSelfRef.CoproDrMario__DOT__lev_a_sl) 
+                       << 7U);
+                if ((2U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cmd_l))) {
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0x1cU;
                 } else {
-                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i = 0U;
-                    while (VL_GTS_III(32, 0x80U, vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)) {
-                        if ((1U == (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_sl))) {
-                            __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v1 
-                                = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
-                                [(0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)];
-                            __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v1 
-                                = (0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i);
-                            vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_live.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_live__v1, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_live__v1));
-                        } else if ((2U == (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_sl))) {
-                            __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v1 
-                                = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
-                                [(0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)];
-                            __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v1 
-                                = (0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i);
-                            vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w1.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w1__v1, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w1__v1));
-                        } else {
-                            __VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v1 
-                                = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
-                                [(0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i)];
-                            __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v1 
-                                = (0x7fU & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i);
-                            vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w2.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__s_w2__v1, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__s_w2__v1));
-                        }
-                        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i 
-                            = ((IData)(1U) + vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i);
-                    }
+                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_cpw = 1U;
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0x1bU;
                 }
-                vlSelfRef.CoproDrMario__DOT__lev_done = 1U;
-                __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0U;
+            } else if ((0x1cU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__sr_addr 
+                    = (0x1ffU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sr_addr)));
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0x1aU;
+            } else if ((0x1aU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__sr_addr 
+                    = (0x1ffU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sr_addr)));
+                __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v1 
+                    = (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_qb));
+                __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v1 
+                    = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2;
+                __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v1 = 1U;
+                if ((0x7fU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2))) {
+                    vlSelfRef.CoproDrMario__DOT__lev_done = 1U;
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0U;
+                } else {
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 
+                        = (0x7fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2)));
+                }
+            } else if ((0x1bU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+                if ((0x7fU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cpw_p))) {
+                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_cpw = 0U;
+                    vlSelfRef.CoproDrMario__DOT__lev_done = 1U;
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0U;
+                } else {
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__cpw_p 
+                        = (0x7fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cpw_p)));
+                }
             } else if ((0x12U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 if (((0x10U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp)) 
                      | vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
@@ -1045,18 +1041,21 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp 
                         = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp)));
                 }
-            } else if ((0x14U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            } else {
+                if ((1U & (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_o4))) {
+                    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v2 
+                        = vlSelfRef.CoproDrMario__DOT__lev_a_cb;
+                    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v3 
+                        = vlSelfRef.CoproDrMario__DOT__lev_a_ca;
+                } else {
+                    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v2 
+                        = vlSelfRef.CoproDrMario__DOT__lev_a_ca;
+                    __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v3 
+                        = vlSelfRef.CoproDrMario__DOT__lev_a_cb;
+                }
                 __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v2 
                     = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_a;
-                __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v2 
-                    = ((1U & (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_o4))
-                        ? (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_cb)
-                        : (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_ca));
-                vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v2, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v2));
-                __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v3 
-                    = ((1U & (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_o4))
-                        ? (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_ca)
-                        : (IData)(vlSelfRef.CoproDrMario__DOT__lev_a_cb));
+                __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v2 = 1U;
                 __Vdly__CoproDrMario__DOT__leafeval__DOT__li = 0U;
                 __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0x15U;
                 __Vdly__CoproDrMario__DOT__leafeval__DOT__sstep = 1U;
@@ -1065,10 +1064,19 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                 __Vdly__CoproDrMario__DOT__leafeval__DOT__smcol = 0U;
                 __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v3 
                     = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_b;
-                vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v3, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v3));
+                __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v3 = 1U;
                 __Vdly__CoproDrMario__DOT__leafeval__DOT__soff 
                     = (0x78U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_a));
-            } else if ((0x15U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            }
+        } else if (((((((((0x15U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)) 
+                          | (0x16U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                         | (0x17U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                        | (0x18U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                       | (0x19U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                      | (1U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                     | (2U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                    | (3U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)))) {
+            if ((0x15U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 vlSelfRef.CoproDrMario__DOT__leafeval__DOT__scan__DOT__c_ 
                     = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
                     [(0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__soff))];
@@ -1078,7 +1086,6 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                           != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__smcol)));
                 if (((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__scan__DOT__brk) 
                      & (4U <= (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srun)))) {
-                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i = 0x10U;
                     if ((0U < (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srun))) {
                         __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[(3U 
                                                                          & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srstart) 
@@ -1388,7 +1395,6 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                 }
             } else if ((0x16U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 if ((4U <= (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srun))) {
-                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__i = 0x10U;
                     if ((0U < (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srun))) {
                         __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[(3U 
                                                                          & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srstart) 
@@ -1699,7 +1705,7 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 = 0U;
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0x17U;
                 }
-            } else {
+            } else if ((0x17U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 if ((1U & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[
                            ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2) 
                             >> 5U)] >> (0x1fU & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2))))) {
@@ -1713,7 +1719,7 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     }
                     __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v4 
                         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2;
-                    vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.enqueue(0U, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v4));
+                    __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v4 = 1U;
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__anyclear = 1U;
                 }
                 if ((0x7fU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2))) {
@@ -1728,16 +1734,7 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2 
                         = (0x7fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2)));
                 }
-            }
-        } else if (((((((((0x18U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)) 
-                          | (0x19U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                         | (1U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                        | (2U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                       | (3U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                      | (4U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                     | (5U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                    | (6U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)))) {
-            if ((0x18U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            } else if ((0x18U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 vlSelfRef.CoproDrMario__DOT__leafeval__DOT__grv__DOT__t 
                     = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
                     [((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp) 
@@ -1756,12 +1753,11 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                                 = ((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__gdest) 
                                              << 3U)) 
                                    | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)));
-                            vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.enqueue(__VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v5, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v5));
+                            __VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v5 = 1U;
                             __VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v6 
                                 = ((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp) 
                                              << 3U)) 
                                    | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)));
-                            vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.enqueue(0U, (IData)(__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v6));
                         }
                         __Vdly__CoproDrMario__DOT__leafeval__DOT__gdest 
                             = (0x1fU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__gdest) 
@@ -1880,28 +1876,35 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__vo 
                         = (0x7fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo)));
                 }
-            } else if ((3U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
-                if ((((0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)) 
-                      & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                         [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
-                            << 3U) | (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
-                                            - (IData)(1U))))] 
-                         == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col))) 
-                     & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
-                     [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
-                        << 3U) | (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
-                                        - (IData)(1U))))])) {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__run_h 
-                        = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_h)));
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__p 
-                        = (0x1fU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
-                                    - (IData)(1U)));
-                } else {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__span_lo 
-                        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p;
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 4U;
-                }
-            } else if ((4U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            } else if ((((0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)) 
+                         & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                            [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
+                               << 3U) | (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
+                                               - (IData)(1U))))] 
+                            == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col))) 
+                        & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
+                        [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
+                           << 3U) | (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
+                                           - (IData)(1U))))])) {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__run_h 
+                    = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_h)));
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__p 
+                    = (0x1fU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
+                                - (IData)(1U)));
+            } else {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__span_lo 
+                    = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p;
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 4U;
+            }
+        } else if (((((((((4U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)) 
+                          | (5U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                         | (6U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                        | (7U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                       | (8U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                      | (9U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                     | (0xaU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
+                    | (0xbU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)))) {
+            if ((4U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 if (((0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_lo)) 
                      & ((~ vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
                          [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
@@ -1940,32 +1943,25 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p;
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 6U;
                 }
-            } else if (((7U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi)) 
-                        & ((~ vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
-                            [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
-                               << 3U) | (7U & ((IData)(1U) 
-                                               + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi))))]) 
-                           | (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                              [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
-                                 << 3U) | (7U & ((IData)(1U) 
-                                                 + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi))))] 
-                              == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col))))) {
-                __Vdly__CoproDrMario__DOT__leafeval__DOT__span_hi 
-                    = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi)));
-            } else {
-                __Vdly__CoproDrMario__DOT__leafeval__DOT__p 
-                    = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r;
-                __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 7U;
-            }
-        } else if (((((((((7U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)) 
-                          | (8U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                         | (9U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                        | (0xaU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                       | (0xbU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                      | (0xcU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                     | (0xdU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) 
-                    | (0xeU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st)))) {
-            if ((7U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            } else if ((6U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+                if (((7U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi)) 
+                     & ((~ vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
+                         [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
+                            << 3U) | (7U & ((IData)(1U) 
+                                            + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi))))]) 
+                        | (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                           [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r) 
+                              << 3U) | (7U & ((IData)(1U) 
+                                              + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi))))] 
+                           == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col))))) {
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__span_hi 
+                        = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi)));
+                } else {
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__p 
+                        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r;
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 7U;
+                }
+            } else if ((7U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
                 if ((((0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)) 
                       & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
                       [((0x78U & (((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
@@ -2039,7 +2035,7 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__p = 0U;
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0xbU;
                 }
-            } else if ((0xbU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            } else {
                 if ((((((7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)) 
                         != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c)) 
                        & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
@@ -2062,173 +2058,164 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
                     __Vdly__CoproDrMario__DOT__leafeval__DOT__p 
                         = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)));
                 }
-            } else if ((0xcU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
-                if ((((((0xfU & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)) 
-                        != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r)) 
-                       & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
-                       [((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
-                                   << 3U)) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c))]) 
-                      & (~ vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
-                         [((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
-                                     << 3U)) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c))])) 
-                     & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                        [((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
-                                    << 3U)) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c))] 
-                        != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col)))) {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__pollution 
-                        = (0x7ffU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__pollution)));
-                }
-                if ((0xfU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p))) {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0xdU;
-                } else {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__p 
-                        = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)));
-                }
-            } else if ((0xdU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
-                vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__hq 
-                    = ((4U <= (0x1fU & ((IData)(1U) 
-                                        + ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi) 
-                                           - (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_lo)))))
-                        ? ([&]() {
-                            __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__n 
-                                = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_h;
-                            __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__Vfuncout 
-                                = (0x1ffU & ((IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__n) 
-                                             * (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__n)));
-                        }(), (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__Vfuncout))
-                        : 0U);
-                vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__vq 
-                    = ((4U <= (0x1fU & ((IData)(1U) 
-                                        + ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_hi) 
-                                           - (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_lo)))))
-                        ? ([&]() {
-                            __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__n 
-                                = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_v;
-                            __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__Vfuncout 
-                                = (0x1ffU & ((IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__n) 
-                                             * (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__n)));
-                        }(), (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__Vfuncout))
-                        : 0U);
-                if ((0x7fU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo))) {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__wc = 0U;
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_ = 0U;
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0xeU;
-                } else {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__vo 
-                        = (0x7fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo)));
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 2U;
-                }
-                vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__mx 
-                    = (((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__hq) 
-                        > (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__vq))
-                        ? (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__hq)
-                        : (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__vq));
-                __Vdly__CoproDrMario__DOT__leafeval__DOT__rdy_ext 
-                    = (0xffffU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__rdy_ext) 
-                                  + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__mx)));
-                __Vdly__CoproDrMario__DOT__leafeval__DOT__vrdy 
-                    = (0xffffU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vrdy) 
-                                  + VL_EXTEND_II(16,9, 
-                                                 ([&]() {
-                                    __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__n 
-                                        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_v;
-                                    __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__Vfuncout 
-                                        = (0x1ffU & 
-                                           ((IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__n) 
-                                            * (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__n)));
-                                }(), (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__Vfuncout)))));
+            }
+        } else if ((0xcU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            if ((((((0xfU & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)) 
+                    != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r)) 
+                   & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__occ_of
+                   [((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
+                               << 3U)) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c))]) 
+                  & (~ vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
+                     [((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
+                                 << 3U)) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c))])) 
+                 & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                    [((0x78U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p) 
+                                << 3U)) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c))] 
+                    != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col)))) {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__pollution 
+                    = (0x7ffU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__pollution)));
+            }
+            if ((0xfU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p))) {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0xdU;
             } else {
-                vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0 
-                    = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__p 
+                    = (0x1fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p)));
+            }
+        } else if ((0xdU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__hq 
+                = ((4U <= (0x1fU & ((IData)(1U) + ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi) 
+                                                   - (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_lo)))))
+                    ? ([&]() {
+                        __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__n 
+                            = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_h;
+                        __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__Vfuncout 
+                            = (0x1ffU & ((IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__n) 
+                                         * (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__n)));
+                    }(), (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__3__Vfuncout))
+                    : 0U);
+            vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__vq 
+                = ((4U <= (0x1fU & ((IData)(1U) + ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_hi) 
+                                                   - (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_lo)))))
+                    ? ([&]() {
+                        __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__n 
+                            = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_v;
+                        __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__Vfuncout 
+                            = (0x1ffU & ((IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__n) 
+                                         * (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__n)));
+                    }(), (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__4__Vfuncout))
+                    : 0U);
+            if ((0x7fU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo))) {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__wc = 0U;
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_ = 0U;
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0xeU;
+            } else {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__vo 
+                    = (0x7fU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo)));
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 2U;
+            }
+            vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__mx 
+                = (((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__hq) 
+                    > (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__vq))
+                    ? (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__hq)
+                    : (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__vq));
+            __Vdly__CoproDrMario__DOT__leafeval__DOT__rdy_ext 
+                = (0xffffU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__rdy_ext) 
+                              + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fin__DOT__mx)));
+            __Vdly__CoproDrMario__DOT__leafeval__DOT__vrdy 
+                = (0xffffU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vrdy) 
+                              + VL_EXTEND_II(16,9, 
+                                             ([&]() {
+                                __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__n 
+                                    = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_v;
+                                __Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__Vfuncout 
+                                    = (0x1ffU & ((IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__n) 
+                                                 * (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__n)));
+                            }(), (IData)(__Vfunc_CoproDrMario__DOT__leafeval__DOT__sq__5__Vfuncout)))));
+        } else if ((0xeU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
+            vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0 
+                = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                   << 3U) | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))];
+            if ((((0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)) 
+                  & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                     [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                        << 3U) | (7U & ((IData)(1U) 
+                                        + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
+                     == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0))) 
+                 & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
                     [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                       << 3U) | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))];
-                if ((((0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)) 
-                      & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                       << 3U) | (7U & ((IData)(2U) 
+                                       + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
+                    == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)))) {
+                vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t 
+                    = (((vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
                          [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                            << 3U) | (7U & ((IData)(1U) 
-                                            + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                         == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0))) 
-                     & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                        [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                           << 3U) | (7U & ((IData)(2U) 
-                                           + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                        == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)))) {
-                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t 
-                        = (((vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
-                             [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                << 3U) | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))] 
-                             & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                                [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                   << 3U) | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))] 
-                                == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0))) 
-                            | (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
-                               [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                  << 3U) | (7U & ((IData)(1U) 
-                                                  + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                               & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                                  [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                     << 3U) | (7U & 
-                                               ((IData)(1U) 
-                                                + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                                  == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)))) 
-                           | (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
+                            << 3U) | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))] 
+                         & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                            [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                               << 3U) | (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))] 
+                            == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0))) 
+                        | (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
+                           [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                              << 3U) | (7U & ((IData)(1U) 
+                                              + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
+                           & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
                               [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                 << 3U) | (7U & ((IData)(2U) 
+                                 << 3U) | (7U & ((IData)(1U) 
                                                  + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                              & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                                 [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                    << 3U) | (7U & 
-                                              ((IData)(2U) 
-                                               + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                                 == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0))));
-                    if (((~ (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t)) 
-                         & (0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))) {
-                        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t 
-                            = (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
-                               [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                  << 3U) | (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc) 
-                                                  - (IData)(1U))))] 
-                               & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                                  [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                     << 3U) | (7U & 
-                                               ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc) 
-                                                - (IData)(1U))))] 
-                                  == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)));
-                    }
-                    if (((~ (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t)) 
-                         & (5U > (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))) {
-                        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t 
-                            = (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
-                               [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                  << 3U) | (7U & ((IData)(3U) 
-                                                  + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                               & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
-                                  [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
-                                     << 3U) | (7U & 
-                                               ((IData)(3U) 
+                              == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)))) 
+                       | (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
+                          [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                             << 3U) | (7U & ((IData)(2U) 
+                                             + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
+                          & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                             [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                                << 3U) | (7U & ((IData)(2U) 
                                                 + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
-                                  == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)));
-                    }
-                    if (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t) {
-                        __Vdly__CoproDrMario__DOT__leafeval__DOT__setup 
-                            = (0xffU & ((IData)(1U) 
-                                        + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__setup)));
-                    }
+                             == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0))));
+                if (((~ (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t)) 
+                     & (0U != (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))) {
+                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t 
+                        = (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
+                           [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                              << 3U) | (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc) 
+                                              - (IData)(1U))))] 
+                           & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                              [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                                 << 3U) | (7U & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc) 
+                                                 - (IData)(1U))))] 
+                              == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)));
                 }
-                if ((5U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))) {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__wc = 0U;
-                    if ((0xfU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_))) {
-                        __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_ = 0U;
-                        __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0xfU;
-                    } else {
-                        __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_ 
-                            = (0xfU & ((IData)(1U) 
-                                       + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_)));
-                    }
+                if (((~ (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t)) 
+                     & (5U > (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)))) {
+                    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t 
+                        = (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vir_of
+                           [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                              << 3U) | (7U & ((IData)(3U) 
+                                              + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
+                           & (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
+                              [(((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_) 
+                                 << 3U) | (7U & ((IData)(3U) 
+                                                 + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))))] 
+                              == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__c0)));
+                }
+                if (vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suh__DOT__t) {
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__setup 
+                        = (0xffU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__setup)));
+                }
+            }
+            if ((5U == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc))) {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__wc = 0U;
+                if ((0xfU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_))) {
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_ = 0U;
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0xfU;
                 } else {
-                    __Vdly__CoproDrMario__DOT__leafeval__DOT__wc 
-                        = (0xfU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)));
+                    __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_ 
+                        = (0xfU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_)));
                 }
+            } else {
+                __Vdly__CoproDrMario__DOT__leafeval__DOT__wc 
+                    = (0xfU & ((IData)(1U) + (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc)));
             }
         } else if ((0xfU == (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st))) {
             vlSelfRef.CoproDrMario__DOT__leafeval__DOT__suv__DOT__c0 
@@ -2345,95 +2332,6 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
             __Vdly__CoproDrMario__DOT__leafeval__DOT__st = 0U;
         }
     }
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__st;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__maxh 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__maxh;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__holes 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__holes;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__toprisk 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__toprisk;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__spawn 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__spawn;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__setup 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__setup;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__pollution 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__pollution;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__buried 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__buried;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__rdy_ext 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__rdy_ext;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vrdy 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vrdy;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__anyvir 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__anyvir;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__wc;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_ 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__seen 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__seen;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fillcnt 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fillcnt;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__node_leaf 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__node_leaf;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[0U] 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[0U];
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[1U] 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[1U];
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[2U] 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[2U];
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[3U] 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[3U];
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__anyclear 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__anyclear;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp;
-    vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_live.commit(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__s_live);
-    vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w1.commit(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__s_w1);
-    vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w2.commit(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__s_w2);
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fo1 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fo1;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_b 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__off_b;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_a 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__off_a;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__li 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__li;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sstep 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__sstep;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__scnt 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__scnt;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srun 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__srun;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__smcol 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__smcol;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__soff 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__soff;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srstart 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__srstart;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2;
-    vlSelfRef.CoproDrMario__DOT__lev_rvc = __Vdly__CoproDrMario__DOT__lev_rvc;
-    vlSelfRef.CoproDrMario__DOT__lev_rvv = __Vdly__CoproDrMario__DOT__lev_rvv;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__gdest 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__gdest;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_h 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__run_h;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_v 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__run_v;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p = __Vdly__CoproDrMario__DOT__leafeval__DOT__p;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_lo 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__span_lo;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__span_hi;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_lo 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vspan_lo;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_hi 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vspan_hi;
-    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo 
-        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vo;
-    vlSelfRef.__VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell.commit(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell);
     if ((0x27U == (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__state))) {
         vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__D 
             = (1U & ((IData)(vlSelfRef.CoproDrMario__DOT__DI) 
@@ -2464,11 +2362,127 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
         vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__adc_sbc 
             = (0x61U == (0x63U & (IData)(vlSelfRef.CoproDrMario__DOT__cpu6502__DOT__IR)));
     }
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__st 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__st;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__maxh 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__maxh;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__holes 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__holes;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__toprisk 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__toprisk;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__spawn 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__spawn;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__setup 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__setup;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__pollution 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__pollution;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__buried 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__buried;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__rdy_ext 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__rdy_ext;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vrdy 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vrdy;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__anyvir 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__anyvir;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wc 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__wc;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__wr_ 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__wr_;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__seen 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__seen;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fillcnt 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fillcnt;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cmd_l 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__cmd_l;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__node_leaf 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__node_leaf;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[0U] 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[0U];
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[1U] 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[1U];
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[2U] 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[2U];
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__markb[3U] 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__markb[3U];
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__anyclear 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__anyclear;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fwp2 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fwp2;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__fo1 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__fo1;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_b 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__off_b;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__off_a 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__off_a;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__li 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__li;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sstep 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__sstep;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__scnt 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__scnt;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srun 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__srun;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__smcol 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__smcol;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__soff 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__soff;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__srstart 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__srstart;
+    vlSelfRef.CoproDrMario__DOT__lev_rvc = __Vdly__CoproDrMario__DOT__lev_rvc;
+    vlSelfRef.CoproDrMario__DOT__lev_rvv = __Vdly__CoproDrMario__DOT__lev_rvv;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__gdest 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__gdest;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_h 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__run_h;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__run_v 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__run_v;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__p = __Vdly__CoproDrMario__DOT__leafeval__DOT__p;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_lo 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__span_lo;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__span_hi 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__span_hi;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_lo 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vspan_lo;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vspan_hi 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vspan_hi;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cpw_p 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__cpw_p;
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__vo;
+    if (__VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v0) {
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v0] 
+            = __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v0;
+    }
+    if (__VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v1) {
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v1] 
+            = __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v1;
+    }
+    if (__VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v2) {
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v2] 
+            = __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v2;
+    }
+    if (__VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v3) {
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v3] 
+            = __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v3;
+    }
+    if (__VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v4) {
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v4] = 0U;
+    }
+    if (__VdlySet__CoproDrMario__DOT__leafeval__DOT__bcell__v5) {
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v5] 
+            = __VdlyVal__CoproDrMario__DOT__leafeval__DOT__bcell__v5;
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__bcell__v6] = 0U;
+    }
     vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_c 
         = (7U & (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo));
     vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_r 
         = (0xfU & ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo) 
                    >> 3U));
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_qb 
+        = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem
+        [vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sr_addr];
     if (vlSelfRef.CoproDrMario__DOT__lev_wr_arg) {
         if ((1U & (~ ((IData)(vlSelfRef.CoproDrMario__DOT__AB) 
                       >> 2U)))) {
@@ -3785,6 +3799,12 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_sequent__TOP__2(VCoproDrMario__
     vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of[0x7fU] 
         = (3U & vlSelfRef.CoproDrMario__DOT__leafeval__DOT__bcell
            [0x7fU]);
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sr_addr 
+        = __Vdly__CoproDrMario__DOT__leafeval__DOT__sr_addr;
+    if (__VdlySet__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0) {
+        vlSelfRef.CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem[__VdlyDim0__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0] 
+            = __VdlyVal__CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem__v0;
+    }
     vlSelfRef.CoproDrMario__DOT__leafeval__DOT__v_col 
         = vlSelfRef.CoproDrMario__DOT__leafeval__DOT__col_of
         [vlSelfRef.CoproDrMario__DOT__leafeval__DOT__vo];
@@ -4786,6 +4806,12 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_comb__TOP__0(VCoproDrMario___02
                                                 | (0xffU 
                                                    & (IData)(vlSelfRef.CoproDrMario__DOT__AB)))
                                              : (IData)(vlSelfRef.CoproDrMario__DOT__AB)));
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_wa 
+        = ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_cpw)
+            ? (((IData)(vlSelfRef.CoproDrMario__DOT__lev_a_sl) 
+                << 7U) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cpw_p))
+            : (((IData)(vlSelfRef.CoproDrMario__DOT__lev_wslot) 
+                << 7U) | (0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__AB))));
     vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2 
         = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_3) 
            & (0x7000U == (0xff00U & (IData)(vlSelfRef.CoproDrMario__DOT__AB))));
@@ -4826,6 +4852,10 @@ VL_INLINE_OPT void VCoproDrMario___024root___nba_comb__TOP__0(VCoproDrMario___02
                                                           == 
                                                           (0xf8U 
                                                            & (IData)(vlSelfRef.CoproDrMario__DOT__AB)))));
+    vlSelfRef.CoproDrMario__DOT__lev_wr_board = ((~ 
+                                                  ((IData)(vlSelfRef.CoproDrMario__DOT__AB) 
+                                                   >> 7U)) 
+                                                 & (IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2));
     vlSelfRef.CoproDrMario__DOT__lev_start = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2) 
                                               & (0xf8U 
                                                  == 

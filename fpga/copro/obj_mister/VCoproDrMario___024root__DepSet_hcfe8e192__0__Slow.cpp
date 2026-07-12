@@ -2027,6 +2027,12 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
                                                 | (0xffU 
                                                    & (IData)(vlSelfRef.CoproDrMario__DOT__AB)))
                                              : (IData)(vlSelfRef.CoproDrMario__DOT__AB)));
+    vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_wa 
+        = ((IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__sl_cpw)
+            ? (((IData)(vlSelfRef.CoproDrMario__DOT__lev_a_sl) 
+                << 7U) | (IData)(vlSelfRef.CoproDrMario__DOT__leafeval__DOT__cpw_p))
+            : (((IData)(vlSelfRef.CoproDrMario__DOT__lev_wslot) 
+                << 7U) | (0x7fU & (IData)(vlSelfRef.CoproDrMario__DOT__AB))));
     vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2 
         = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_3) 
            & (0x7000U == (0xff00U & (IData)(vlSelfRef.CoproDrMario__DOT__AB))));
@@ -2067,6 +2073,10 @@ VL_ATTR_COLD void VCoproDrMario___024root___stl_sequent__TOP__0(VCoproDrMario___
                                                           == 
                                                           (0xf8U 
                                                            & (IData)(vlSelfRef.CoproDrMario__DOT__AB)))));
+    vlSelfRef.CoproDrMario__DOT__lev_wr_board = ((~ 
+                                                  ((IData)(vlSelfRef.CoproDrMario__DOT__AB) 
+                                                   >> 7U)) 
+                                                 & (IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2));
     vlSelfRef.CoproDrMario__DOT__lev_start = ((IData)(vlSelfRef.CoproDrMario__DOT____VdfgRegularize_hb6d3a560_2_2) 
                                               & (0xf8U 
                                                  == 
@@ -2213,6 +2223,7 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->CoproDrMario__DOT__DI = VL_RAND_RESET_I(8);
     vlSelf->CoproDrMario__DOT__a_ram = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__a_addr = VL_RAND_RESET_I(12);
+    vlSelf->CoproDrMario__DOT__lev_wr_board = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__lev_start = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__lev_wr_arg = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__lev_enc = VL_RAND_RESET_I(3);
@@ -2314,15 +2325,11 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->CoproDrMario__DOT__leafeval__DOT__bcell[__Vi0] = VL_RAND_RESET_I(3);
     }
-    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
-        vlSelf->CoproDrMario__DOT__leafeval__DOT__s_live[__Vi0] = VL_RAND_RESET_I(3);
-    }
-    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
-        vlSelf->CoproDrMario__DOT__leafeval__DOT__s_w1[__Vi0] = VL_RAND_RESET_I(3);
-    }
-    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
-        vlSelf->CoproDrMario__DOT__leafeval__DOT__s_w2[__Vi0] = VL_RAND_RESET_I(3);
-    }
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__sr_addr = VL_RAND_RESET_I(9);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__cpw_p = VL_RAND_RESET_I(7);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__sl_cpw = VL_RAND_RESET_I(1);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__sl_wa = VL_RAND_RESET_I(9);
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__sl_qb = VL_RAND_RESET_I(8);
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->CoproDrMario__DOT__leafeval__DOT__col_of[__Vi0] = VL_RAND_RESET_I(2);
     }
@@ -2332,6 +2339,7 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->CoproDrMario__DOT__leafeval__DOT__vir_of[__Vi0] = VL_RAND_RESET_I(1);
     }
+    vlSelf->CoproDrMario__DOT__leafeval__DOT__cmd_l = VL_RAND_RESET_I(4);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__st = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__node_leaf = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__fo1 = VL_RAND_RESET_I(5);
@@ -2374,7 +2382,6 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->CoproDrMario__DOT__leafeval__DOT__span_hi = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__vspan_lo = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__vspan_hi = VL_RAND_RESET_I(5);
-    vlSelf->CoproDrMario__DOT__leafeval__DOT__i = VL_RAND_RESET_I(32);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__fo2b__DOT__fom = VL_RAND_RESET_I(5);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__scan__DOT__brk = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__scan__DOT__c_ = VL_RAND_RESET_I(2);
@@ -2386,6 +2393,9 @@ VL_ATTR_COLD void VCoproDrMario___024root___ctor_var_reset(VCoproDrMario___024ro
     vlSelf->CoproDrMario__DOT__leafeval__DOT__suh__DOT__t = VL_RAND_RESET_I(1);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__suv__DOT__c0 = VL_RAND_RESET_I(2);
     vlSelf->CoproDrMario__DOT__leafeval__DOT__suv__DOT__t = VL_RAND_RESET_I(1);
+    for (int __Vi0 = 0; __Vi0 < 512; ++__Vi0) {
+        vlSelf->CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem[__Vi0] = VL_RAND_RESET_I(8);
+    }
     for (int __Vi0 = 0; __Vi0 < 4096; ++__Vi0) {
         vlSelf->CoproDrMario__DOT__wram__DOT__mem[__Vi0] = VL_RAND_RESET_I(8);
     }

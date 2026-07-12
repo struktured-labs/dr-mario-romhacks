@@ -99,6 +99,11 @@ VL_ATTR_COLD void VLeafEval___024root___stl_sequent__TOP__0(VLeafEval___024root*
     vlSelfRef.LeafEval__DOT__v_c = (7U & (IData)(vlSelfRef.LeafEval__DOT__vo));
     vlSelfRef.LeafEval__DOT__v_r = (0xfU & ((IData)(vlSelfRef.LeafEval__DOT__vo) 
                                             >> 3U));
+    vlSelfRef.LeafEval__DOT__sl_wa = ((IData)(vlSelfRef.LeafEval__DOT__sl_cpw)
+                                       ? (((IData)(vlSelfRef.a_sl) 
+                                           << 7U) | (IData)(vlSelfRef.LeafEval__DOT__cpw_p))
+                                       : (((IData)(vlSelfRef.wslot) 
+                                           << 7U) | (IData)(vlSelfRef.waddr)));
     vlSelfRef.LeafEval__DOT__occ_of[0U] = (0U != (3U 
                                                   & vlSelfRef.LeafEval__DOT__bcell
                                                   [0U]));
@@ -1996,6 +2001,22 @@ VL_ATTR_COLD bool VLeafEval___024root___eval_phase__stl(VLeafEval___024root* vlS
 }
 
 #ifdef VL_DEBUG
+VL_ATTR_COLD void VLeafEval___024root___dump_triggers__ico(VLeafEval___024root* vlSelf) {
+    (void)vlSelf;  // Prevent unused variable warning
+    VLeafEval__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
+    VL_DEBUG_IF(VL_DBG_MSGF("+    VLeafEval___024root___dump_triggers__ico\n"); );
+    auto& vlSelfRef = std::ref(*vlSelf).get();
+    // Body
+    if ((1U & (~ vlSelfRef.__VicoTriggered.any()))) {
+        VL_DBG_MSGF("         No triggers active\n");
+    }
+    if ((1ULL & vlSelfRef.__VicoTriggered.word(0U))) {
+        VL_DBG_MSGF("         'ico' region trigger index 0 is active: Internal 'ico' trigger - first iteration\n");
+    }
+}
+#endif  // VL_DEBUG
+
+#ifdef VL_DEBUG
 VL_ATTR_COLD void VLeafEval___024root___dump_triggers__act(VLeafEval___024root* vlSelf) {
     (void)vlSelf;  // Prevent unused variable warning
     VLeafEval__Syms* const __restrict vlSymsp VL_ATTR_UNUSED = vlSelf->vlSymsp;
@@ -2057,15 +2078,11 @@ VL_ATTR_COLD void VLeafEval___024root___ctor_var_reset(VLeafEval___024root* vlSe
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->LeafEval__DOT__bcell[__Vi0] = VL_RAND_RESET_I(3);
     }
-    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
-        vlSelf->LeafEval__DOT__s_live[__Vi0] = VL_RAND_RESET_I(3);
-    }
-    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
-        vlSelf->LeafEval__DOT__s_w1[__Vi0] = VL_RAND_RESET_I(3);
-    }
-    for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
-        vlSelf->LeafEval__DOT__s_w2[__Vi0] = VL_RAND_RESET_I(3);
-    }
+    vlSelf->LeafEval__DOT__sr_addr = VL_RAND_RESET_I(9);
+    vlSelf->LeafEval__DOT__cpw_p = VL_RAND_RESET_I(7);
+    vlSelf->LeafEval__DOT__sl_cpw = VL_RAND_RESET_I(1);
+    vlSelf->LeafEval__DOT__sl_wa = VL_RAND_RESET_I(9);
+    vlSelf->LeafEval__DOT__sl_qb = VL_RAND_RESET_I(8);
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->LeafEval__DOT__col_of[__Vi0] = VL_RAND_RESET_I(2);
     }
@@ -2075,6 +2092,7 @@ VL_ATTR_COLD void VLeafEval___024root___ctor_var_reset(VLeafEval___024root* vlSe
     for (int __Vi0 = 0; __Vi0 < 128; ++__Vi0) {
         vlSelf->LeafEval__DOT__vir_of[__Vi0] = VL_RAND_RESET_I(1);
     }
+    vlSelf->LeafEval__DOT__cmd_l = VL_RAND_RESET_I(4);
     vlSelf->LeafEval__DOT__st = VL_RAND_RESET_I(5);
     vlSelf->LeafEval__DOT__node_leaf = VL_RAND_RESET_I(1);
     vlSelf->LeafEval__DOT__fo1 = VL_RAND_RESET_I(5);
@@ -2117,7 +2135,6 @@ VL_ATTR_COLD void VLeafEval___024root___ctor_var_reset(VLeafEval___024root* vlSe
     vlSelf->LeafEval__DOT__span_hi = VL_RAND_RESET_I(5);
     vlSelf->LeafEval__DOT__vspan_lo = VL_RAND_RESET_I(5);
     vlSelf->LeafEval__DOT__vspan_hi = VL_RAND_RESET_I(5);
-    vlSelf->LeafEval__DOT__i = VL_RAND_RESET_I(32);
     vlSelf->LeafEval__DOT__fo2b__DOT__fom = VL_RAND_RESET_I(5);
     vlSelf->LeafEval__DOT__scan__DOT__brk = VL_RAND_RESET_I(1);
     vlSelf->LeafEval__DOT__scan__DOT__c_ = VL_RAND_RESET_I(2);
@@ -2129,5 +2146,8 @@ VL_ATTR_COLD void VLeafEval___024root___ctor_var_reset(VLeafEval___024root* vlSe
     vlSelf->LeafEval__DOT__suh__DOT__t = VL_RAND_RESET_I(1);
     vlSelf->LeafEval__DOT__suv__DOT__c0 = VL_RAND_RESET_I(2);
     vlSelf->LeafEval__DOT__suv__DOT__t = VL_RAND_RESET_I(1);
+    for (int __Vi0 = 0; __Vi0 < 512; ++__Vi0) {
+        vlSelf->LeafEval__DOT__slotram__DOT__mem[__Vi0] = VL_RAND_RESET_I(8);
+    }
     vlSelf->__Vtrigprevexpr___TOP__clk__0 = VL_RAND_RESET_I(1);
 }

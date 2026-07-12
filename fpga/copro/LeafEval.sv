@@ -36,11 +36,34 @@ module LeafEval(
 	output reg [15:0] imm
 );
 
-// board register files: CUR (evaluated/mutated) + 3 snapshot slots.
-// NOTE: written ONLY inside the main FSM always block (single driver for Quartus);
-// window writes are folded in there via `wr`.
+// CUR as registers (the eval/scan walks index it combinationally); the 3 snapshot
+// slots in ONE inferred BRAM (sequential access only: window writes + 130-cyc copies)
+// -- 3 register files didn't fit the device (fitter: 4246/4191 LABs).
 reg [2:0] bcell [0:127] /*verilator public_flat_rd*/;
-reg [2:0] s_live [0:127], s_w1 [0:127], s_w2 [0:127];
+// snapshot slots in an EXPLICIT dpram (behavioral arrays fail BRAM inference in
+// Quartus Std -> got synthesized as 1.5k registers and blew the LAB budget).
+// port A = writes (host window / copy-out walk), port B = registered reads (copy-in).
+reg  [8:0] sr_addr;
+reg  [6:0] cpw_p;
+wire [8:0] sr_waddr = {wslot, waddr};
+wire       sl_we    = (wr && wslot != 2'd0) || sl_cpw;
+reg        sl_cpw;                    // S_CP_W write strobe
+wire [8:0] sl_wa    = sl_cpw ? {a_sl, cpw_p} : sr_waddr;
+wire [7:0] sl_wd    = sl_cpw ? {5'd0, bcell[cpw_p]} : {5'd0, wdata};
+wire [7:0] sl_qb;
+wire [2:0] slotq = sl_qb[2:0];
+dpram #(.widthad_a(9), .width_a(8)) slotram (
+	.clock_a  (clk),
+	.address_a(sl_wa),
+	.data_a   (sl_wd),
+	.wren_a   (sl_we),
+	.q_a      (),
+	.clock_b  (clk),
+	.address_b(sr_addr),
+	.data_b   (8'd0),
+	.wren_b   (1'b0),
+	.q_b      (sl_qb)
+);
 
 wire [1:0] col_of  [0:127];
 wire       occ_of  [0:127];
@@ -62,7 +85,8 @@ localparam S_IDLE=0, S_COLWALK=1, S_VNEXT=2, S_HRUN_L=3, S_HSPAN_L=4, S_HRUN_R=5
            S_HSPAN_R=6, S_VRUN_U=7, S_VSPAN_U=8, S_VRUN_D=9, S_VSPAN_D=10,
            S_POLROW=11, S_POLCOL=12, S_VFIN=13, S_SETUP_H=14, S_SETUP_V=15, S_DONE=16,
            S_COPY=17, S_FO1=18, S_FO2=19, S_PLACE=20, S_SCAN=21, S_EOL=22,
-           S_APPLY=23, S_GRAV=24, S_RESDONE=25;
+           S_APPLY=23, S_GRAV=24, S_RESDONE=25, S_CP_R=26, S_CP_W=27, S_CP_P=28;
+reg [3:0] cmd_l;
 reg [4:0] st;
 reg       node_leaf;           // CMD_NODE: run the leaf after resolve
 // land/resolve working regs
@@ -107,15 +131,9 @@ integer i;
 
 always @(posedge clk) begin
 	if (rst) begin
-		st <= S_IDLE; done <= 1'b0;
+		st <= S_IDLE; done <= 1'b0; sl_cpw <= 1'b0;
 	end else begin
-		if (wr)
-			case (wslot)
-				2'd0: bcell[waddr]  <= wdata;
-				2'd1: s_live[waddr] <= wdata;
-				2'd2: s_w1[waddr]   <= wdata;
-				2'd3: s_w2[waddr]   <= wdata;
-			endcase
+		if (wr && wslot == 2'd0) bcell[waddr] <= wdata;   // slot writes go via the dpram port
 		case (st)
 		S_IDLE: if (start || cmd_go) begin
 			done <= 1'b0;
@@ -124,8 +142,9 @@ always @(posedge clk) begin
 				pollution <= 0; buried <= 0; rdy_ext <= 0; vrdy <= 0; anyvir <= 0;
 				wc <= 0; wr_ <= 0; seen <= 0; fillcnt <= 0;
 				st <= S_COLWALK;
-			end else if (cmd == 4'd2 || cmd == 4'd3)             // slot copies
-				st <= S_COPY;
+			end else if (cmd == 4'd2 || cmd == 4'd3) begin       // slot copies
+				cmd_l <= cmd; st <= S_COPY;
+			end
 			else if (cmd == 4'd4) begin                          // NODE: land+place+resolve+leaf
 				node_leaf <= 1'b1;
 				legal <= 1'b0; rv_cells <= 0; rv_vir <= 0; imm <= 0;
@@ -135,22 +154,27 @@ always @(posedge clk) begin
 			end
 		end
 
+		// copy CUR <- slot: pipelined BRAM read (addr set cycle N, data cycle N+1)
 		S_COPY: begin
-			if (cmd == 4'd2)
-				for (i = 0; i < 128; i = i + 1)
-					case (a_sl)
-						2'd1: bcell[i] <= s_live[i];
-						2'd2: bcell[i] <= s_w1[i];
-						default: bcell[i] <= s_w2[i];
-					endcase
-			else
-				for (i = 0; i < 128; i = i + 1)
-					case (a_sl)
-						2'd1: s_live[i] <= bcell[i];
-						2'd2: s_w1[i]   <= bcell[i];
-						default: s_w2[i] <= bcell[i];
-					endcase
-			done <= 1'b1; st <= S_IDLE;
+			fwp2 <= 0; cpw_p <= 0;
+			sr_addr <= {a_sl, 7'd0};
+			if (cmd_l == 4'd2) st <= S_CP_P;
+			else begin sl_cpw <= 1'b1; st <= S_CP_W; end
+		end
+		S_CP_P: begin                             // prime: cell 0 lands in slotq next cycle
+			sr_addr <= sr_addr + 1'b1;
+			st <= S_CP_R;
+		end
+		S_CP_R: begin
+			bcell[fwp2] <= slotq;                 // slotq = cell fwp2
+			sr_addr <= sr_addr + 1'b1;
+			if (fwp2 == 7'd127) begin done <= 1'b1; st <= S_IDLE; end
+			else fwp2 <= fwp2 + 1'b1;
+		end
+		// copy slot <- CUR: drive the dpram write port, 128 cycles
+		S_CP_W: begin
+			if (cpw_p == 7'd127) begin sl_cpw <= 1'b0; done <= 1'b1; st <= S_IDLE; end
+			else cpw_p <= cpw_p + 1'b1;
 		end
 
 		// ---- landing: first_occ walks (col, then col+1 for horizontal) ----

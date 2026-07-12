@@ -33,6 +33,7 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         CData/*0:0*/ CoproDrMario__DOT__rst_m;
         CData/*7:0*/ CoproDrMario__DOT__DI;
         CData/*0:0*/ CoproDrMario__DOT__a_ram;
+        CData/*0:0*/ CoproDrMario__DOT__lev_wr_board;
         CData/*0:0*/ CoproDrMario__DOT__lev_start;
         CData/*0:0*/ CoproDrMario__DOT__lev_wr_arg;
         CData/*2:0*/ CoproDrMario__DOT__lev_enc;
@@ -79,9 +80,9 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__CO;
         CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__NMI_edge;
         CData/*1:0*/ CoproDrMario__DOT__cpu6502__DOT__regsel;
-        CData/*7:0*/ CoproDrMario__DOT__cpu6502__DOT__P;
     };
     struct {
+        CData/*7:0*/ CoproDrMario__DOT__cpu6502__DOT__P;
         CData/*5:0*/ CoproDrMario__DOT__cpu6502__DOT__state;
         CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__PC_inc;
         CData/*1:0*/ CoproDrMario__DOT__cpu6502__DOT__src_reg;
@@ -121,6 +122,10 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         CData/*7:0*/ CoproDrMario__DOT__cpu6502__DOT__ALU__DOT__temp_BI;
         CData/*4:0*/ CoproDrMario__DOT__cpu6502__DOT__ALU__DOT__temp_h;
         CData/*0:0*/ CoproDrMario__DOT__cpu6502__DOT__ALU__DOT__temp_HC;
+        CData/*6:0*/ CoproDrMario__DOT__leafeval__DOT__cpw_p;
+        CData/*0:0*/ CoproDrMario__DOT__leafeval__DOT__sl_cpw;
+        CData/*7:0*/ CoproDrMario__DOT__leafeval__DOT__sl_qb;
+        CData/*3:0*/ CoproDrMario__DOT__leafeval__DOT__cmd_l;
         CData/*4:0*/ CoproDrMario__DOT__leafeval__DOT__st;
         CData/*0:0*/ CoproDrMario__DOT__leafeval__DOT__node_leaf;
         CData/*4:0*/ CoproDrMario__DOT__leafeval__DOT__fo1;
@@ -141,13 +146,13 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         CData/*3:0*/ CoproDrMario__DOT__leafeval__DOT__wr_;
         CData/*4:0*/ CoproDrMario__DOT__leafeval__DOT__maxh;
         CData/*7:0*/ CoproDrMario__DOT__leafeval__DOT__holes;
+    };
+    struct {
         CData/*7:0*/ CoproDrMario__DOT__leafeval__DOT__toprisk;
         CData/*7:0*/ CoproDrMario__DOT__leafeval__DOT__spawn;
         CData/*7:0*/ CoproDrMario__DOT__leafeval__DOT__setup;
         CData/*0:0*/ CoproDrMario__DOT__leafeval__DOT__anyvir;
         CData/*0:0*/ CoproDrMario__DOT__leafeval__DOT__seen;
-    };
-    struct {
         CData/*4:0*/ CoproDrMario__DOT__leafeval__DOT__fillcnt;
         CData/*6:0*/ CoproDrMario__DOT__leafeval__DOT__vo;
         CData/*3:0*/ CoproDrMario__DOT__leafeval__DOT__v_r;
@@ -189,6 +194,8 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         SData/*15:0*/ CoproDrMario__DOT__cpu6502__DOT__PC;
         SData/*15:0*/ CoproDrMario__DOT__cpu6502__DOT__PC_temp;
         SData/*8:0*/ CoproDrMario__DOT__cpu6502__DOT__ALU__DOT__temp;
+        SData/*8:0*/ CoproDrMario__DOT__leafeval__DOT__sr_addr;
+        SData/*8:0*/ CoproDrMario__DOT__leafeval__DOT__sl_wa;
         SData/*10:0*/ CoproDrMario__DOT__leafeval__DOT__pollution;
         SData/*9:0*/ CoproDrMario__DOT__leafeval__DOT__buried;
         SData/*15:0*/ CoproDrMario__DOT__leafeval__DOT__rdy_ext;
@@ -199,23 +206,18 @@ class alignas(VL_CACHE_LINE_BYTES) VCoproDrMario___024root final : public Verila
         SData/*11:0*/ __VdlyDim0__CoproDrMario__DOT__wram__DOT__mem__v0;
         SData/*11:0*/ __VdlyDim0__CoproDrMario__DOT__wram__DOT__mem__v1;
         VlWide<4>/*127:0*/ CoproDrMario__DOT__leafeval__DOT__markb;
-        IData/*31:0*/ CoproDrMario__DOT__leafeval__DOT__i;
         IData/*31:0*/ __VactIterCount;
         VlUnpacked<CData/*7:0*/, 16384> CoproDrMario__DOT__rom;
         VlUnpacked<CData/*7:0*/, 4> CoproDrMario__DOT__cpu6502__DOT__AXYS;
         VlUnpacked<CData/*2:0*/, 128> CoproDrMario__DOT__leafeval__DOT__bcell;
-        VlUnpacked<CData/*2:0*/, 128> CoproDrMario__DOT__leafeval__DOT__s_live;
-        VlUnpacked<CData/*2:0*/, 128> CoproDrMario__DOT__leafeval__DOT__s_w1;
-        VlUnpacked<CData/*2:0*/, 128> CoproDrMario__DOT__leafeval__DOT__s_w2;
         VlUnpacked<CData/*1:0*/, 128> CoproDrMario__DOT__leafeval__DOT__col_of;
         VlUnpacked<CData/*0:0*/, 128> CoproDrMario__DOT__leafeval__DOT__occ_of;
+    };
+    struct {
         VlUnpacked<CData/*0:0*/, 128> CoproDrMario__DOT__leafeval__DOT__vir_of;
+        VlUnpacked<CData/*7:0*/, 512> CoproDrMario__DOT__leafeval__DOT__slotram__DOT__mem;
         VlUnpacked<CData/*7:0*/, 4096> CoproDrMario__DOT__wram__DOT__mem;
     };
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w2;
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_w1;
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__s_live;
-    VlNBACommitQueue<VlUnpacked<CData/*2:0*/, 128>, false, CData/*2:0*/, 1> __VdlyCommitQueueCoproDrMario__DOT__leafeval__DOT__bcell;
     VlTriggerVec<1> __VstlTriggered;
     VlTriggerVec<1> __VicoTriggered;
     VlTriggerVec<3> __VactTriggered;
