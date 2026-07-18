@@ -65,8 +65,25 @@ VSEEN1, VSEEN2 = 0x616A, 0x616B   # count-was-nonzero-this-match latches (gate t
                                   # in 1P/demo contexts the unused P2 count reads 0 -> START-spam)
 import os as _os
 USE_SEEDS = _os.environ.get("DRSEED", "1") != "0"   # DRSEED=0 -> seeds stay 0 = deterministic mirror
+# WEAVE steering: when sliding to the target column is blocked at the pill's row (stuck
+# >= WEAVE_LIM hook-cycles), release the gravity freeze for one drop so the pill descends
+# a row and can slide past the obstruction (down-and-over), instead of hovering frozen and
+# then force-dropping straight down. Measured: 8-17% of legal cols are slide-unreachable at
+# half-to-3/4 fill -> misplacement -> burial (hardware walls at ~20 viruses). DRWEAVE=0 off.
+USE_WEAVE = _os.environ.get("DRWEAVE", "1") != "0"
+# DRHUMAN=1 -> HUMAN-CHALLENGE build: P1 = human passthrough (no copro search, no $F5/$F7
+# injection, no P1 gravity pinning in act), P2 = the validated copro AI unchanged.
+HUMAN_P1 = _os.environ.get("DRHUMAN", "0") == "1"
+WEAVE_LIM = int(_os.environ.get("DRWEAVELIM", "40"))   # hook-cycles of no-move before a weave drop
+                                                        # (> DAS repeat ~30 so normal slides don't trip it)
 VCOUNT_P1, VCOUNT_P2 = 0x0324, 0x03A4   # remaining virus counts (0 => that player cleared -> STAGE CLEAR)
 W2_BASE = 0x5200
+# DRPOCKET=1: single-window build (Analogue Pocket core has only the $5000 window).
+# P2's copro traffic rides the $5000 mailbox instead of $5200. Requires DRHUMAN=1
+# (P1 must not be using the window; with both players active they'd collide).
+if _os.environ.get("DRPOCKET", "0") == "1":
+    assert _os.environ.get("DRHUMAN", "0") == "1", "DRPOCKET requires DRHUMAN=1 (single window)"
+    W2_BASE = 0x5000
 # if a pill sits still this many frames (while not search-frozen), force DOWN to unstick
 STUCK_LIM = 60        # 1s -- continuous holds again; if truly stuck kick fast to unpark
 # copro window (mapper 100)
@@ -248,8 +265,15 @@ def build_main(level=11, speed=1):
         a.ins16("LDA_abs", pend); a.br("BNE", f"{L}_st1"); a.jmp(f"{L}_done"); a.label(f"{L}_st1")
         a.ins16("LDA_abs", delay); a.br("BEQ", f"{L}_st2"); a.jmp(f"{L}_done"); a.label(f"{L}_st2")
         a.ins("LDX_imm", 0)
+        # NES playfield empties are 0xFF *or* 0x00 (per tile-encoding); the copro parser only
+        # treats 0xFF as empty, so a 0x00 cell reads as a PHANTOM yellow pill -> the color-heavy
+        # depth-3 endgame eval corrupts once mid-game clears create 0x00 cells (walls at ~20;
+        # sim never sees it -- faithful_to_nes always emits 0xFF). Normalize 0x00 -> 0xFF here.
         a.label(f"{L}_cp")
-        a.ins16("LDA_absX", board_src); a.ins16("STA_absX", wbase)
+        a.ins16("LDA_absX", board_src); a.br("BNE", f"{L}_cpnz")   # non-zero -> store as-is
+        a.ins("LDA_imm", 0xFF)                                      # 0x00 -> empty
+        a.label(f"{L}_cpnz")
+        a.ins16("STA_absX", wbase)
         a.ins("INX"); a.ins("CPX_imm", 128); a.br("BNE", f"{L}_cp")
         for k, src in enumerate(colsrcs):
             if k == 0:      # cA carries seed low nibble (<<4)
@@ -268,7 +292,8 @@ def build_main(level=11, speed=1):
         a.ins("LDA_imm", 0); a.ins16("STA_abs", pend); a.ins16("STA_abs", wretry)
         a.ins16("STA_abs", wdog); a.ins16("STA_abs", wdogh)
         a.label(f"{L}_done")
-    handle(1, 0x5000, 0x0400, [0x0301, 0x0302, 0x031A, 0x031B], ARMED, WDOG, WRETRY, PEND1, DELAY1, TGT_C1, TGT_O1, WDOGH1, SEED1)
+    if not HUMAN_P1:
+        handle(1, 0x5000, 0x0400, [0x0301, 0x0302, 0x031A, 0x031B], ARMED, WDOG, WRETRY, PEND1, DELAY1, TGT_C1, TGT_O1, WDOGH1, SEED1)
     handle(2, W2_BASE, 0x0500, [0x0381, 0x0382, 0x039A, 0x039B], ARMED2, WDOG2, WRETRY2, PEND2, DELAY2, TGT_C2, TGT_O2, WDOGH2, SEED2)
     a.jmp("act")
 
@@ -307,12 +332,18 @@ def build_main(level=11, speed=1):
     a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF6); a.jmp("act_p1")
     a.label("mv_p2")
     a.ins16("LDA_abs", 0x0385); a.ins16("CMP_abs", TGT_C2); a.br("BEQ", "dn_p2")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
+    if not USE_WEAVE:
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)  # baseline: freeze at spawn row (slide-only)
+    # WEAVE: skip the freeze -> the pill falls at natural gravity WHILE sliding toward the
+    # target, weaving down-and-over past columns blocked at the spawn row. DAS shift-rate
+    # (~1 col/6f) >> drop-rate (~1 row/16f), so it reaches the target column well before landing.
     a.ins("LDY_imm", 0x01); a.ins16("LDA_abs", 0x0385); a.ins16("CMP_abs", TGT_C2); a.br("BCC", "st_p2")
     a.ins("LDY_imm", 0x02); a.jmp("st_p2")
     a.label("dn_p2"); a.ins("LDY_imm", 0x04)
     a.label("st_p2"); a.ins("STY_zp", 0xF6)
     a.label("act_p1")
+    if HUMAN_P1:
+        a.jmp("act_done")                                   # human P1: never touch $F5/$F7/GRAV_P1
     # skip P1 acting if we're currently searching for P1
     a.ins16("LDA_abs", ARMED); a.br("BEQ", "act_p1_go")    # not searching P1 -> steer it
     a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)       # searching P1 -> freeze + skip steer
@@ -327,7 +358,9 @@ def build_main(level=11, speed=1):
     a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF5); a.jmp("act_done")
     a.label("mv_p1")
     a.ins16("LDA_abs", 0x0305); a.ins16("CMP_abs", TGT_C1); a.br("BEQ", "dn_p1")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
+    if not USE_WEAVE:
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)  # baseline: freeze at spawn row (slide-only)
+    # WEAVE: skip the freeze -> pill falls while sliding, weaving down-and-over (see mv_p2).
     a.ins("LDY_imm", 0x01); a.ins16("LDA_abs", 0x0305); a.ins16("CMP_abs", TGT_C1); a.br("BCC", "st_p1")
     a.ins("LDY_imm", 0x02); a.jmp("st_p1")
     a.label("dn_p1"); a.ins("LDY_imm", 0x04)
