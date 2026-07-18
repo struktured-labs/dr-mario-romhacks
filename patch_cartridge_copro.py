@@ -363,7 +363,14 @@ def build_main(level=11, speed=1):
     # (~1 col/6f) >> drop-rate (~1 row/16f), so it reaches the target column well before landing.
     a.ins("LDY_imm", 0x01); a.ins16("LDA_abs", 0x0385); a.ins16("CMP_abs", TGT_C2); a.br("BCC", "st_p2")
     a.ins("LDY_imm", 0x02); a.jmp("st_p2")
-    a.label("dn_p2"); a.ins("LDY_imm", 0x04)
+    a.label("dn_p2")
+    if NO_FREEZE:
+        # ANYTIME: never fast-drop while the search is still ARMED — gravity is the time
+        # budget. Aligned + still thinking = hold position (no input) and keep falling.
+        a.ins16("LDA_abs", ARMED2); a.br("BEQ", "dn_p2_go")
+        a.ins("LDY_imm", 0x00); a.jmp("st_p2")
+        a.label("dn_p2_go")
+    a.ins("LDY_imm", 0x04)
     a.label("st_p2"); a.ins("STY_zp", 0xF6)
     a.label("act_p1")
     if HUMAN_P1:
