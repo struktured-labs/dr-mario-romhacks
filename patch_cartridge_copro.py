@@ -306,8 +306,12 @@ def build_main(level=11, speed=1):
     # (time-sharing wait was letting pills drop 2-4 rows before their target arrived ->
     # unreachable columns -> bad placements). Called from act below.
     a.label("freeze_pending")
-    a.ins16("LDA_abs", PEND1); a.br("BEQ", "fp_p2")
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
+    if not HUMAN_P1:
+        # (DRHUMAN builds MUST skip this: handle(1) never runs, so PEND1 is uninitialized
+        #  boot garbage — nonzero garbage pinned P1's gravity forever = capsule stuck at top,
+        #  observed on Pocket hardware 2026-07-18.)
+        a.ins16("LDA_abs", PEND1); a.br("BEQ", "fp_p2")
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P1)
     a.label("fp_p2")
     a.ins16("LDA_abs", PEND2); a.br("BEQ", "fp_done")
     a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
