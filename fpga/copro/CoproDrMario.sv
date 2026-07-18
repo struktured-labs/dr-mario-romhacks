@@ -1,3 +1,4 @@
+// rebuild-tag: BoardEngine dpram-slots (fit fix) 2026-07-11e
 // Dr. Mario depth-2 AI coprocessor (mapper 100 = MMC1 banking + this block).
 // A second 6502 (Arlet core, renamed copro6502) free-runs at the core master clock
 // (~85.9 MHz vs the game CPU's 1.79 MHz) computing the depth-2 pill placement.
@@ -18,7 +19,7 @@
 //
 // Proven in simulation (fpga/copro in dr-mario-mods): handshake 6/6 vs the py65 machine,
 // 13-23M copro clocks per pill -> ~0.15-0.35s at 85.9MHz.
-module CoproDrMario(
+module CoproDrMario #(parameter [6:0] WIN = 7'b0101_000) (   // WIN = prg_ain[15:9] window select
 	input         clk,        // host/bridge clock (NES system clock ~21.5MHz)
 	input         clk_cpu,    // coprocessor clock (clk85 ~85.9MHz): 6502 + ROM + RAM port A
 	input         ce,         // M2 (game-CPU cycle enable) for host-side sampling
@@ -28,10 +29,10 @@ module CoproDrMario(
 	input         prg_write,
 	input   [7:0] prg_din,
 	output  [7:0] prg_dout,   // valid when copro_sel && prg_read (cart_top overrides)
-	output        copro_sel   // host window hit ($5000-$51FF)
+	output        copro_sel   // host window hit (WIN: copro1=$5000-$51FF, copro2=$5200-$53FF)
 );
 
-assign copro_sel = enable && (prg_ain[15:9] == 7'b0101_000);   // $5000-$51FF
+assign copro_sel = enable && (prg_ain[15:9] == WIN);   // window-relative offset = prg_ain[8:0]
 
 // ------------------------------------------------------------------ coprocessor CPU
 wire [15:0] AB;
@@ -40,6 +41,7 @@ wire        WE;
 reg   [4:0] rst_cnt = 5'h1F;    // parked in reset until first GO (host clk domain)
 reg         parked  = 1'b1;
 wire        cpu_rst_src = (rst_cnt != 0) || parked;
+// 2FF sync into the fast CPU domain (reset pulse is 31 host clocks = ~124 clk_cpu: plenty)
 reg         rst_m = 1'b1, cpu_rst = 1'b1;
 always @(posedge clk_cpu) begin rst_m <= cpu_rst_src; cpu_rst <= rst_m; end
 wire  [7:0] DI;
