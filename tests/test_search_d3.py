@@ -20,7 +20,8 @@ patch_vs_cpu.OPS.setdefault("ASL_zp", 0x06)
 patch_vs_cpu.OPS.setdefault("ORA_zp", 0x05)
 patch_vs_cpu.OPS.setdefault("EOR_zp", 0x45)
 from py65_harness import Cpu
-from test_depth2 import (_rand_board, _emit_calc_imm, _emit_copy, emit_landplace,
+from test_depth2 import (S_BEST_C, S_BEST_O,
+                         _rand_board, _emit_calc_imm, _emit_copy, emit_landplace,
                          S_CA, S_CB, S_NA, S_NB, CI_LO, CI_HI, PO, PC, PCA, PCB)
 from test_leaf_d3 import emit_leaf_score_d3, emit_combine_d3, EV_POL_LO, EV_POL_HI
 from test_pollution import emit_pollution
@@ -134,6 +135,7 @@ def _e_node(a, o_zp, c_zp, ca_abs, cb_abs):
 def _emit_search_d3_engine(a):
     a.label("search")
     a.ins("LDA_imm", 0xFF); a.ins("STA_zp", D_BO)
+    a.ins16("STA_abs", S_BEST_O)                    # ANYTIME: live mailbox invalid until 1st cand
     a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_BVL); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_BVH)
     # tie-break seed (same as soft build)
     a.ins16("LDA_abs", S_CA); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("STA_zp", D_SEED)
@@ -279,6 +281,8 @@ def _emit_search_d3_engine(a):
     a.br("BVC", "o_s1"); a.ins("EOR_imm", 0x80); a.label("o_s1"); a.br("BPL", "s_next")
     a.ins("LDA_zp", D_V1L); a.ins("STA_zp", D_BVL); a.ins("LDA_zp", D_V1H); a.ins("STA_zp", D_BVH)
     a.ins("LDA_zp", D_C1); a.ins("STA_zp", D_BC); a.ins("LDA_zp", D_O1); a.ins("STA_zp", D_BO)
+    a.ins("LDA_zp", D_BC); a.ins16("STA_abs", S_BEST_C)     # ANYTIME: live-publish running best
+    a.ins("LDA_zp", D_BO); a.ins16("STA_abs", S_BEST_O)
     a.label("s_next")
     a.ins("INC_zp", D_J1); a.jmp("s_loop")
     a.label("o_done"); a.ins("RTS")
@@ -456,6 +460,7 @@ def _score_to_ac(a):
 def _emit_search_d3(a):
     a.label("search")
     a.ins("LDA_imm", 0xFF); a.ins("STA_zp", D_BO)
+    a.ins16("STA_abs", S_BEST_O)                    # ANYTIME: live mailbox invalid until 1st cand
     a.ins("LDA_imm", 0x00); a.ins("STA_zp", D_BVL); a.ins("LDA_imm", 0x80); a.ins("STA_zp", D_BVH)   # best_val=-32768
     # tie-break seed rides the color bytes' HIGH nibbles: SEED = (S_CB&$F0)|(S_CA>>4); 0=off
     a.ins16("LDA_abs", S_CA); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A"); a.ins("STA_zp", D_SEED)
@@ -625,6 +630,8 @@ def _emit_search_d3(a):
     a.br("BVC", "o_s1"); a.ins("EOR_imm", 0x80); a.label("o_s1"); a.br("BPL", "s_next")
     a.ins("LDA_zp", D_V1L); a.ins("STA_zp", D_BVL); a.ins("LDA_zp", D_V1H); a.ins("STA_zp", D_BVH)
     a.ins("LDA_zp", D_C1); a.ins("STA_zp", D_BC); a.ins("LDA_zp", D_O1); a.ins("STA_zp", D_BO)
+    a.ins("LDA_zp", D_BC); a.ins16("STA_abs", S_BEST_C)     # ANYTIME: live-publish running best
+    a.ins("LDA_zp", D_BO); a.ins16("STA_abs", S_BEST_O)
     a.label("s_next")
     a.ins("INC_zp", D_J1); a.jmp("s_loop")
     a.label("o_done"); a.ins("RTS")

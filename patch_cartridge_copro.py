@@ -74,6 +74,11 @@ USE_WEAVE = _os.environ.get("DRWEAVE", "1") != "0"
 # DRHUMAN=1 -> HUMAN-CHALLENGE build: P1 = human passthrough (no copro search, no $F5/$F7
 # injection, no P1 gravity pinning in act), P2 = the validated copro AI unchanged.
 HUMAN_P1 = _os.environ.get("DRHUMAN", "0") == "1"
+# DRNOFREEZE=1 -> ANYTIME steering: never pin P2 gravity while searching. The firmware
+# live-publishes its running best into the result mailbox (orient=0xFF = "no result yet"
+# sentinel); the driver refreshes TGT every hook and weave-steers while the search refines.
+# Pill fall time becomes the AI's honest time budget (kills the visible mid-air pause).
+NO_FREEZE = _os.environ.get("DRNOFREEZE", "0") == "1"
 WEAVE_LIM = int(_os.environ.get("DRWEAVELIM", "40"))   # hook-cycles of no-move before a weave drop
                                                         # (> DAS repeat ~30 so normal slides don't trip it)
 VCOUNT_P1, VCOUNT_P2 = 0x0324, 0x03A4   # remaining virus counts (0 => that player cleared -> STAGE CLEAR)
@@ -317,8 +322,23 @@ def build_main(level=11, speed=1):
     a.jsr("freeze_pending")
     # P2 first (only if we're not currently freezing it)
     a.ins16("LDA_abs", ARMED2); a.br("BEQ", "act_p2")      # not searching P2 -> steer it
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)       # searching P2 -> freeze + skip steer
-    a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
+    if NO_FREEZE:
+        # ANYTIME: refresh TGT from the LIVE mailbox and keep steering during the search.
+        # Scratch = $616C/$616D free driver RAM (NOT zp $DB/$DC = v28cs eval scratch).
+        a.ins16("LDA_abs", W2_BASE + 0x86); a.ins("CMP_imm", 0xFF); a.br("BEQ", "nf2_hold")
+        a.ins16("STA_abs", 0x616C)
+        a.ins16("LDA_abs", W2_BASE + 0x85); a.ins16("STA_abs", 0x616D)
+        a.ins16("LDA_abs", W2_BASE + 0x86); a.ins16("CMP_abs", 0x616C); a.br("BNE", "act_p1")  # torn read: keep old TGT
+        a.ins16("LDA_abs", 0x616D); a.ins16("STA_abs", TGT_C2)
+        a.ins16("LDA_abs", 0x616C); a.ins16("STA_abs", TGT_O2)
+        a.jmp("act_p2")                                     # weave-steer toward the live target, no freeze
+        a.label("nf2_hold")
+        # no candidate published yet (first ~10ms of the search): brief freeze as before
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
+        a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
+    else:
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)       # searching P2 -> freeze + skip steer
+        a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
     a.label("act_p2")
     a.ins16("LDA_abs", STK2); a.ins("CMP_imm", STUCK_LIM); a.br("BCC", "act_p2_n")
     a.ins("LDY_imm", 0x04); a.ins("STY_zp", 0xF6); a.jmp("act_p1")   # stuck: force drop
