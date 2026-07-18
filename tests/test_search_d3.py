@@ -47,6 +47,8 @@ TK1_KL, TK1_KH, TK1_O, TK1_C = 0x0A00, 0x0A20, 0x0A40, 0x0A60
  D_B2L, D_B2H, D_KL, D_KH, D_I2L, D_I2H, D_MKL, D_MKH, D_MI, D_J, D_PI, D_SL, D_SM, D_SH,
  D_EBL, D_EBH, D_EA, D_V3L, D_V3H, D_EL, D_EH, D_V1L, D_V1H, D_J1, D_T1C,
  D_SEED, D_JT) = range(0x40, 0x68)
+D_L1L, D_L1H = 0x68, 0x69     # ply-1 leaf (for the temporal discount)
+DISC = False                   # emit discounted combine (set by build_copro_d3)
 
 THIRD = [(0, 1), (1, 2), (2, 0), (1, 1)]   # stratified 4-pill subset (3 mixed + 1 double), /4=shift
 RESOLVE_LBL = "resolve_capped"   # TARGETED (deploy config, isolation 12/12); "resolve_capped_full" for full
@@ -193,6 +195,9 @@ def _emit_search_d3_engine(a):
     _e_copy(a, 1, True)
     _e_node(a, D_O1, D_C1, S_CA, S_CB)
     a.ins16("LDA_abs", LEV_IMM); a.ins("STA_zp", D_I1L); a.ins16("LDA_abs", LEV_IMM + 1); a.ins("STA_zp", D_I1H)
+    if DISC:
+        a.ins16("LDA_abs", LEV_SCO); a.ins("STA_zp", D_L1L)
+        a.ins16("LDA_abs", LEV_SCO + 1); a.ins("STA_zp", D_L1H)
     a.ins16("LDA_abs", LEV_WIN_R); a.br("BEQ", "o_nw")
     a.ins("CLC"); a.ins("LDA_zp", D_I1L); a.ins("ADC_imm", WIN & 0xFF); a.ins("STA_zp", D_V1L)
     a.ins("LDA_zp", D_I1H); a.ins("ADC_imm", (WIN >> 8) & 0xFF); a.ins("STA_zp", D_V1H)
@@ -267,8 +272,19 @@ def _emit_search_d3_engine(a):
     a.label("k_nx")
     a.ins("INC_zp", D_J); a.jmp("k_loop")
     a.label("k_done")
-    a.ins("CLC"); a.ins("LDA_zp", D_I1L); a.ins("ADC_zp", D_B2L); a.ins("STA_zp", D_V1L)
-    a.ins("LDA_zp", D_I1H); a.ins("ADC_zp", D_B2H); a.ins("STA_zp", D_V1H)
+    if DISC:
+        # val1 = imm1 + leaf1 + asr16(best2 - leaf1)   [d = 0.5 temporal discount]
+        a.ins("SEC"); a.ins("LDA_zp", D_B2L); a.ins("SBC_zp", D_L1L); a.ins("STA_zp", D_V1L)
+        a.ins("LDA_zp", D_B2H); a.ins("SBC_zp", D_L1H)
+        a.ins("CMP_imm", 0x80); a.ins("ROR_A"); a.ins("STA_zp", D_V1H)   # asr hi (sign-preserving)
+        a.ins("LDA_zp", D_V1L); a.ins("ROR_A"); a.ins("STA_zp", D_V1L)   # ror lo with carry
+        a.ins("CLC"); a.ins("LDA_zp", D_V1L); a.ins("ADC_zp", D_L1L); a.ins("STA_zp", D_V1L)
+        a.ins("LDA_zp", D_V1H); a.ins("ADC_zp", D_L1H); a.ins("STA_zp", D_V1H)
+        a.ins("CLC"); a.ins("LDA_zp", D_V1L); a.ins("ADC_zp", D_I1L); a.ins("STA_zp", D_V1L)
+        a.ins("LDA_zp", D_V1H); a.ins("ADC_zp", D_I1H); a.ins("STA_zp", D_V1H)
+    else:
+        a.ins("CLC"); a.ins("LDA_zp", D_I1L); a.ins("ADC_zp", D_B2L); a.ins("STA_zp", D_V1L)
+        a.ins("LDA_zp", D_I1H); a.ins("ADC_zp", D_B2H); a.ins("STA_zp", D_V1H)
     a.label("o_cand")
     a.ins("LDA_zp", D_SEED); a.br("BEQ", "o_nj")
     a.ins("LDA_zp", D_O1); a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ASL_A"); a.ins("ORA_zp", D_C1)

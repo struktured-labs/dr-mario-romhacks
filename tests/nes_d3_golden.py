@@ -13,6 +13,8 @@ from test_eval_terms import g_buried, g_setup
 from test_incremental import g_readiness_ext
 
 WIN = 30000   # firmware 16-bit-fitting win bonus (dominates max-non-win ~16600, +imm < 32767)
+DISC_SHIFT = None   # temporal discount: val = imm1 + leaf1 + ((best2-leaf1) >> DISC_SHIFT).
+                    # None = off (classic). 1 = d=0.5 (fixes dual-end park pathology; +14% solo efficiency).
 USE_VRDY = True
 RESOLVE = "targeted"   # deploy config (isolation 12/12); "full" only for older cross-checks
 
@@ -184,7 +186,11 @@ def decide_d3(board, pA, pB, nA, nB, topk1=8, topk2=8, third=None, seed=0):
                         v2 = imm2 + tot // len(pills3)
                     if best2 is None or v2 > best2:
                         best2 = v2
-                val = imm1 + best2
+                if DISC_SHIFT is None:
+                    val = imm1 + best2
+                else:
+                    leaf1_ = _k1 - imm1
+                    val = imm1 + leaf1_ + ((best2 - leaf1_) >> DISC_SHIFT)
         val += _jitter(seed, o4, col)
         if best_val is None or val > best_val:
             best_val = val; best_key = (col, o4)
