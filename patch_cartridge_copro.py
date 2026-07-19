@@ -97,19 +97,25 @@ W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5084, 0x508
 B_SEL, B_START, B_LEFT, B_RIGHT = 0x20, 0x10, 0x02, 0x01
 
 # DRSTUDY=1 -> "study pause": freeze game logic on pause but keep the last gameplay frame
-# fully rendered instead of the vanilla blank+"PAUSE". Default ON for human carts (DRHUMAN=1)
-# so a paused board can be studied. Mechanism (base pause routine at CPU $978E; verified on
-# base drmario.nes in Mesen — see tmp/study_pause/): the routine blanks the background
-# ($2001 bit3), fills OAM with $FF, draws "PAUSE", then spins on $B654 whose tail re-clears
-# OAM every frame. We keep background rendering ON, and swap the two pause frame-waits from
-# $B654 -> $B670 (an identical wait WITHOUT the OAM-clear tail) so the sprites that were in
-# the buffer at pause entry stay put; the entry OAM-clear and the PAUSE draw are NOP'd.
-#   NOTE (validation basis): base-ROM change is Mesen-proven. The copro carts are mapper 100
-#   (not Mesen-emulable); DRSTUDY applies the SAME asserted byte patches to the same pause
-#   routine in the v28cs image (which already carries 2 of the 5 edits from a prior partial
-#   attempt — the patch is idempotent). The falling capsule + bottle + viruses stay visible;
-#   the next-pill preview / Dr.Mario / magnifier sprites are built by the frozen main loop and
-#   are NOT restored by this confined patch (would need a snapshot-restore buffer).
+# rendered instead of the vanilla blank+"PAUSE". Default ON for human carts (DRHUMAN=1) so a
+# paused board can be studied. Mechanism (base pause routine at CPU $978E; verified on base
+# drmario.nes in Mesen — see tmp/study_pause/): the routine blanks the background ($2001 bit3),
+# fills OAM with $FF, draws "PAUSE", then spins on $B654 whose tail re-clears OAM every frame.
+# We keep background rendering ON, and swap the two pause frame-waits $B654 -> $B670 (identical
+# wait WITHOUT the OAM-clear tail) so the sprites in the buffer at pause entry stay put; the
+# entry OAM-clear is NOP'd. The falling capsule + bottle + viruses are in the buffer at pause
+# entry, so they persist. The NEXT-PILL PREVIEW is built by a later (skipped) main-loop phase,
+# so we HAND-DRAW it: the pause loop's old "draw PAUSE" call is repointed to a 47-byte routine
+# (STUDY_BLOB at $D2CC, a common dead-padding slot free in base AND v28cs) that writes the two
+# preview sprites into OAM slots 2-3 from the next-pill colors $031A/$031B (tile $60|cA / $70|cB,
+# pos Y=$45 X=$BE/$C6 attr=$02 — matches the game's own preview; Mesen-verified byte-for-byte).
+#   NOTE (validation basis): base-ROM change is Mesen-proven (paused frame shows bottle+viruses+
+#   capsule+preview, frozen, clean resume). The copro carts are mapper 100 (not Mesen-emulable);
+#   DRSTUDY applies the SAME asserted byte patches + blob to the v28cs image (which already
+#   carries 2 of the 5 edits from a prior partial attempt — the patch is idempotent). Dr.Mario /
+#   magnifier sprites are still not restored (decor built by the skipped main-loop phase). The
+#   carts run in VS-CPU mode; pause-reachability and 2P preview correctness are NOT emulator-
+#   verified. $D2CC-$D2FF must be confirmed dead in any deployed binary before surgical patching.
 STUDY = _os.environ.get("DRSTUDY", "1" if HUMAN_P1 else "0") != "0"
 # Anchor on the pause loop's START/$F7 check (LDA $F5;CMP #$10;BEQ;LDA $F7;CMP #$F0;BEQ) —
 # these bytes are NEVER touched by the edits, so the locator stays valid + idempotent even
@@ -119,9 +125,21 @@ STUDY_EDITS = [   # (rel-to-anchor, [accepted originals], replacement, note)
     (-0x20, [bytes.fromhex("2054b6")], bytes.fromhex("2070b6"), "entry wait $B654->$B670 (no OAM clear)"),
     (-0x1D, [bytes.fromhex("a916"), bytes.fromhex("a91e")], bytes.fromhex("a91e"), "keep background rendering ON"),
     (-0x12, [bytes.fromhex("2094b8"), bytes.fromhex("eaeaea")], bytes.fromhex("eaeaea"), "drop entry OAM clear"),
-    (-0x03, [bytes.fromhex("20f688")], bytes.fromhex("eaeaea"), "drop PAUSE draw"),
+    (-0x03, [bytes.fromhex("20f688"), bytes.fromhex("eaeaea")], bytes.fromhex("20ccd2"), "draw preview (JSR $D2CC)"),
     (0x0C, [bytes.fromhex("2054b6")], bytes.fromhex("2070b6"), "loop wait $B654->$B670 (no OAM clear)"),
 ]
+# Preview-draw routine, placed at CPU $D2CC (dead padding after the routine ending $D2CB RTS;
+# 52 free bytes, filler in base AND v28cs). Reads next-pill colors $031A/$031B, writes the two
+# preview half-pill sprites to OAM slots 2-3 (unused during pause; capsule holds slots 0-1).
+STUDY_BLOB_CPU = 0xD2CC
+STUDY_BLOB = bytes.fromhex(
+    "AD1A03" "2903" "0960" "8D0902"   # LDA $031A; AND #3; ORA #$60; STA $0209 (slot2 tile = left)
+    "AD1B03" "2903" "0970" "8D0D02"   # LDA $031B; AND #3; ORA #$70; STA $020D (slot3 tile = right)
+    "A945" "8D0802" "8D0C02"          # LDA #$45; STA $0208; STA $020C      (Y = 69, both)
+    "A902" "8D0A02" "8D0E02"          # LDA #$02; STA $020A; STA $020E      (attr = 2, both)
+    "A9BE" "8D0B02"                   # LDA #$BE; STA $020B                 (slot2 X = 190)
+    "A9C6" "8D0F02"                   # LDA #$C6; STA $020F                 (slot3 X = 198)
+    "60")                            # RTS
 
 
 class StudyPatchError(Exception):
@@ -130,9 +148,12 @@ class StudyPatchError(Exception):
 
 def apply_study_pause(rom):
     """Apply the DRSTUDY 'study pause' byte patches to a Dr. Mario PRG image in place.
-    Idempotent + asserted: locate the pause routine by a stable 19-byte anchor, verify each
-    target holds an accepted original (base) OR the already-patched value (v28cs / re-run),
-    and fail loudly on anything else. Returns the count of edits actually written."""
+    Idempotent + asserted: locate the pause routine by a stable anchor, verify each target holds
+    an accepted original (base) OR the already-patched value (v28cs / re-run), place the preview
+    blob in dead padding (asserting it is filler or already the blob), and fail loudly on
+    anything else. Returns the count of edits actually written (edits + blob)."""
+    if rom[4] != 2:
+        raise StudyPatchError(f"DRSTUDY: expected a 32KB-PRG image (2 banks), got {rom[4]}")
     a = rom.find(STUDY_ANCHOR)
     if a < 0:
         raise StudyPatchError("DRSTUDY: pause-routine anchor not found (unexpected ROM)")
@@ -145,12 +166,20 @@ def apply_study_pause(rom):
             raise StudyPatchError(
                 f"DRSTUDY: 0x{off:X} ({note}): got {got.hex()}, expected one of "
                 + "/".join(b.hex() for b in accepted + [after]))
+    blob_off = 16 + (STUDY_BLOB_CPU - 0x8000)              # $D2CC -> file offset in a 32KB image
+    cur = bytes(rom[blob_off:blob_off + len(STUDY_BLOB)])
+    if cur != STUDY_BLOB and set(cur) - {0x00, 0xFF}:      # must be dead padding (or already ours)
+        raise StudyPatchError(
+            f"DRSTUDY: blob target 0x{blob_off:X} (${STUDY_BLOB_CPU:04X}) not free: {cur[:8].hex()}...")
     written = 0
     for rel, accepted, after, note in STUDY_EDITS:
         off = a + rel
         if bytes(rom[off:off + len(after)]) != after:
             rom[off:off + len(after)] = after
             written += 1
+    if cur != STUDY_BLOB:
+        rom[blob_off:blob_off + len(STUDY_BLOB)] = STUDY_BLOB
+        written += 1
     return written
 
 
