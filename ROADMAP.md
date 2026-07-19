@@ -38,8 +38,9 @@
 - **Obvious-move gate, phase 2 (R4–R7)**: depth-proportional hang credit,
   matched-cover setup credit, targeted caps. Target: **≥95% take-rate**
   (the "wife-readiness gate"); projected ~96–97%.
-- **Study v3.1**: fix VS-mode OAM slot collision (STUDY letters must not displace
-  P2's frozen capsule); then TE v6 goes to romhacking.net (Struktured account).
+- **TE v6 (study v3.1)**: ✅ built & validated all modes (1P/2P/VS — both players'
+  frozen capsules intact + STUDY + mode-correct preview). BPS in `release/`;
+  romhacking.net upload = author's move.
 - **Expert corpus (DRMC 2017–2026)**: ~41 GB banked (2024 championship complete,
   2025 partial); self-healing download loop working through YouTube rate limits.
   Champions table complete except 2025. Match-timestamp index parsed (305 matches).
