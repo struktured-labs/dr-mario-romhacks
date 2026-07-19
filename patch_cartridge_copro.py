@@ -179,18 +179,26 @@ def build_main(level=11, speed=1):
     a.ins("CMP_imm", 0x07); a.br("BEQ", "an_start")         # post-match: START -> rematch
     a.ins("RTS")
     a.label("an_title")
-    # DETERMINISTIC mode landing: START only when $0727 == 2 (VS-CPU exactly). The old
-    # $04!=0 gate armed at 2P too and could START from the wrong mode (nav flake: 1P
-    # mis-lands where the never-terminating nav then eats the human's controller).
-    a.ins16("LDA_abs", 0x0727); a.ins("CMP_imm", 0x02); a.br("BNE", "an_tog")
+    # VS-CPU landing gate. $FF30 cycles three states: 1P ($0727=1,$04=0) -> 2P-human
+    # ($0727=2,$04=0) -> VS-CPU ($0727=2,$04=1). $04 is the ONLY discriminator that
+    # isolates VS-CPU; $0727==2 is ALSO true at 2P-human. Gating START on $0727==2 (the
+    # 992682f "deterministic-nav" experiment) fires START one toggle early, INTO 2P-human,
+    # where $04==0 leaves the play-dispatch AI dormant (see "LDA $04; BNE go_ai" above) ->
+    # neither board is ever uploaded, DONE never fires, both capsules stagnate. That is the
+    # v4 AB-cart regression. Gate on $04 (BEQ->toggle past 2P-human, land on VS-CPU): this
+    # is the emission that ALL shipped/validated carts use (Pocket + AB); $0727==2 never
+    # shipped. NOTE: keep this a byte-exact "LDA $04; BEQ; JMP" 7-byte block -- any change
+    # here shifts the whole downstream driver and reopens the byte-divergence from the
+    # deployed reference carts.
+    a.ins("LDA_zp", 0x04); a.br("BEQ", "an_tog")
     a.jmp("an_start")
     a.label("an_tog")
     a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 1); a.br("BEQ", "an_tog_go")
     a.ins("RTS")
     a.label("an_tog_go")
     a.jsr(0xFF30)                                           # ONE toggle per window (game needs a
-    a.ins("RTS")                                            #  frame between mode inits; the $0727==2
-                                                            #  START gate provides determinism)
+    a.ins("RTS")                                            #  frame between mode inits; the $04
+                                                            #  gate above lands VS-CPU deterministically)
     a.label("an_lvl")
     a.ins("LDA_imm", level)
     a.ins16("STA_abs", 0x0316)                              # P1 level
