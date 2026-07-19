@@ -74,6 +74,8 @@ class Sim:
         # keep P1 copro ($5000) benign / P1 not pending so handle1/act_p1 are quiet
         # frozen A-press edge bookkeeping not modeled; we read raw $F6 writes.
         self.presses = []                   # ($F6) each frame
+        self.grav_period = 1                # hooks per 1-row fall (1=every frame; macro test slows it
+        self.gcount = 0                     #  to ~L11 so the driver has time to commit + steer)
 
     def run_main(self, maxins=20000):
         mpu = self.mpu
@@ -107,9 +109,12 @@ class Sim:
                 self.mem[P2X] -= 1
             if f6 & 0x01 and self.mem[P2X] < 7:      # RIGHT
                 self.mem[P2X] += 1
-            if not froze:                   # gravity: fall one row when not pinned
-                if self.mem[P2Y] > 0:
-                    self.mem[P2Y] -= 1
+            if not froze:                   # gravity: fall one row every grav_period hooks
+                self.gcount += 1
+                if self.gcount >= self.grav_period:
+                    self.gcount = 0
+                    if self.mem[P2Y] > 0:
+                        self.mem[P2Y] -= 1
         return dict(f6=f6, froze=froze, y=self.mem[P2Y], x=self.mem[P2X],
                     o=self.mem[P2O], rot=self.mem[ROT_DONE2], tgt_o=self.mem[TGT_O2],
                     tgt_c=self.mem[TGT_C2], wdog=self.mem[WDOG2], armed=self.mem[ARMED2])
@@ -257,6 +262,30 @@ for _ in range(20):
         old_a_low = True
 check("OLD driver DID attempt low rotation (the bug)", old_a_low,
       "old anytime driver chases the late orient even when flush -> silent-fail backwards lock")
+
+# ---------------------------------------------------------------- MACRO: full-pill placed orientation
+# The gate this incident was missing. The clear-regression (MiSTer A/B 2026-07-19: DRROTFIX=1 P2
+# cleared ~0) was a wrong LANDED orientation -- the anytime path stored the copro orient UNMAPPED,
+# and the orient-lock froze it before handle()'s DONE-time map could correct it. A decision-level
+# test can't see that; only driving a REAL pill through the REAL driver to LANDING and checking the
+# PLACED orientation+column can. Removing the nf2 copro->game map makes 3/4 of these FAIL (the pill
+# lands the raw copro orient instead of the intended game orient).
+print("MACRO (DRROTFIX=1): full pill -> LANDED orientation+column == mapped copro target")
+def land_pill(game_orient, col, spawn_orient=0, spawn_x=3, rotfix=True):
+    s = Sim(rotfix=rotfix)
+    s.grav_period = 12                              # ~L11 MED: room to commit (min-think) then steer
+    spawn_pill(s, y=0x0D, x=spawn_x, orient=spawn_orient)
+    publish_live(s, col=col, orient=game_orient)    # ANYTIME path (the nf2 map under test); never DONE
+    for _ in range(400):
+        s.frame(apply_physics=True)
+        if s.mem[P2Y] == 0:                         # no board modeled -> floor == landed
+            break
+    return s.mem[P2O], s.mem[P2X]
+# every game orient (copro->game map {0:3,1:1,2:0,3:2} -- only 1 is identity) x both slide directions
+for (G, C, so, sx) in [(3, 6, 0, 3), (0, 1, 0, 4), (2, 5, 0, 2), (1, 7, 0, 0)]:
+    o, x = land_pill(G, C, spawn_orient=so, spawn_x=sx)
+    check(f"pill LANDS orient={G} col={C} (spawn o={so} x={sx})", o == G and x == C,
+          f"landed orient={o} col={x}  <- would be raw/unmapped if the nf2 map regressed")
 
 print()
 npass = sum(1 for _, c, _ in results if c)
