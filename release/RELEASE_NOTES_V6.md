@@ -35,13 +35,13 @@ Apply against an unmodified *Dr. Mario (USA)* ROM with any BPS-capable patcher
   decorative sprites are built by a game phase the freeze skips). The study-relevant content —
   bottle, viruses, falling capsule, and next-pill preview — is all shown.
 - In VS CPU / 2-player mode the "STUDY" text sits at the very top and slightly overlaps the
-  two-player score header; the freeze/capsule/preview behavior is otherwise identical to
-  1-player.
+  two-player score header (cosmetic). Both players' capsules and the preview are preserved, and
+  the preview is placed correctly for each layout.
 
 ## Compatibility
 
 - **Base ROM:** Dr. Mario (USA) — MD5: `d3ec44424b5ac1a4dc77709829f721c9`
-- **Study Mode validated on:** Mesen (headless) — both 1-player and VS CPU pause paths
+- **Study Mode validated on:** Mesen (headless) — 1-player, 2-player, and VS CPU pause paths
 - **Mapper:** standard MMC1 (mapper 1) — runs on accurate NES emulators and the MiSTer NES core
 
 ## Technical Details
@@ -56,7 +56,8 @@ Apply against an unmodified *Dr. Mario (USA)* ROM with any BPS-capable patcher
 | 0x17F3 | `$54` → `$70` | pause loop frame-wait `$B654` → `$B670` (no OAM clear) |
 | 0x2968 | Sprite data | "PAUSE" letter quads changed to "STUDY" |
 | CHR Bank 1 | Tiles 0xA0-0xA2 | custom T, D, Y letter graphics |
-| 0x52DC ($D2CC) | New routine | 50-byte study-draw: STUDY letters (slots 2-6) + next-pill preview (slots 7-8), sparing the frozen capsule (slots 0-1) |
+| 0x52DC ($D2CC) | New routine (part 1) | draws STUDY into OAM slots 32-36 + preview tiles into slots 37-38 (above every capsule), then jumps to part 2 |
+| 0x2008 ($9FF8) | New routine (part 2) | positions the preview per game mode (1-player: right box; 2-player/VS: above P1's board) |
 
 ## Credits
 
