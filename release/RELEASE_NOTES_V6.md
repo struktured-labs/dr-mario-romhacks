@@ -35,9 +35,9 @@ Apply against an unmodified *Dr. Mario (USA)* ROM with any BPS-capable patcher
 - The Dr. Mario throwing figure and the magnifier viruses are not shown while paused (these
   decorative sprites are built by a game phase the freeze skips). The study-relevant content —
   bottle, viruses, falling capsule, and next-pill preview — is all shown.
-- In VS CPU / 2-player mode the "STUDY" text sits at the very top and slightly overlaps the
-  two-player score header (cosmetic). Both players' capsules and both players' next-pill previews
-  are preserved, each preview placed correctly above its own board.
+- In VS CPU / 2-player mode the "STUDY" text is lifted to the very top of the screen so it clears
+  the two-player score header and stays legible. Both players' capsules and both players' next-pill
+  previews are preserved, each preview placed correctly above its own board.
 
 ## Compatibility
 
@@ -60,7 +60,8 @@ Apply against an unmodified *Dr. Mario (USA)* ROM with any BPS-capable patcher
 | 0x52DC ($D2CC) | New routine (part 1) | STUDY into OAM slots 32-36, P1 preview tiles into 37-38 (above every capsule), P1 1-player position, then jump to part 2 |
 | 0x2008 ($9FF8) | New routine (part 2) | 1-player → done; else set the 2-player/VS P1 position and P2 preview Y, then jump to part 3a |
 | 0x2381 ($A371) | New routine (part 3a) | P2 preview tiles + attribute into slots 39-40, then jump to part 3b |
-| 0x3E66 ($BE56) | New routine (part 3b) | P2 preview X position (above P2's board) |
+| 0x3E66 ($BE56) | New routine (part 3b) | P2 preview X position (above P2's board), then jump to part 3c |
+| 0x3C36 ($BC26) | New routine (part 3c) | in 2-player/VS, lift the STUDY letters (OAM Y = 8) to clear the score header |
 
 ## Credits
 

@@ -105,7 +105,7 @@ B_SEL, B_START, B_LEFT, B_RIGHT = 0x20, 0x10, 0x02, 0x01
 # wait WITHOUT the OAM-clear tail) so the sprites in the buffer at pause entry stay put; the
 # entry OAM-clear is NOP'd. The falling capsule + bottle + viruses are in the buffer at pause
 # entry, so they persist. The pause loop's draw call ($97D3) is repointed to STUDY_BLOB at $D2CC
-# (a 4-part trampoline routine in dead padding free in base AND v28cs) which (1) reconnects the
+# (a 5-part trampoline routine in dead padding free in base AND v28cs) which (1) reconnects the
 # "STUDY" text by setting $42=$80 then JSR $88F6 so the 5 letters land in OAM slots 32-36 (ABOVE
 # every capsule/preview, so BOTH players' capsules in 2P/VS stay put), and (2) HAND-DRAWS the
 # next-pill preview(s) — P1 (slots 37-38, colors $031A/$031B) always, and P2 (slots 39-40, colors
@@ -135,7 +135,7 @@ STUDY_EDITS = [   # (rel-to-anchor, [accepted originals], replacement, note)
 # buffer max, so BOTH players' capsules (slots 0-3 in 2P/VS) are byte-untouched. Both players consume
 # the shared pill sequence at different rates, so P2's next pill ($039A/$039B) differs from P1's
 # ($031A/$031B) and must show separately (the game itself draws both, $87DA/$87FE).
-# A mode-correct 2-preview draw doesn't fit one dead run, so it is a 4-part trampoline through dead
+# A mode-correct 2-preview draw + a 2P/VS STUDY lift don't fit one dead run, so it is a 5-part trampoline through dead
 # padding free in base AND v28cs (part1 in the fixed bank; parts 2-4 in bank0, where the pause routine
 # already runs so they are always mapped):
 #   part1 @ $D2CC: $42=$80; JSR $88F6 (STUDY -> 32-36); write P1 tiles+attr (37-38) and the 1P-default
@@ -151,11 +151,17 @@ STUDY_EDITS = [   # (rel-to-anchor, [accepted originals], replacement, note)
 #   both capsules + STUDY + BOTH mode-correct previews showing each player's actual next pill, frozen,
 #   clean resume). The copro carts are mapper 100 (not Mesen-emulable); DRSTUDY applies the SAME
 #   asserted byte patches + blobs, and the 2P base test reproduces the cart's both-capsules-in-buffer
-#   layout. All four dead runs must be confirmed dead in any deployed binary before surgical patching.
+#   layout. All five dead runs must be confirmed dead in any deployed binary before surgical patching.
 STUDY_BLOB_CPU  = 0xD2CC   # part1  (fixed bank; duplicated by expand at file 0x52DC / 0xD2DC)
 STUDY_BLOB2_CPU = 0x9FF8   # part2  (bank0; single copy, file 0x2008)
 STUDY_BLOB3_CPU = 0xA371   # part3a (bank0; single copy, file 0x2381)
 STUDY_BLOB4_CPU = 0xBE56   # part3b (bank0; single copy, file 0x3E66)
+STUDY_BLOB5_CPU = 0xBC26   # part3c (bank0; single copy, file 0x3C36) — 2P/VS STUDY lift
+# In 2P/VS the "1P/2P/LEVEL" header box's topmost pixel row is screen row 18 (measured in Mesen).
+# STUDY at the base Y=$0F (sprite rows 16-23) overlaps it, so in 2P/VS ONLY we lift the 5 STUDY
+# letters' OAM Y to $08 (sprite rows 9-16) — clears the header (1-px gap above row 18) and stays
+# below scanline 8 (survives an NTSC top-8-line CRT trim). 1P keeps $0F (its top is clear).
+STUDY_2P_Y = 0x08
 STUDY_BLOB = bytes.fromhex(                          # part1 — exactly 52 B (fills the $D2CC run)
     "A980" "8542" "20F688"            # LDA #$80; STA $42; JSR $88F6   (STUDY -> slots 32-36)
     "AD1A03" "0960" "8D9502"          # LDA $031A; ORA #$60; STA $0295 (P1 slot37 tile = left half)
@@ -177,11 +183,15 @@ STUDY_BLOB3 = bytes.fromhex(                         # part3a @ $A371 (27 B) —
     "AD9B03" "0970" "8DA102"          # LDA $039B; ORA #$70; STA $02A1 (P2 slot40 tile = right half)
     "A902" "8D9E02" "8DA202"          # LDA #$02; STA $029E; STA $02A2 (P2 attr, both halves)
     "4C56BE")                         # JMP $BE56 -> part3b
-STUDY_BLOB4 = bytes.fromhex(                         # part3b @ $BE56 (11 B) — P2 X, then done
+STUDY_BLOB4 = bytes.fromhex(                         # part3b @ $BE56 (13 B) — P2 X, then part3c
     "A9B8" "8D9F02"                   # LDA #$B8; STA $029F (P2 slot39 X = 184, above P2 board)
     "A9C0" "8DA302"                   # LDA #$C0; STA $02A3 (P2 slot40 X = 192)
-    "60")                             # RTS
-# Prior blobs at $D2CC accepted as overwritable so an already-patched image upgrades in place.
+    "4C26BC")                         # JMP $BC26 -> part3c (2P/VS STUDY lift)
+STUDY_BLOB5 = bytes.fromhex(                         # part3c @ $BC26 (18 B) — lift STUDY in 2P/VS
+    "A9%02X" % STUDY_2P_Y +           # LDA #$08  (2P/VS STUDY Y; clears the header box)
+    "8D8002" "8D8402" "8D8802" "8D8C02" "8D9002"  # STA Y of STUDY slots 32,33,34,35,36
+    "60")                             # RTS  (only reached in 2P/VS; 1P returns at part2)
+# Prior blobs accepted as overwritable so an already-patched image upgrades in place.
 OLD_STUDY_BLOB_V2 = bytes.fromhex(   # v2: preview only, slots 2-3, no STUDY text (47 B)
     "AD1A03" "2903" "0960" "8D0902" "AD1B03" "2903" "0970" "8D0D02"
     "A945" "8D0802" "8D0C02" "A902" "8D0A02" "8D0E02" "A9BE" "8D0B02" "A9C6" "8D0F02" "60")
@@ -194,6 +204,8 @@ OLD_STUDY_BLOB_V31 = bytes.fromhex(  # v3.1 part1 @ $D2CC (34 B code, was $00-pa
 OLD_STUDY_BLOB2_V31 = bytes.fromhex( # v3.1 part2 @ $9FF8 (31 B)
     "A945" "A2BE" "AC2707" "88" "F004" "A933" "A238"
     "8D9402" "8D9802" "8E9702" "8A" "18" "6908" "8D9B02" "60")
+OLD_STUDY_BLOB4_V32 = bytes.fromhex( # v3.2 part3b @ $BE56 (11 B, ended RTS instead of JMP part3c)
+    "A9B8" "8D9F02" "A9C0" "8DA302" "60")
 
 
 class StudyPatchError(Exception):
@@ -220,13 +232,14 @@ def apply_study_pause(rom):
             raise StudyPatchError(
                 f"DRSTUDY: 0x{off:X} ({note}): got {got.hex()}, expected one of "
                 + "/".join(b.hex() for b in accepted + [after]))
-    # 4 blob targets, each in a confirmed dead run; every one must be free (or already ours, or a
+    # 5 blob targets, each in a confirmed dead run; every one must be free (or already ours, or a
     # prior blob we are upgrading in place). (cpu, blob, dead-run-size, [accepted prior prefixes])
     targets = [
         (STUDY_BLOB_CPU,  STUDY_BLOB,  52, [OLD_STUDY_BLOB_V2, OLD_STUDY_BLOB_V3, OLD_STUDY_BLOB_V31]),
         (STUDY_BLOB2_CPU, STUDY_BLOB2, 38, [OLD_STUDY_BLOB2_V31]),
         (STUDY_BLOB3_CPU, STUDY_BLOB3, 28, []),
-        (STUDY_BLOB4_CPU, STUDY_BLOB4, 24, []),
+        (STUDY_BLOB4_CPU, STUDY_BLOB4, 24, [OLD_STUDY_BLOB4_V32]),
+        (STUDY_BLOB5_CPU, STUDY_BLOB5, 22, []),
     ]
     def _overwritable(reg, blob, olds):
         if reg[:len(blob)] == blob or set(reg) <= {0x00, 0xFF}:              # already ours / pristine
