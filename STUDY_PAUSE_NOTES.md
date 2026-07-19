@@ -39,39 +39,57 @@ preview. Since the **next-pill preview is required study info**, we hand-draw it
 | `$97B6` | `20 54 B6` `JSR $B654` | `20 70 B6` `JSR $B670` | entry wait, no OAM clear |
 | `$97BA` | `A9 16` `LDA #$16` | `A9 1E` `LDA #$1E` | keep background rendering ON |
 | `$97C4` | `20 94 B8` `JSR $B894` | `EA EA EA` NOP | drop entry OAM clear |
-| `$97D3` | `20 F6 88` `JSR $88F6` | `20 CC D2` `JSR $D2CC` | draw preview instead of "PAUSE" |
+| `$97D3` | `20 F6 88` `JSR $88F6` | `20 CC D2` `JSR $D2CC` | draw STUDY text + preview (v3 routine) |
 | `$97E2` | `20 54 B6` `JSR $B654` | `20 70 B6` `JSR $B670` | loop wait, no OAM clear |
 
 Base-ROM file offsets (`= CPU − $8000 + $10`): `$17C7`(`54→70`), `$17CA`(`16→1E`),
 `$17D4`–`$17D6`(`→EA EA EA`), `$17E3`–`$17E5`(`→20 CC D2`), `$17F3`(`54→70`).
 
-**Preview routine** at CPU `$D2CC` (file `$52DC`) — 47 bytes of dead padding after the routine
-ending `$D2CB RTS`, **filler in base AND v28cs**, reachable via JSR from the pause loop (fixed
-bank). It reads the next-pill colors and writes the two preview half-pill sprites to OAM slots
-2-3 (unused during pause; capsule holds 0-1):
+**STUDY-draw routine (v3)** at CPU `$D2CC` (file `$52DC`) — 50 bytes of dead padding after the
+routine ending `$D2CB RTS`, **filler in base AND v28cs** (52-byte run), reachable via JSR from the
+pause loop (fixed bank). It does BOTH jobs the single `$97D3` call site must now cover — reconnect
+the "STUDY" text AND draw the preview — without clobbering the frozen capsule:
 
 ```
-LDA $031A / AND #$03 / ORA #$60 / STA $0209   ; slot2 tile = $60|colorA  (left half)
-LDA $031B / AND #$03 / ORA #$70 / STA $020D   ; slot3 tile = $70|colorB  (right half)
-LDA #$45  / STA $0208 / STA $020C             ; Y = 69   (both halves)
-LDA #$02  / STA $020A / STA $020E             ; attr = 2 (palette)
-LDA #$BE  / STA $020B                         ; slot2 X = 190
-LDA #$C6  / STA $020F                         ; slot3 X = 198
+LDA #$08 / STA $42               ; OAM cursor = 8 -> $88F6 writes STUDY into slots 2-6
+JSR $88F6                        ; the game's letter drawer, drawing the STUDY quads ($53=0);
+                                 ;   leaves the capsule at slots 0-1, ends with $42=28
+LDA $031A / ORA #$60 / STA $021D ; slot7 tile = $60|colorA  (preview left half)
+LDA $031B / ORA #$70 / STA $0221 ; slot8 tile = $70|colorB  (preview right half)
+LDA #$45  / STA $021C / STA $0220 ; Y = 69  (both halves)
+LDA #$02  / STA $021E / STA $0222 ; attr = 2 (palette)
+LDA #$BE  / STA $021F             ; slot7 X = 190
+LDA #$C6  / STA $0223             ; slot8 X = 198
 RTS
 ```
 
-Position/tile/attr match the game's own preview exactly (Mesen byte-verified:
-`nextA=$01 nextB=$00` → tiles `$61/$70`, `Y=$45`, `X=$BE/$C6`, `attr=$02`).
+Why `$42=8`: `$88F6` (a shared drawer with 37 call sites) writes its sprite list starting at OAM
+slot `$42/4`, and `$42` is 0 at pause entry — so an unguarded `JSR $88F6` would draw the 5 STUDY
+letters into slots 0-4 and **overwrite the falling capsule** (slots 0-1). Presetting `$42=8` moves
+the letters to slots 2-6 and spares the capsule. No color mask is needed: the game's own preview
+(`$8772`) computes `template + color` (ADC) and never masks, so the raw colors are 0-2 and
+`$60|c == $60+c`. Slot map while paused: **0-1 capsule, 2-6 STUDY, 7-8 preview.**
 
-## Validation (base ROM, Mesen headless — `tmp/study_pause/`)
+Position/tile/attr match the game's own preview exactly (Mesen byte-verified: `nextA=$01 nextB=$00`
+→ tiles `$61/$70`, `Y=$45`, `X=$BE/$C6`, `attr=$02`).
 
-`Mesen --testrunner tmp/study_pause/study_probe.lua tmp/drmario_study.nes`
+## Validation
 
-- `study_pre.png` — playing; `study_paused.png` — PAUSED: bottle, **all viruses**, the
-  **falling capsule**, and the **next-pill preview** stay visible and frozen (`$2001`=`$1E`,
-  pill-y frozen at 10 for 90 frames); `study_post.png` — after unpause: full render restored,
-  pill advanced, **no corruption** (on-screen sprites 46 → 4 while paused → 46 after resume).
-- `verify_preview.lua`: drawn preview tiles == `$60|($031A&3)` / `$70|($031B&3)` → MATCH.
+**v3 (STUDY text + preview), TE v6 ROM, Mesen headless — `tmp/study_v3/`.** The v3 blob was
+validated on the full public build (`tmp/drmario_te_v6.nes` = base + VS-CPU + STUDY apparatus +
+this study-pause) in **both** game modes:
+
+- **1-player** (`te_v6_1p_*`): paused OAM = slots 0-1 capsule (`$62/$72`), 2-6 STUDY
+  (`$0D $A0 $0C $A1 $A2` = S,T,U,D,Y at Y=15), 7-8 preview (`$61/$70` at Y=69, X=190/198 —
+  matches the game's own preview for `next=$01/$00`); pill-y frozen at 11 for 90 frames
+  (`$2001`=`$1E`), clean resume (on-screen 46 → 9 paused → 46).
+- **VS CPU** (`te_v6_vs_*`, `$0727=2 $04=1`): identical slot map and freeze/resume; capsule X
+  reflects P1's left board. The pause path (`$978E`, single call site `$814B`) is shared, so
+  1P and VS behave identically. Minor: in VS the STUDY sprites sit at the very top and slightly
+  overlap the 2-player score header (cosmetic; the VS background layout owns that row).
+
+**v2 base-ROM proof (superseded)** — `tmp/study_pause/`: earlier preview-only blob (slots 2-3,
+no STUDY text), byte-verified `$60|($031A&3)` / `$70|($031B&3)` tiles.
 
 ## Remaining limitation
 
