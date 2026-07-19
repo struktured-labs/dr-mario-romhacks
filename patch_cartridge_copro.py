@@ -382,8 +382,12 @@ def build_main(level=11, speed=1):
             a.ins16("LDA_abs", 0x616C); a.ins16("STA_abs", TGT_O2)
         a.jmp("act_p2")                                     # weave-steer toward the live target
         a.label("nf2_hold")
-        # no candidate published yet (first ~10ms of the search): brief freeze as before
-        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
+        # no candidate published yet. FAIRNESS: under ROTFIX the capsule keeps FALLING under
+        # live gravity (no pin) -- we only WITHHOLD steering until there is a move to make.
+        # DRROTFIX=0 keeps the legacy brief freeze (byte-identical to the deployed carts).
+        a.ins("LDA_imm", 0)
+        if not ROTFIX:
+            a.ins16("STA_abs", GRAV_P2)
         a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
     else:
         a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)       # searching P2 -> freeze + skip steer
@@ -391,10 +395,11 @@ def build_main(level=11, speed=1):
     a.label("act_p2")
     if ROTFIX:
         # SETTLE GUARD: while a new pill is PENDING (search not started, TGT still stale from the
-        # previous pill) hold frozen HIGH -- do not steer to a stale target or latch a stale orient.
+        # previous pill) WITHHOLD steering so no stale target/orient is adopted. Gravity during
+        # PEND2 is handled by freeze_pending (deployed; the ~3-frame settle sits inside the spawn
+        # no-fall window) -- we do NOT pin GRAV_P2 here (fairness: no extra world-stop).
         a.ins16("LDA_abs", PEND2); a.br("BEQ", "act_p2_go")
-        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)
-        a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
+        a.ins("LDA_imm", 0); a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
         a.label("act_p2_go")
     a.ins16("LDA_abs", STK2); a.ins("CMP_imm", STUCK_LIM); a.br("BCC", "act_p2_n")
     a.ins("LDY_imm", 0x04); a.ins("STY_zp", 0xF6); a.jmp("act_p1")   # stuck: force drop
@@ -403,25 +408,28 @@ def build_main(level=11, speed=1):
     # pills near the top on hardware because (with NAV_T=5*/frame) 32-hook cycles = 6.4
     # frames per edge -> 25s to move 4 cols -> pill hovered forever.
     if ROTFIX:
-        # ROTATION PRE-PHASE + MINIMUM-THINK gate (orient not yet committed):
-        #  - orient != target -> rotate toward TGT_O2 while frozen HIGH (open air), so every
-        #    required rotation lands before descent (NES rotation fails flush against objects;
-        #    late rotations fail silently and lock the capsule BACKWARDS -- field-seen).
-        #  - orient reached -> hold frozen until the think gate opens: DONE (ARMED2==0) or
-        #    WDOG2 >= MIN_THINK hooks of search (below that the argmax is a shallow first guess).
+        # ROTATION PRE-PHASE + MINIMUM-THINK gate (orient not yet committed) -- all under LIVE
+        # gravity (FAIRNESS north star: the AI never pins gravity to buy time; it plays under the
+        # same fall a human does):
+        #  - orient != target -> press A to rotate toward TGT_O2 (no pin). Rotations land in the
+        #    first natural fall-steps -- the honest budget. If a late-game fall is too fast to
+        #    finish, that is the same constraint a human faces (we do NOT stop the world for it).
+        #  - orient reached -> WITHHOLD lateral + orient-lock until the think gate opens: DONE
+        #    (ARMED2==0) or WDOG2 >= MIN_THINK hooks (below that the argmax is a shallow guess).
+        #    During the gate the capsule keeps FALLING (no pin); we simply do not ACT yet.
         #  - at the gate: LATCH ROT_DONE2 (orient locked) and fall through to the column phase.
-        # (ROT_DONE2 set => this whole block is skipped: orient stays put, only the column moves.)
+        # (ROT_DONE2 set => this whole block is skipped: orient stays put, only the column moves.
+        #  That is the feasibility lock -- a late candidate can't re-rotate a low/flush capsule.)
         a.ins16("LDA_abs", ROT_DONE2); a.br("BNE", "mv_p2")           # committed -> column only
         a.ins16("LDA_abs", 0x03A5); a.ins16("CMP_abs", TGT_O2); a.br("BEQ", "p2_orient_ok")
-        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)             # freeze HIGH while rotating
-        a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xF8)
-        a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF6); a.jmp("act_p1")   # press A (one rotation)
+        a.ins("LDA_imm", 0x00); a.ins("STA_zp", 0xF8)                # edge (held=0) so A rotates,
+        a.ins("LDA_imm", 0x80); a.ins("STA_zp", 0xF6); a.jmp("act_p1")   # under live gravity, no pin
         a.label("p2_orient_ok")                                       # orient reached; think gate:
         a.ins16("LDA_abs", ARMED2); a.br("BEQ", "p2_commit")         # DONE -> commit
         a.ins16("LDA_abs", WDOGH2); a.br("BNE", "p2_commit")         # >256 hooks searched -> commit
         a.ins16("LDA_abs", WDOG2); a.ins("CMP_imm", MIN_THINK); a.br("BCS", "p2_commit")
-        a.ins("LDA_imm", 0); a.ins16("STA_abs", GRAV_P2)             # gate closed: hold HIGH, no lateral
-        a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
+        a.ins("LDA_imm", 0); a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8)   # gate closed: no ACT,
+        a.jmp("act_p1")                                              # but NO pin -- capsule falls
         a.label("p2_commit")
         a.ins("LDA_imm", 1); a.ins16("STA_abs", ROT_DONE2)           # orient LOCKED -> begin descent
     else:

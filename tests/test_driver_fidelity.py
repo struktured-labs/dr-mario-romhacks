@@ -95,6 +95,9 @@ class Sim:
         f6 = self.mem[Z_F6]
         self.presses.append(f6)
         froze = (self.mem[GRAV_P2] == 0)    # driver pinned the drop timer this frame
+        if not hasattr(self, "froze_hist"):
+            self.froze_hist = []
+        self.froze_hist.append(froze)       # FAIRNESS audit: was gravity pinned this frame?
         if apply_physics:
             if f6 & 0x80:                   # A -> rotate, but NES rotation fails flush (low)
                 if self.mem[P2Y] > FLUSH_Y:
@@ -155,8 +158,8 @@ for _ in range(60):
         break
 check("orient reached target", s.mem[P2O] == s.mem[TGT_O2], f"P2O={s.mem[P2O]} TGT_O2={s.mem[TGT_O2]}")
 check("all rotations happened HIGH (Y>FLUSH)", not low_rot, f"rotate Ys={rot_ys}, FLUSH_Y={FLUSH_Y}")
-check("gravity frozen during rotation", all(y >= 0x0C for y in rot_ys) if rot_ys else True,
-      f"min rotate Y={min(rot_ys) if rot_ys else '-'} (spawn 0x0D)")
+check("FAIRNESS: gravity NEVER pinned during rotate/min-think", not any(s.froze_hist),
+      f"pinned frames={sum(s.froze_hist)}/{len(s.froze_hist)} (rotations ran UNDER live gravity)")
 
 # ---------------------------------------------------------------- scenario 2: min-think gate
 print("SCENARIO 2 (DRROTFIX=1): min-think -- no lateral until WDOG2>=MIN_THINK or DONE")
@@ -212,6 +215,23 @@ for _ in range(20):
 check("committed while low", low_y <= FLUSH_Y and s.mem[ROT_DONE2] == 1, f"Y={low_y} ROT_DONE2={s.mem[ROT_DONE2]}")
 check("orient NOT changed by late retarget", s.mem[P2O] == committed_o, f"P2O={s.mem[P2O]} committed={committed_o}")
 check("NO A-press attempted while low (no backwards-lock)", not a_pressed_low)
+
+# ---------------------------------------------------------------- scenario 4: FAIRNESS (no world-stop)
+print("SCENARIO 4 (DRROTFIX=1): FAIRNESS -- the driver never pins P2 gravity in the steering path")
+s = Sim(rotfix=True)
+spawn_pill(s, y=0x0D, x=2, orient=1)       # needs a rotation; PEND2=0 so freeze_pending is inactive
+publish_live(s, col=6, orient=3)           # target = rotate + far slide, search never DONE
+for _ in range(120):                       # full lifecycle: rotate -> min-think -> commit -> descend
+    s.frame()
+check("gravity pinned 0 frames across a full pill (rotate+min-think+descend)", not any(s.froze_hist),
+      f"pinned={sum(s.froze_hist)}/{len(s.froze_hist)} frames -- everything ran under live gravity")
+# control: the ONE remaining pin is freeze_pending's PEND2 settle (deployed, inside the spawn no-fall window)
+s2 = Sim(rotfix=True)
+spawn_pill(s2, y=0x0D, x=3, orient=0)
+s2.mem[PEND2] = 1                          # pill still PENDING its search
+s2.frame(apply_physics=False)
+check("PENDING settle IS pinned (freeze_pending, the one deployed in-window pin)", s2.froze_hist[-1] is True,
+      "bounded by DELAY2 ~15 hooks ~3 frames, entirely inside the ~20f spawn animation")
 
 # ---------------------------------------------------------------- OLD driver regression demo
 print("SCENARIO 3-OLD (DRROTFIX=0): same late retarget -> OLD driver rotates LOW (backwards-lock)")
