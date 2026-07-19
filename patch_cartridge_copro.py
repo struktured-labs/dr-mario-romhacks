@@ -530,7 +530,18 @@ def build_main(level=11, speed=1):
             # committed). Once ROT_DONE2 latches, keep the committed orient so a late candidate
             # cannot rotate a low/flush capsule and lock it backwards.
             a.ins16("LDA_abs", ROT_DONE2); a.br("BNE", "nf2_col_only")
-            a.ins16("LDA_abs", 0x616C); a.ins16("STA_abs", TGT_O2)
+            # MAP copro orient -> game orient here, exactly as handle() does at DONE
+            # ({0:3,1:1,2:0,3:2}; 0xFF already peeled off to nf2_hold). The live mailbox is
+            # copro-space; storing it UNMAPPED made the orient-lock freeze a wrong-game orient,
+            # so P2 placed mis-oriented and cleared ~nothing (MiSTer A/B 2026-07-19). v2era masks
+            # this by rotating raw in-flight then self-correcting when handle() maps at DONE; the
+            # lock commits before DONE, so the live path must map too.
+            a.ins16("LDA_abs", 0x616C)
+            a.ins("CMP_imm", 0); a.br("BNE", "nf2_o1"); a.ins("LDA_imm", 3); a.jmp("nf2_ost")
+            a.label("nf2_o1"); a.ins("CMP_imm", 1); a.br("BNE", "nf2_o2"); a.ins("LDA_imm", 1); a.jmp("nf2_ost")
+            a.label("nf2_o2"); a.ins("CMP_imm", 2); a.br("BNE", "nf2_o3"); a.ins("LDA_imm", 0); a.jmp("nf2_ost")
+            a.label("nf2_o3"); a.ins("LDA_imm", 2)
+            a.label("nf2_ost"); a.ins16("STA_abs", TGT_O2)
             a.label("nf2_col_only")
         else:
             a.ins16("LDA_abs", 0x616C); a.ins16("STA_abs", TGT_O2)

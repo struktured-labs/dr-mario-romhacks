@@ -126,12 +126,18 @@ def spawn_pill(s, y=0x0D, x=3, orient=0):
     s.mem[TGT_C2] = 3; s.mem[TGT_O2] = orient
 
 
+# scenarios speak GAME orient; the copro mailbox is copro-space and the driver maps it
+# ({0:3,1:1,2:0,3:2}). Route game->copro (inverse) so both the DONE path (handle) and the live
+# path (nf2, now mapped) land on the intended game orient in TGT_O2.
+INV = {3: 0, 1: 1, 0: 2, 2: 3}
+
+
 def publish_live(s, col, orient):
-    s.mem[W2_DONE] = 0; s.mem[W2_COL] = col; s.mem[W2_OR] = orient   # best-so-far, still searching
+    s.mem[W2_DONE] = 0; s.mem[W2_COL] = col; s.mem[W2_OR] = INV[orient]   # best-so-far, searching
 
 
 def publish_done(s, col, orient):
-    s.mem[W2_DONE] = 1; s.mem[W2_COL] = col; s.mem[W2_OR] = orient   # DONE
+    s.mem[W2_DONE] = 1; s.mem[W2_COL] = col; s.mem[W2_OR] = INV[orient]   # DONE
 
 
 results = []
