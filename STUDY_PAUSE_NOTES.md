@@ -32,74 +32,78 @@ magnifier viruses — are drawn *after* the pause-check (measured: buffer holds 
 `$814B`, fills to 46 later). So preserving the buffer keeps the capsule + background but not the
 preview. Since the **next-pill preview is required study info**, we hand-draw it during pause.
 
-## The patch (5 edits inside `$97B6`–`$97F2` + a 2-part routine at `$D2CC`/`$9FF8`)
+## The patch (5 edits inside `$97B6`–`$97F2` + a 4-part routine at `$D2CC`/`$9FF8`/`$A371`/`$BE56`)
 
 | CPU addr | before | after | effect |
 |---|---|---|---|
 | `$97B6` | `20 54 B6` `JSR $B654` | `20 70 B6` `JSR $B670` | entry wait, no OAM clear |
 | `$97BA` | `A9 16` `LDA #$16` | `A9 1E` `LDA #$1E` | keep background rendering ON |
 | `$97C4` | `20 94 B8` `JSR $B894` | `EA EA EA` NOP | drop entry OAM clear |
-| `$97D3` | `20 F6 88` `JSR $88F6` | `20 CC D2` `JSR $D2CC` | draw STUDY text + preview (v3.1 routine) |
+| `$97D3` | `20 F6 88` `JSR $88F6` | `20 CC D2` `JSR $D2CC` | draw STUDY text + both previews (v3.2) |
 | `$97E2` | `20 54 B6` `JSR $B654` | `20 70 B6` `JSR $B670` | loop wait, no OAM clear |
 
 Base-ROM file offsets (`= CPU − $8000 + $10`): `$17C7`(`54→70`), `$17CA`(`16→1E`),
 `$17D4`–`$17D6`(`→EA EA EA`), `$17E3`–`$17E5`(`→20 CC D2`), `$17F3`(`54→70`).
 
-**STUDY-draw routine (v3.1)** — a two-part trampoline in dead padding **filler in base AND v28cs**.
-It reconnects the "STUDY" text AND draws the next-pill preview during pause, **without disturbing any
-capsule, in 1-player *and* 2-player/VS layouts**. (v3 drew STUDY into slots 2-6 and the preview into
-7-8; that clobbered P2's capsule at slots 2-3 in 2P/VS — confirmed on real Pocket hardware.)
+**STUDY-draw routine (v3.2)** — a four-part trampoline in dead padding **filler in base AND v28cs**
+(part1 in the fixed bank; parts 2-4 in bank 0, where the pause routine already runs so they are always
+mapped). It reconnects "STUDY" AND draws **both players'** next-pill previews during pause, **without
+disturbing any capsule, in 1P / 2P / VS**. STUDY → OAM slots 32-36, P1 preview → 37-38, P2 preview
+(2P/VS only) → 39-40 — all **above the slot-15 gameplay-buffer max**, so both capsules (slots 0-3 in
+2P/VS) stay byte-untouched. Both players consume the shared pill sequence at different rates, so P2's
+next pill (`$039A/$039B`) differs from P1's (`$031A/$031B`) and is drawn separately (the game itself
+draws both — `$87DA` P1 @ X=$38, `$87FE` P2 @ X=$B8).
 
-**part1** @ CPU `$D2CC` (file `$52DC`; padded with `$00` to 50 B):
 ```
-LDA #$80 / STA $42               ; OAM cursor = 128 -> $88F6 writes STUDY into slots 32-36
-JSR $88F6                        ; game's letter drawer ($53=0); STUDY at Y=$45/X=$70.. (top)
-LDA $031A / ORA #$60 / STA $0295 ; slot37 tile = $60|colorA   (preview left half)
-LDA $031B / ORA #$70 / STA $0299 ; slot38 tile = $70|colorB   (preview right half)
-LDA #$02  / STA $0296 / STA $029A ; attr = 2 (both halves)
-JMP $9FF8                         ; -> part2 (mode-correct Y/X, then RTS)
-```
-**part2** @ CPU `$9FF8` (file `$2008`, bank 0 — the pause routine itself runs here, so it is mapped):
-```
-LDA #$45 / LDX #$BE              ; 1P defaults: Y=$45 (69), XL=$BE (190) — right-side "next" box
-LDY $0727 / DEY / BEQ w          ; player mode: 1 -> 1P (keep defaults); 2 -> 2P/VS (override)
-LDA #$33 / LDX #$38             ; 2P/VS: Y=$33 (51), XL=$38 (56) — above P1's left board
-w: STA $0294 / STA $0298         ; slot37/38 Y
-   STX $0297                     ; slot37 X = XL
-   TXA / CLC / ADC #$08 / STA $029B  ; slot38 X = XL + 8
-   RTS
+part1 @ $D2CC (52 B, fills the run):
+  LDA #$80 / STA $42 / JSR $88F6      ; STUDY -> slots 32-36
+  LDA $031A/ORA #$60/STA $0295        ; P1 slot37 tile         LDA $031B/ORA #$70/STA $0299  ; P1 slot38
+  LDA #$02 / STA $0296 / STA $029A    ; P1 attr
+  LDA #$45 / STA $0294 / STA $0298    ; P1 Y=$45  (1P default)
+  LDA #$BE / STA $0297 ; LDA #$C6 / STA $029B  ; P1 X=$BE/$C6 (1P)      JMP $9FF8
+part2 @ $9FF8 (34 B):
+  LDY $0727 / DEY / BEQ RTS           ; 1P -> keep part1's defaults, no P2
+  LDA #$33 / STA $0294/$0298/$029C/$02A0   ; all four preview Y = $33 (2P/VS)
+  LDA #$38 / STA $0297 ; LDA #$40 / STA $029B  ; P1 X = $38/$40         JMP $A371
+part3a @ $A371 (27 B):
+  LDA $039A/ORA #$60/STA $029D        ; P2 slot39 tile         LDA $039B/ORA #$70/STA $02A1  ; P2 slot40
+  LDA #$02 / STA $029E / STA $02A2    ; P2 attr                JMP $BE56
+part3b @ $BE56 (11 B):
+  LDA #$B8 / STA $029F ; LDA #$C0 / STA $02A3  ; P2 X = $B8/$C0 (above P2 board)   RTS
 ```
 
-Why slots 32-36 / 37-38: `$88F6` (a shared drawer, 37 call sites) writes starting at slot `$42/4`.
-At pause entry `$42` is 0 and, in 2P/VS, the capsules occupy slots 0-3 (P1 0-1, P2 2-3) while the
-full 2-player buffer only reaches slot 15 — so writing STUDY at slots 32-36 and the preview at 37-38
-(via `$42=$80`) lands **above every capsule/preview**, leaving them untouched. No color mask is
-needed: the game's own preview (`$8772`) computes `template + color` (ADC) and never masks, so raw
-colors are 0-2 and `$60|c == $60+c`. Position/tile match the game's own preview exactly in each mode
-(Mesen byte-verified, `next=$01/$00`: 1P `Y=$45 X=$BE/$C6`; 2P/VS `Y=$33 X=$38/$40`; tiles `$61/$70`).
+Why slots 32-40: `$88F6` (a shared drawer, 37 call sites) writes starting at slot `$42/4`; `$42` is 0
+at pause entry, and in 2P/VS the capsules occupy slots 0-3 while the full 2-player buffer only reaches
+slot 15, so `$42=$80` (STUDY → 32-36) plus previews at 37-40 land **above everything**, untouched. No
+color mask needed: the game's own preview (`$8772`) uses `template + color` (ADC) and never masks, so
+raw colors are 0-2 and `$60|c == $60+c`. Positions match the game's own previews per mode (1P P1
+`Y=$45 X=$BE/$C6`; 2P/VS P1 `Y=$33 X=$38/$40`, P2 `Y=$33 X=$B8/$C0`).
 
 ## Validation
 
-**v3.1, TE v6 ROM, Mesen headless — `tmp/study_v3/` (`te31_{1p,2p,vs}_*`).** Validated on the full
+**v3.2, TE v6 ROM, Mesen headless — `tmp/study_v3/` (`te32_{1p,2p,2pd,vs}_*`).** Validated on the full
 public build (`tmp/drmario_te_v6.nes` = base + VS-CPU + STUDY apparatus + this study-pause) in **all
-three** game modes. STUDY always at slots 32-36 (`$0D $A0 $0C $A1 $A2` = S,T,U,D,Y, Y=15); preview at
-slots 37-38 (`$61/$70`); pill-y frozen for 90 frames (`$2001`=`$1E`); clean resume.
+three** game modes. STUDY always at slots 32-36 (`$0D $A0 $0C $A1 $A2` = S,T,U,D,Y, Y=15); pill-y
+frozen for 90 frames (`$2001`=`$1E`); clean resume.
 
-- **1-player** (`$0727=1`): capsule slots 0-1 (`$62/$72` X=120/128) untouched; preview at
-  `Y=69 X=190/198` (right box). On-screen 46 → 9 paused → 46.
-- **2-player** (`$0727=2 $04=0`) — the regression test that reproduces the cart's buffer: **BOTH**
-  capsules survive — P1 slots 0-1 (X=56/64) and **P2 slots 2-3 (X=184/192)** are byte-unchanged;
-  preview at `Y=51 X=56/64` (above P1's left board). On-screen 11 paused.
-- **VS CPU** (`$0727=2 $04=1`): capsule slots 0-1 untouched; preview at `Y=51 X=56/64` (same as 2P).
+- **1-player** (`$0727=1`): capsule slots 0-1 untouched; single P1 preview at `Y=69 X=190/198` (right
+  box); P2 slots 39-40 stay off-screen (no P2). On-screen 46 → 9 paused → 46.
+- **2-player** (`$0727=2 $04=0`): **all four capsule halves (slots 0-3) byte-unchanged** — P1 (X=56/64)
+  and P2 (X=184/192); P1 preview `Y=51 X=56/64`, P2 preview `Y=51 X=184/192`. On-screen 13.
+- **2-player, diverged** (`te32_2pd`, P1 fast-dropped ahead of idle P2): P1next=`$00/$01`, P2next=
+  `$00/$00` → P1 preview tiles `$60/$71` vs P2 `$60/$70` — **the two previews show each player's actual,
+  different next pill** (proof they are per-player, not copies); both capsules still untouched.
+- **VS CPU** (`$0727=2 $04=1`): P1 cap untouched; P1 preview `$61/…` (next=$01) vs P2 preview `$60/…`
+  (next=$00) at X=56 / X=184 — again per-player.
 
-The pause path (`$978E`, single call site `$814B`) is shared across modes, and part2 keys off `$0727`
-(1 vs 2), so the preview lands in the game's own per-mode "next" position. Minor cosmetic: the STUDY
-sprites sit at the very top and slightly overlap the 2-player score header (the VS layout owns that
-row). **Cart basis:** copro carts are mapper 100 (not Mesen-emulable); the 2P *base* test reproduces
-the both-capsules-in-buffer layout the cart exhibits, and the same asserted bytes are applied.
+The pause path (`$978E`, single call site `$814B`) is shared across modes; part2 keys off `$0727` so P1
+and P2 previews land in the game's own per-mode "next" positions. Minor cosmetic: the STUDY sprites sit
+at the very top and slightly overlap the 2-player score header. **Cart basis:** copro carts are mapper
+100 (not Mesen-emulable); the 2P *base* test reproduces the both-capsules-in-buffer layout the cart
+exhibits, and the same asserted bytes are applied.
 
-**Earlier proofs (superseded):** v3 (`te_v6_*`, slots 2-6/7-8, clobbered P2 capsule in 2P/VS);
-v2 (`tmp/study_pause/`, preview-only slots 2-3, no STUDY text).
+**Earlier proofs (superseded):** v3.1 (`te31_*`, P1 preview only), v3 (slots 2-6/7-8, clobbered P2
+capsule in 2P/VS), v2 (`tmp/study_pause/`, preview-only slots 2-3, no STUDY text).
 
 ## Remaining limitation
 

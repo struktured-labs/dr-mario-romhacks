@@ -18,8 +18,9 @@ Apply against an unmodified *Dr. Mario (USA)* ROM with any BPS-capable patcher
 - **Study Mode pause** — pressing START during play freezes the game while keeping the
   screen rendered, so positions can be studied:
   - "STUDY" text shown at the top of the screen instead of "PAUSE"
-  - The full bottle, all viruses, and the **falling capsule** stay visible and frozen
-  - The **next-pill preview** stays visible while paused *(new in v6)*
+  - The full bottle, all viruses, and the **falling capsule(s)** stay visible and frozen
+  - The **next-pill preview** stays visible while paused — in 2-player and VS CPU, **both
+    players'** previews are shown, each above its own board *(new in v6)*
   - Pressing START again resumes cleanly with no corruption
 
 ## Changes from Original
@@ -35,8 +36,8 @@ Apply against an unmodified *Dr. Mario (USA)* ROM with any BPS-capable patcher
   decorative sprites are built by a game phase the freeze skips). The study-relevant content —
   bottle, viruses, falling capsule, and next-pill preview — is all shown.
 - In VS CPU / 2-player mode the "STUDY" text sits at the very top and slightly overlaps the
-  two-player score header (cosmetic). Both players' capsules and the preview are preserved, and
-  the preview is placed correctly for each layout.
+  two-player score header (cosmetic). Both players' capsules and both players' next-pill previews
+  are preserved, each preview placed correctly above its own board.
 
 ## Compatibility
 
@@ -52,12 +53,14 @@ Apply against an unmodified *Dr. Mario (USA)* ROM with any BPS-capable patcher
 | 0x17C7 | `$54` → `$70` | pause entry frame-wait `$B654` → `$B670` (no OAM clear) |
 | 0x17D4 | `JSR $B894` → `NOP×3` | drop the pause-entry OAM clear |
 | 0x17DC | `$77` → `$0F` | move "STUDY" text to the top of the screen |
-| 0x17E3 | `JSR $88F6` → `JSR $D2CC` | pause draw calls the study routine (STUDY text + preview) |
+| 0x17E3 | `JSR $88F6` → `JSR $D2CC` | pause draw calls the study routine (STUDY text + previews) |
 | 0x17F3 | `$54` → `$70` | pause loop frame-wait `$B654` → `$B670` (no OAM clear) |
 | 0x2968 | Sprite data | "PAUSE" letter quads changed to "STUDY" |
 | CHR Bank 1 | Tiles 0xA0-0xA2 | custom T, D, Y letter graphics |
-| 0x52DC ($D2CC) | New routine (part 1) | draws STUDY into OAM slots 32-36 + preview tiles into slots 37-38 (above every capsule), then jumps to part 2 |
-| 0x2008 ($9FF8) | New routine (part 2) | positions the preview per game mode (1-player: right box; 2-player/VS: above P1's board) |
+| 0x52DC ($D2CC) | New routine (part 1) | STUDY into OAM slots 32-36, P1 preview tiles into 37-38 (above every capsule), P1 1-player position, then jump to part 2 |
+| 0x2008 ($9FF8) | New routine (part 2) | 1-player → done; else set the 2-player/VS P1 position and P2 preview Y, then jump to part 3a |
+| 0x2381 ($A371) | New routine (part 3a) | P2 preview tiles + attribute into slots 39-40, then jump to part 3b |
+| 0x3E66 ($BE56) | New routine (part 3b) | P2 preview X position (above P2's board) |
 
 ## Credits
 
