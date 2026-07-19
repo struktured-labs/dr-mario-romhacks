@@ -96,6 +96,63 @@ W_BOARD, W_CA, W_GO, W_DONE, W_COL, W_OR = 0x5000, 0x5080, 0x5084, 0x5084, 0x508
 # NES pad bits on $F5 (pressed-this-frame): A=$80 B=$40 Sel=$20 Start=$10 U=$08 D=$04 L=$02 R=$01
 B_SEL, B_START, B_LEFT, B_RIGHT = 0x20, 0x10, 0x02, 0x01
 
+# DRSTUDY=1 -> "study pause": freeze game logic on pause but keep the last gameplay frame
+# fully rendered instead of the vanilla blank+"PAUSE". Default ON for human carts (DRHUMAN=1)
+# so a paused board can be studied. Mechanism (base pause routine at CPU $978E; verified on
+# base drmario.nes in Mesen — see tmp/study_pause/): the routine blanks the background
+# ($2001 bit3), fills OAM with $FF, draws "PAUSE", then spins on $B654 whose tail re-clears
+# OAM every frame. We keep background rendering ON, and swap the two pause frame-waits from
+# $B654 -> $B670 (an identical wait WITHOUT the OAM-clear tail) so the sprites that were in
+# the buffer at pause entry stay put; the entry OAM-clear and the PAUSE draw are NOP'd.
+#   NOTE (validation basis): base-ROM change is Mesen-proven. The copro carts are mapper 100
+#   (not Mesen-emulable); DRSTUDY applies the SAME asserted byte patches to the same pause
+#   routine in the v28cs image (which already carries 2 of the 5 edits from a prior partial
+#   attempt — the patch is idempotent). The falling capsule + bottle + viruses stay visible;
+#   the next-pill preview / Dr.Mario / magnifier sprites are built by the frozen main loop and
+#   are NOT restored by this confined patch (would need a snapshot-restore buffer).
+STUDY = _os.environ.get("DRSTUDY", "1" if HUMAN_P1 else "0") != "0"
+# Anchor on the pause loop's START/$F7 check (LDA $F5;CMP #$10;BEQ;LDA $F7;CMP #$F0;BEQ) —
+# these bytes are NEVER touched by the edits, so the locator stays valid + idempotent even
+# after patching (all 5 edits sit just before/after this window, never inside it).
+STUDY_ANCHOR = bytes.fromhex("a5f5c910f00ca5f7c9f0f0b7")
+STUDY_EDITS = [   # (rel-to-anchor, [accepted originals], replacement, note)
+    (-0x20, [bytes.fromhex("2054b6")], bytes.fromhex("2070b6"), "entry wait $B654->$B670 (no OAM clear)"),
+    (-0x1D, [bytes.fromhex("a916"), bytes.fromhex("a91e")], bytes.fromhex("a91e"), "keep background rendering ON"),
+    (-0x12, [bytes.fromhex("2094b8"), bytes.fromhex("eaeaea")], bytes.fromhex("eaeaea"), "drop entry OAM clear"),
+    (-0x03, [bytes.fromhex("20f688")], bytes.fromhex("eaeaea"), "drop PAUSE draw"),
+    (0x0C, [bytes.fromhex("2054b6")], bytes.fromhex("2070b6"), "loop wait $B654->$B670 (no OAM clear)"),
+]
+
+
+class StudyPatchError(Exception):
+    pass
+
+
+def apply_study_pause(rom):
+    """Apply the DRSTUDY 'study pause' byte patches to a Dr. Mario PRG image in place.
+    Idempotent + asserted: locate the pause routine by a stable 19-byte anchor, verify each
+    target holds an accepted original (base) OR the already-patched value (v28cs / re-run),
+    and fail loudly on anything else. Returns the count of edits actually written."""
+    a = rom.find(STUDY_ANCHOR)
+    if a < 0:
+        raise StudyPatchError("DRSTUDY: pause-routine anchor not found (unexpected ROM)")
+    if rom.find(STUDY_ANCHOR, a + 1) >= 0:
+        raise StudyPatchError("DRSTUDY: pause-routine anchor is ambiguous (multiple matches)")
+    for rel, accepted, after, note in STUDY_EDITS:          # verify all before writing any
+        off = a + rel
+        got = bytes(rom[off:off + len(after)])
+        if got != after and got not in accepted:
+            raise StudyPatchError(
+                f"DRSTUDY: 0x{off:X} ({note}): got {got.hex()}, expected one of "
+                + "/".join(b.hex() for b in accepted + [after]))
+    written = 0
+    for rel, accepted, after, note in STUDY_EDITS:
+        off = a + rel
+        if bytes(rom[off:off + len(after)]) != after:
+            rom[off:off + len(after)] = after
+            written += 1
+    return written
+
 
 def build_main(level=11, speed=1):
     a = Asm6502(UNIT1_CPU)
@@ -452,6 +509,11 @@ def main():
         "unexpected v28cs blob head"
     rom[BLOB_FILE:BLOB_FILE + 5] = bytes([0x85, 0xF6, 0x4C, 0x54, 0xFF])
     print("blob head repointed: STA $F6; JMP $FF54 (every frame, all modes)")
+
+    if STUDY:
+        n = apply_study_pause(rom)      # asserted + idempotent; touches only the pause routine
+        print(f"DRSTUDY: study-pause patched ($978E; {n} new edit(s)) — bg stays on, "
+              f"sprites frozen, no blank/PAUSE")
 
     tmp = OUT + ".2bank"
     open(tmp, "wb").write(rom)
