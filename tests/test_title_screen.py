@@ -22,11 +22,15 @@ from title_screen import (
     _decode_strip,
     apply_training_edition_title,
     footer_hook_patched,
+    footer_layout,
+    footer_metasprite,
     footer_routine,
 )
 
-# TE v8 relocates the footer routine/data off DRSTUDY's part3b ($BE56) / part2 ($9FF8) runs.
-V8_ROUTINE_OFF, V8_DATA_OFF, V8_TEXT = 0x40B9, 0x4F10, "V8.00 STRUK LABS"
+# TE v8 relocates the footer routine/data off DRSTUDY's part3b ($BE56) / part2 ($9FF8) runs and
+# into two 24-byte runs free in base v6 AND the v28cs/copro carts (so the v8 BPS is the cart
+# byte-basis).  The credit is shortened to "V8.00 SL" -> a 4-tile, 17-byte metasprite.
+V8_ROUTINE_OFF, V8_DATA_OFF, V8_TEXT = 0x40B9, 0x40FF, "V8.00 SL"
 
 
 def _allowed_offsets():
@@ -87,17 +91,18 @@ def test_title_patch_is_idempotent():
     assert bytes(patched) == once
 
 
-def _allowed_offsets_at(routine_off, data_off):
+def _allowed_offsets_at(routine_off, data_off, footer_text):
+    n_tiles, base_x = footer_layout(footer_text)
     allowed = set(range(TITLE_TILEMAP_OFFSET, TITLE_TILEMAP_OFFSET + 10))
     allowed.update(range(FOOTER_HOOK_OFFSET, FOOTER_HOOK_OFFSET + 3))
-    allowed.update(range(routine_off, routine_off + len(footer_routine(data_off))))
-    allowed.update(range(data_off, data_off + len(FOOTER_METASPRITE)))
+    allowed.update(range(routine_off, routine_off + len(footer_routine(data_off, base_x))))
+    allowed.update(range(data_off, data_off + len(footer_metasprite(n_tiles))))
     for page in TITLE_CHR_PAGES:
         for tile_id in TITLE_TOP_TILE_IDS:
             off = CHR_START + page * CHR_PAGE_SIZE + tile_id * 16
             allowed.update(range(off, off + 16))
-    for tile_id in FOOTER_TILE_IDS:
-        off = CHR_START + FOOTER_CHR_PAGE * CHR_PAGE_SIZE + tile_id * 16
+    for i in range(n_tiles):
+        off = CHR_START + FOOTER_CHR_PAGE * CHR_PAGE_SIZE + (FOOTER_TILE_IDS[0] + i) * 16
         allowed.update(range(off, off + 16))
     return allowed
 
@@ -111,17 +116,21 @@ def test_footer_helpers_reproduce_v7_defaults():
 def test_relocated_v8_footer_is_a_scoped_patch():
     original = Path("drmario.nes").read_bytes()
     patched = bytearray(original)
+    # subtitle (10 tiles x 2 pages) + footer (4 tiles for "V8.00 SL") = 24 CHR tiles
     assert apply_training_edition_title(
-        patched, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_TEXT) == 28
+        patched, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_TEXT) == 24
 
     changed = {i for i, (a, b) in enumerate(zip(original, patched)) if a != b}
     assert changed
-    assert changed <= _allowed_offsets_at(V8_ROUTINE_OFF, V8_DATA_OFF)
-    # hook -> JSR $C0A9; routine carries the $CF00 data pointer; metasprite at $CF00
+    assert changed <= _allowed_offsets_at(V8_ROUTINE_OFF, V8_DATA_OFF, V8_TEXT)
+    # hook -> JSR $C0A9; routine carries the $C0EF data pointer; metasprite (<=24 B) at $C0EF
+    n_tiles, base_x = footer_layout(V8_TEXT)
     assert bytes(patched[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3]) == footer_hook_patched(V8_ROUTINE_OFF)
-    routine = footer_routine(V8_DATA_OFF)
+    routine = footer_routine(V8_DATA_OFF, base_x)
     assert bytes(patched[V8_ROUTINE_OFF:V8_ROUTINE_OFF + len(routine)]) == routine
-    assert bytes(patched[V8_DATA_OFF:V8_DATA_OFF + len(FOOTER_METASPRITE)]) == FOOTER_METASPRITE
+    meta = footer_metasprite(n_tiles)
+    assert len(meta) <= 24
+    assert bytes(patched[V8_DATA_OFF:V8_DATA_OFF + len(meta)]) == meta
 
 
 def test_relocated_v8_footer_is_idempotent():
@@ -129,7 +138,7 @@ def test_relocated_v8_footer_is_idempotent():
     kw = dict(routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_TEXT)
     apply_training_edition_title(patched, **kw)
     once = bytes(patched)
-    assert apply_training_edition_title(patched, **kw) == 28
+    assert apply_training_edition_title(patched, **kw) == 24
     assert bytes(patched) == once
 
 

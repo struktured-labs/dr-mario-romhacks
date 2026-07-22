@@ -30,19 +30,21 @@ from patch_cartridge_copro import (apply_study_pause,
                                    STUDY_BLOB2, STUDY_BLOB2_CPU,
                                    STUDY_BLOB4, STUDY_BLOB4_CPU)
 from title_screen import (apply_training_edition_title, footer_routine, footer_hook_patched,
-                          FOOTER_HOOK_OFFSET, FOOTER_METASPRITE,
-                          TITLE_TILEMAP_OFFSET, TITLE_BOTTOM_BASE_TILE_IDS)
+                          footer_metasprite, footer_layout,
+                          FOOTER_HOOK_OFFSET, TITLE_TILEMAP_OFFSET, TITLE_BOTTOM_BASE_TILE_IDS)
 from make_bps import make_bps, apply_bps
 
 BASE = "drmario.nes"
 BASE_MD5 = "d3ec44424b5ac1a4dc77709829f721c9"
 
 # TE v8 footer relocation.  The v7 footer sat on DRSTUDY's part2 ($9FF8, file 0x2008) and
-# part3b ($BE56, file 0x3E66).  These free fixed-bank runs are confirmed filler in the v6
-# ROM and in the v28cs / copro cart lineages (routine run is common to all three):
-V8_ROUTINE_OFF = 0x40B9   # CPU $C0A9  (24-byte free run; routine is 23 bytes)
-V8_DATA_OFF    = 0x4F10   # CPU $CF00  (48-byte free run; metasprite table is 33 bytes)
-V8_FOOTER_TEXT = "V8.00 STRUK LABS"
+# part3b ($BE56, file 0x3E66).  v8 is the byte-basis for the copro carts, so BOTH the routine
+# and its metasprite must land in runs free-and-identical in base v6, v28cs AND the copro carts.
+# The only such runs are 24 bytes, so the footer credit is shortened to "V8.00 SL" -> a 4-tile,
+# 17-byte metasprite (see footer_layout); routine (23 B) and table (17 B) each take a common run:
+V8_ROUTINE_OFF = 0x40B9   # CPU $C0A9  (24-byte run free in base v6 + v28cs + copro)
+V8_DATA_OFF    = 0x40FF   # CPU $C0EF  (24-byte run free in base v6 + v28cs + copro)
+V8_FOOTER_TEXT = "V8.00 SL"
 
 rom_out = sys.argv[1] if len(sys.argv) > 1 else "tmp/drmario_te_v8.nes"
 bps_out = sys.argv[2] if len(sys.argv) > 2 else "release/drmario_te_v8.bps"
@@ -57,10 +59,14 @@ patch_vs_cpu.apply_patches(BASE, rom_out)
 d = bytearray(open(rom_out, "rb").read())
 n_study = apply_study_pause(d)
 # 3) title branding with the footer routine/data RELOCATED off the study runs
-n_tiles = apply_training_edition_title(
+tiles_written = apply_training_edition_title(
     d, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_FOOTER_TEXT)
 open(rom_out, "wb").write(d)
 tgt = bytes(d)
+
+v8_n_tiles, v8_base_x = footer_layout(V8_FOOTER_TEXT)
+exp_routine = footer_routine(V8_DATA_OFF, v8_base_x)
+exp_meta = footer_metasprite(v8_n_tiles)
 
 # --- self-verify: study intact (incl. the two ex-collision runs), footer relocated, subtitle intact ---
 for blob, cpu, name in [(STUDY_BLOB,  STUDY_BLOB_CPU,  "part1 $D2CC"),
@@ -70,9 +76,9 @@ for blob, cpu, name in [(STUDY_BLOB,  STUDY_BLOB_CPU,  "part1 $D2CC"),
     assert tgt[off:off + len(blob)] == blob, f"DRSTUDY {name} clobbered by branding"
 assert tgt[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3] == footer_hook_patched(V8_ROUTINE_OFF), \
     "title hook not repointed to $C0A9"
-exp_routine = footer_routine(V8_DATA_OFF)
 assert tgt[V8_ROUTINE_OFF:V8_ROUTINE_OFF + len(exp_routine)] == exp_routine, "footer routine not at $C0A9"
-assert tgt[V8_DATA_OFF:V8_DATA_OFF + len(FOOTER_METASPRITE)] == FOOTER_METASPRITE, "footer metasprite not at $CF00"
+assert tgt[V8_DATA_OFF:V8_DATA_OFF + len(exp_meta)] == exp_meta, "footer metasprite not at $C0EF"
+assert len(exp_meta) <= 24, "footer metasprite must fit a 24-byte common run for the cart basis"
 assert tgt[TITLE_TILEMAP_OFFSET:TITLE_TILEMAP_OFFSET + 10] == bytes(TITLE_BOTTOM_BASE_TILE_IDS), \
     "crash-sensitive title tilemap disturbed"
 
@@ -83,6 +89,7 @@ os.makedirs(os.path.dirname(bps_out) or ".", exist_ok=True)
 open(bps_out, "wb").write(patch)
 
 print(f"\nTE v8 ROM -> {rom_out} ({len(tgt)} B, md5 {hashlib.md5(tgt).hexdigest()})")
-print(f"  study edits {n_study}, title tiles {n_tiles}; footer routine $C0A9 / data $CF00 / text {V8_FOOTER_TEXT!r}")
+print(f"  study edits {n_study}, title tiles {tiles_written}; footer routine $C0A9 / "
+      f"data $C0EF ({len(exp_meta)}B) / text {V8_FOOTER_TEXT!r}")
 print(f"  study runs part2 $9FF8 + part3b $BE56 intact (footer no longer collides)")
 print(f"BPS patch -> {bps_out} ({len(patch)} B, verified: drmario.nes + patch == ROM)")
