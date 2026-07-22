@@ -2,7 +2,7 @@
 """Reproducible title-branded build of Dr. Mario Training Edition.
 
 The build applies the public v5 IPS from ROMhacking.net to a clean USA ROM,
-then adds a ``TRAINING EDITION`` subtitle to the title-screen capsule.
+then adds a ``TRAINING EDITION`` subtitle and ``V7.00 STRUK LABS`` title footer.
 
   usage: build_te_v7.py [rom_out=tmp/drmario_te_v7.nes] [bps_out=release/drmario_te_v7.bps]
 """
@@ -15,6 +15,8 @@ sys.path.insert(0, "tests")
 
 from make_bps import apply_bps, make_bps
 from title_screen import (
+    FOOTER_HOOK_OFFSET,
+    FOOTER_HOOK_PATCHED,
     TITLE_BOTTOM_BASE_TILE_IDS,
     TITLE_TILEMAP_OFFSET,
     apply_training_edition_title,
@@ -64,6 +66,7 @@ open(rom_out, "wb").write(d)
 tgt = bytes(d)
 
 assert tgt[TITLE_TILEMAP_OFFSET:TITLE_TILEMAP_OFFSET + 10] == bytes(TITLE_BOTTOM_BASE_TILE_IDS)
+assert tgt[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3] == FOOTER_HOOK_PATCHED
 
 # 3) Release patch, verified by applying it back to the clean base.
 patch = make_bps(src, tgt)
