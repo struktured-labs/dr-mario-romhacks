@@ -78,16 +78,19 @@ gravity — that would be a genuine, publishable nuance).
 **Objective.** The direct competitive claim: does depth-3 expectimax beat depth-2 BFS in a
 *versus* race with garbage?
 
-**PREREQUISITE (blocking — resolve first).** `FaithfulDrMarioEnv` is **solo; it has no VS garbage
-model.** Two options, pick one and record the choice:
-- **(a) Add a faithful Python VS garbage model** to the env: Dr. Mario VS sends *garbage/junk
-  pills* to the opponent when a placement clears **≥2 lines simultaneously** (single-line clears
-  send nothing); the count/colors/columns of the junk are determined by the clear (verify the
-  exact rule against the ROM or a reliable reference — this is a small RE task). This is the
-  reusable, deterministic, high-throughput option and is worth building for the paper.
-- **(b) Race both AIs in the real ROM's VS mode** on mapper-100 hardware/emulator (the ROM
-  already implements garbage). Higher fidelity, lower throughput, harder to run at N.
-  Recommend (a) for N, optionally spot-check against (b).
+**PREREQUISITE (a day of wiring, NOT research — the rule is already extracted).**
+`FaithfulDrMarioEnv` is **solo**, so E3 needs a 2-player env. But the VS garbage rule does **not**
+need reverse-engineering — it was deterministically extracted from the ROM and verified
+(`tmp/probe_attack.lua`: freezes P2, injects P1 clears, diffs P2's board cell-by-cell). **The rule:**
+- **1 line cleared → 0 garbage tiles.** **≥2 lines cleared *simultaneously* → exactly 2 tiles.**
+- Garbage **colors = the cleared runs' colors**; tiles **enter at row 0 and fall**; columns are
+  **4 apart**, from the fixed pair set **{1,5} / {2,6} / {3,7}**.
+
+So the prerequisite is **wiring this known rule into a 2-player env** (`experiments/vs_env.py`
+wrapping two `FaithfulDrMarioEnv` boards + the garbage exchange above) — ~a day, deterministic,
+high-throughput, and reusable for the C6 tempo/competitive-theory section. **Spot-check it against
+the real ROM's VS mode** on mapper-100 hardware/emulator (which implements garbage natively) on a
+handful of games. The **experiment lane owns the wiring.**
 
 **Method.** Once garbage is modeled: run ours-vs-his VS games, **both directions** (ours as P1 /
 his P2, then swapped) to control P1/P2 asymmetry, at matched (level, speed), **paired seeds**
@@ -96,18 +99,19 @@ no peeking):** floor **N ≥ 200 games per direction**; report the Wilson CI and
 excludes 50%. (Power note: distinguishing a true 60% from 50% at 80% power needs ~200 games; 55%
 vs 50% needs ~780 — size to the effect you see in a pilot of ~50.)
 
-**Deliverable.** Win-rate table (both directions, CIs) + the garbage-model note (option a/b and
-the rule verified). Honest reporting: if it's close, say so with the CI.
+**Deliverable.** Win-rate table (both directions, CIs) + the `vs_env.py` garbage wiring and its
+hardware spot-check. Honest reporting: if it's close, say so with the CI.
 
 ## E4 — Tournament-setting revalidation (the L11-MED-solo gap)
 **Objective.** Establish the *envelope* where our strong-play claim holds — required before any
 `CLAIMS.md` Formulation B/C headline at a non-L11-MED setting.
 
 **Method.**
-1. **Map DRMC settings → in-game (level, speed).** The corpus shows e.g. Level 10 in "Gold Speed"
-   monthlies and championship VS. **"Gold Speed" is a DRMC bracket/division name, not
-   self-evidently an in-game speed** — confirm the actual (level, speed) each relevant bracket
-   uses (check a VOD's setup screen or the DRMC ruleset). Record the mapping.
+1. **Consume the DRMC settings → in-game (level, speed) mapping from the corpus.** *(Routed to the
+   corpus program / obs-studio by the lead: broadcast overlays show LEVEL/SPD per match on screen,
+   so the mapping is extractable from on-disk footage + rules pages and will land in
+   `players.json` / `brackets.json` metadata.)* Read it from there rather than re-deriving it;
+   until it's populated, sweep the full grid in step 2 so no cell is missed.
 2. **Solo clear-rate sweep** through `FaithfulDrMarioEnv` across the confirmed grid — levels
    spanning at least {10 … 20} × speeds {MED, HI} (and LOW if any bracket uses it), honoring the
    ROM-exact gravity per `TEMPO_DESIGN.md §2.5`. **N ≥ 50 seeds per cell.**
@@ -129,9 +133,12 @@ statement ("≥X% clear holds for levels ≤L at speed S") for `CLAIMS.md`.
 - All results land in `paper/` as tables in the `final_regress.out` format, with N and the
   statistical test named, ready to drop into §5/§10 and Table T2.
 
-## Open dependencies flagged to the lead
-- **VS garbage model** (E3 prerequisite) — is anyone already building a Python VS/garbage model,
-  or should the experiment lane own it? It's independently useful (VS analysis, the tempo/
-  competitive-theory section C6).
-- **DRMC setting mapping** (E4 step 1) — confirm (level, speed) per bracket; the corpus owner /
-  the player-data program may already know this.
+## Dependencies — both RESOLVED by the lead (2026-07-22)
+- **VS garbage rule** (E3) — RESOLVED: already extracted + verified from the ROM
+  (`tmp/probe_attack.lua`); rule stated inline in E3. Remaining work is *wiring* it into
+  `experiments/vs_env.py` (~a day), owned by the experiment lane. Not a research blocker.
+- **DRMC setting mapping** (E4 step 1) — ROUTED to the corpus program (obs-studio); will arrive
+  as `players.json` / `brackets.json` metadata (LEVEL/SPD from broadcast overlays). E4 consumes it.
+
+**Status: parked.** The experiment queue picks up E1/E2 when tonight's sweeps drain; E3 unblocks
+once `vs_env.py` is wired; E4 unblocks as the corpus metadata lands.
