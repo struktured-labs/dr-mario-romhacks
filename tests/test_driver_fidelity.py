@@ -29,6 +29,7 @@ PEND2, DELAY2 = 0x614F, 0x615F
 TGT_C2, TGT_O2 = 0x6152, 0x6153
 ROT_DONE2 = 0x616E
 LAST_COL2, LAST_ORI2, STABLE_CT2 = 0x616F, 0x6170, 0x6171   # DRSLAM argmax-stability state
+SLAM_OK = 0x6172                                             # DRSLAM_COLDGUARD "pipeline validated" latch
 STK2 = 0x615B
 LASTY1, LASTY2 = 0x6154, 0x6155
 P1Y = 0x0306
@@ -43,16 +44,17 @@ _KNOB_ENV = {"kopen": "DRSLAM_KOPEN", "kend": "DRSLAM_KEND", "kcross": "DRSLAM_K
              "vcend": "DRSLAM_VCEND", "lowy": "DRSLAM_LOWY", "minthink": "DRMINTHINK"}
 
 
-def load_build(rotfix, slam=True, human=False, pocket=False, patcher=WT, **knobs):
+def load_build(rotfix, slam=True, coldguard=True, human=False, pocket=False, patcher=WT, **knobs):
     """Import the patcher fresh (module-level env is read at import) and return build_main bytes.
-    slam=True/False sets DRSLAM; human/pocket select the shipped variants (DRHUMAN/DRPOCKET);
-    **knobs override the phase table (kopen/kend/kcross/vcend/lowy) and the driver-fix min-think
-    floor (minthink) so scenarios stay fast + deterministic."""
-    for k in ("DRNOFREEZE", "DRROTFIX", "DRHUMAN", "DRPOCKET", "DRSLAM", *_KNOB_ENV.values()):
+    slam=True/False sets DRSLAM; coldguard=True/False sets DRSLAM_COLDGUARD (the first-DONE gate);
+    human/pocket select the shipped variants (DRHUMAN/DRPOCKET); **knobs override the phase table
+    (kopen/kend/kcross/vcend/lowy) and the min-think floor (minthink) so scenarios stay deterministic."""
+    for k in ("DRNOFREEZE", "DRROTFIX", "DRHUMAN", "DRPOCKET", "DRSLAM", "DRSLAM_COLDGUARD", *_KNOB_ENV.values()):
         os.environ.pop(k, None)
     os.environ["DRNOFREEZE"] = "1"
     os.environ["DRROTFIX"] = "1" if rotfix else "0"
     os.environ["DRSLAM"] = "1" if slam else "0"
+    os.environ["DRSLAM_COLDGUARD"] = "1" if coldguard else "0"
     if human:
         os.environ["DRHUMAN"] = "1"
     if pocket:
@@ -64,7 +66,7 @@ def load_build(rotfix, slam=True, human=False, pocket=False, patcher=WT, **knobs
         if p not in sys.path:
             sys.path.insert(0, p)
     # unique module name per (patcher, config) so env changes take effect (module body re-runs)
-    key = f"pc_{abs(hash((patcher, rotfix, slam, human, pocket, tuple(sorted(knobs.items()))))):x}"
+    key = f"pc_{abs(hash((patcher, rotfix, slam, coldguard, human, pocket, tuple(sorted(knobs.items()))))):x}"
     spec = importlib.util.spec_from_file_location(key, patcher)
     m = importlib.util.module_from_spec(spec)
     sys.modules[spec.name] = m
@@ -157,6 +159,8 @@ def spawn_pill(s, y=0x0D, x=3, orient=0):
     s.mem[ROT_DONE2] = 0; s.mem[STK2] = 0
     s.mem[W2_DONE] = 0; s.mem[W2_OR] = 0xFF; s.mem[W2_COL] = 0  # no candidate
     s.mem[TGT_C2] = 3; s.mem[TGT_O2] = orient
+    s.mem[SLAM_OK] = 1   # normal mid-match: the pipeline has DONE'd before -> slam armed. Cold-entry
+                         #   scenarios below clear this to test DRSLAM_COLDGUARD explicitly.
 
 
 # scenarios speak GAME orient; the copro mailbox is copro-space and the driver maps it
@@ -444,6 +448,55 @@ for i in range(220):
         break
 check("F: ZERO gravity pins across a full SLAM-path pill (rotate+min-think+slam, all under live gravity)",
       not any(s.froze_hist), f"pinned={sum(s.froze_hist)}/{len(s.froze_hist)} frames")
+
+# ---------------------------------------------------------------- (g) DRSLAM_COLDGUARD gate
+print("SCENARIO G (DRSLAM_COLDGUARD): the confidence slam is HELD until P2's first DONE of the match")
+s = Sim(rotfix=True, slam=True, coldguard=True, minthink=8, kopen=4, vcend=10, lowy=6)
+s.grav_period = 40                      # Y stays high -> isolate the OPEN stability gate (no crossover)
+spawn_pill(s, y=0x0D, x=3, orient=0)
+s.mem[SLAM_OK] = 0                       # COLD entry: nothing validated yet this match
+publish_live(s, col=3, orient=0)        # perfectly stable + aligned argmax -- but pre-first-DONE
+cold_downs = 0
+for i in range(60):
+    st = s.frame(apply_physics=False)   # Y frozen high: only the OPEN stability gate could fire
+    if st["f6"] & 0x04:
+        cold_downs += 1
+check("G: pre-first-DONE (SLAM_OK=0) the confidence slam does NOT fire (falls back to DONE-wait)",
+      cold_downs == 0 and s.mem[SLAM_OK] == 0, f"DOWN frames={cold_downs} SLAM_OK={s.mem[SLAM_OK]}")
+publish_done(s, col=3, orient=0)        # P2's first DONE -> handle() arms SLAM_OK; the ceiling slams
+g_done_slam = False
+for i in range(10):
+    st = s.frame(apply_physics=False)
+    if st["f6"] & 0x04:
+        g_done_slam = True
+check("G: P2's first DONE arms SLAM_OK (and the DONE ceiling still slams)",
+      s.mem[SLAM_OK] == 1 and g_done_slam, f"SLAM_OK={s.mem[SLAM_OK]} done_slam={g_done_slam}")
+
+# ---------------------------------------------------------------- (h) round-1 dead-round REGRESSION
+print("SCENARIO H (regression): cold round-1 first pill -- pre-fix slam commits the pre-DONE window,")
+print("  the coldguard waits for the validated DONE. (Field: slam dead-rounds round 1, wins rounds 2-3.)")
+def cold_first_pill(coldguard):
+    # cold match entry: the $5200 window holds a WRONG move (col1) until the search DONEs the RIGHT
+    # move (col6) late (cold search). SLAM_OK=0 = first pill of the match, nothing validated yet.
+    s = Sim(rotfix=True, slam=True, coldguard=coldguard, minthink=8, kopen=4, kcross=6, vcend=10, lowy=6)
+    s.soft_drop = True; s.grav_period = 16
+    spawn_pill(s, y=0x0D, x=3, orient=0)
+    s.mem[SLAM_OK] = 0
+    for i in range(300):
+        if i < 120:
+            publish_live(s, col=1, orient=0)      # cold pre-DONE window = a WRONG move
+        else:
+            publish_done(s, col=6, orient=0)      # the real answer, only now validated (DONE)
+        st = s.frame(apply_physics=True)
+        if st["y"] == 0:
+            break
+    return s.mem[P2X]
+buggy = cold_first_pill(coldguard=False)   # == the aea9f6e pre-fix slam
+fixed = cold_first_pill(coldguard=True)    # DRSLAM_COLDGUARD default
+check("H: WITHOUT the coldguard the cold pill commits the WRONG pre-DONE move (col1) = the dead round",
+      buggy == 1, f"pre-fix landed col={buggy} (wrong=1, correct=6)")
+check("H: WITH the coldguard (default) the cold pill waits for the DONE and lands correct (col6)",
+      fixed == 6, f"fixed landed col={fixed}")
 
 # ---------------------------------------------------------------- byte-exactness: DRSLAM=0 == canonical
 print("BYTE-EXACT (DRSLAM=0): rebuilds byte-identical to canonical, all three shipped variants")
