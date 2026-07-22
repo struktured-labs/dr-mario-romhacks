@@ -69,6 +69,11 @@ VSEEN1, VSEEN2 = 0x616A, 0x616B   # count-was-nonzero-this-match latches (gate t
 # capsule and locks it BACKWARDS (field-seen on the Pocket combo brain 2026-07-19). $616C/$616D
 # are the anytime torn-read scratch; $616E is the next free PRG-RAM byte.
 ROT_DONE2 = 0x616E
+# DRSLAM confidence-gated slam: P2 argmax-stability tracking (all free PRG-RAM past ROT_DONE2).
+# LAST_COL2/LAST_ORI2 = last published (column, MAPPED game-orient); STABLE_CT2 = hooks the
+# published argmax has held unchanged (saturating), reset on any change or a new pill. The slam
+# gate reads STABLE_CT2 to decide when the running best is confident enough to fast-drop.
+LAST_COL2, LAST_ORI2, STABLE_CT2 = 0x616F, 0x6170, 0x6171
 import os as _os
 USE_SEEDS = _os.environ.get("DRSEED", "1") != "0"   # DRSEED=0 -> seeds stay 0 = deterministic mirror
 # WEAVE steering: when sliding to the target column is blocked at the pill's row (stuck
@@ -98,6 +103,28 @@ ROTFIX = _os.environ.get("DRROTFIX", "1") != "0"
 # is ignored during it anyway). Below this the search's argmax is a shallow first guess; the
 # field miss (dual-end at cols 6-7 lost to a left-wall half-credit) was a commit off that guess.
 MIN_THINK = int(_os.environ.get("DRMINTHINK", "90"))
+# DRSLAM=1 (default): CONFIDENCE-GATED SLAM. Once the capsule is column-aligned + orient-locked
+# (ROT_DONE2, so the min-think floor already passed), fast-drop as soon as the published argmax has
+# held stable for K hooks -- instead of idling at natural gravity until the search formally DONEs
+# (~81% of a depth-3 search is confirmatory; tmp/tempo/TEMPO_DESIGN.md). SLAM REQUIRES ROTFIX: the
+# min-think floor is safety layer 1 against the v1 shallow-argmax slam-suicide, so with DRROTFIX=0
+# SLAM auto-disables. DRSLAM=0 rebuilds byte-exact to canonical (every add below is `if SLAM`-guarded).
+SLAM = (_os.environ.get("DRSLAM", "1") != "0") and ROTFIX
+# Phase-aware tuning table (byte-patchable immediates, DRMINTHINK-style, so per-platform tuning
+# is a rebuild via env or a byte-patch). K is in HOOKS the argmax has been stable (~5 hooks/frame;
+# the FPGA publishes ~1 candidate / ~10 hooks on MiSTer, ~4x slower on the 21.47MHz Pocket -> the
+# gate is the PRIMARY commit there, so retune K per platform):
+#   K_OPEN  : opening/mid (virus_count >= VC_ENDGAME) -- aggressive; the argmax settles first here.
+#   K_END   : endgame (virus_count < VC_ENDGAME) -- 255 = require DONE (early commits ~20% worse there).
+#   K_CROSS : PAST THE FEASIBILITY CROSSOVER (still searching while the capsule is already low, Y <
+#             CROSS_LOWY) -- minimal stability: DONE is physically unreachable, so commit the stable
+#             argmax rather than drift-lock (TEMPO_DESIGN §2.5). This reactive net self-calibrates --
+#             it never trips when the search finishes before the capsule falls (e.g. incremental-eval).
+K_OPEN     = int(_os.environ.get("DRSLAM_KOPEN",  "40"))
+K_END      = int(_os.environ.get("DRSLAM_KEND",   "255"))
+K_CROSS    = int(_os.environ.get("DRSLAM_KCROSS", "8"))
+VC_ENDGAME = int(_os.environ.get("DRSLAM_VCEND",  "10"))
+CROSS_LOWY = int(_os.environ.get("DRSLAM_LOWY",   "8"))
 VCOUNT_P1, VCOUNT_P2 = 0x0324, 0x03A4   # remaining virus counts (0 => that player cleared -> STAGE CLEAR)
 W2_BASE = 0x5200
 # DRPOCKET=1: single-window build (Analogue Pocket core has only the $5000 window).
@@ -298,6 +325,9 @@ def build_main(level=11, speed=1):
     a.ins16("STA_abs", VSEEN1); a.ins16("STA_abs", VSEEN2)
     if ROTFIX:
         a.ins16("STA_abs", ROT_DONE2)                       # A==0 here: orient-commit latch clear
+    if SLAM:
+        a.ins16("STA_abs", LAST_COL2); a.ins16("STA_abs", LAST_ORI2)   # A==0: argmax-stability state
+        a.ins16("STA_abs", STABLE_CT2)
     a.ins("LDA_imm", 3)                                     # sane targets pre-first-publish
     a.ins16("STA_abs", TGT_C1); a.ins16("STA_abs", TGT_O1)
     a.ins16("STA_abs", TGT_C2); a.ins16("STA_abs", TGT_O2)
@@ -415,6 +445,8 @@ def build_main(level=11, speed=1):
     a.ins("LDA_imm", 0); a.ins16("STA_abs", WRETRY)
     if ROTFIX:
         a.ins16("STA_abs", ROT_DONE2)                       # A==0 here: new P2 pill -> re-enter pre-phase
+    if SLAM:
+        a.ins16("STA_abs", STABLE_CT2)                      # A==0: new pill -> argmax must re-prove stability
     a.label("no_p2_new")
     a.ins16("LDA_abs", 0x0386); a.ins16("STA_abs", LASTY2)
 
@@ -579,6 +611,21 @@ def build_main(level=11, speed=1):
         a.ins16("LDA_abs", PEND2); a.br("BEQ", "act_p2_go")
         a.ins("LDA_imm", 0); a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8); a.jmp("act_p1")
         a.label("act_p2_go")
+        if SLAM:
+            # ARGMAX-STABILITY TRACKER (past the PEND settle guard, so no stale-target counting):
+            # count hooks the published (column, MAPPED orient) has held unchanged. TGT_O2 is the
+            # game-mapped orient (8d7ba75) -- compare the MAPPED value so a copro-space orient wobble
+            # isn't miscounted. Reset on any change; saturate at 0xFE so K_END=0xFF means "never via
+            # stability" (DONE-only). Feeds the dn_p2 confidence gate below.
+            a.ins16("LDA_abs", TGT_C2); a.ins16("CMP_abs", LAST_COL2); a.br("BNE", "p2_st_chg")
+            a.ins16("LDA_abs", TGT_O2); a.ins16("CMP_abs", LAST_ORI2); a.br("BNE", "p2_st_chg")
+            a.ins16("LDA_abs", STABLE_CT2); a.ins("CMP_imm", 0xFE); a.br("BCS", "p2_st_done")
+            a.ins16("INC_abs", STABLE_CT2); a.jmp("p2_st_done")
+            a.label("p2_st_chg")                            # argmax moved -> record + reset the counter
+            a.ins16("LDA_abs", TGT_C2); a.ins16("STA_abs", LAST_COL2)
+            a.ins16("LDA_abs", TGT_O2); a.ins16("STA_abs", LAST_ORI2)
+            a.ins("LDA_imm", 0); a.ins16("STA_abs", STABLE_CT2)
+            a.label("p2_st_done")
     a.ins16("LDA_abs", STK2); a.ins("CMP_imm", STUCK_LIM); a.br("BCC", "act_p2_n")
     a.ins("LDY_imm", 0x04); a.ins("STY_zp", 0xF6); a.jmp("act_p1")   # stuck: force drop
     a.label("act_p2_n")
@@ -605,6 +652,14 @@ def build_main(level=11, speed=1):
         a.label("p2_orient_ok")                                       # orient reached; think gate:
         a.ins16("LDA_abs", ARMED2); a.br("BEQ", "p2_commit")         # DONE -> commit
         a.ins16("LDA_abs", WDOGH2); a.br("BNE", "p2_commit")         # >256 hooks searched -> commit
+        if SLAM:
+            # SPEED-AWARE MIN-THINK: past the feasibility crossover (capsule already low while still
+            # searching, Y < CROSS_LOWY) the min-think floor would let the pill LAND before it opens
+            # -> the orient never locks and the column gate never runs = drift-lock. The orient is
+            # ALREADY at target here (past the CMP above), so committing merely LATCHES it (no low
+            # rotation -> DRROTFIX's no-backwards-lock invariant holds) and hands the descent to the
+            # confidence gate -- which is the PRIMARY commit mechanism under fast/slow-silicon gravity.
+            a.ins16("LDA_abs", 0x0386); a.ins("CMP_imm", CROSS_LOWY); a.br("BCC", "p2_commit")
         a.ins16("LDA_abs", WDOG2); a.ins("CMP_imm", MIN_THINK); a.br("BCS", "p2_commit")
         a.ins("LDA_imm", 0); a.ins("STA_zp", 0xF6); a.ins("STA_zp", 0xF8)   # gate closed: no ACT,
         a.jmp("act_p1")                                              # but NO pin -- capsule falls
@@ -626,10 +681,30 @@ def build_main(level=11, speed=1):
     a.ins("LDY_imm", 0x02); a.jmp("st_p2")
     a.label("dn_p2")
     if NO_FREEZE:
-        # ANYTIME: never fast-drop while the search is still ARMED — gravity is the time
-        # budget. Aligned + still thinking = hold position (no input) and keep falling.
-        a.ins16("LDA_abs", ARMED2); a.br("BEQ", "dn_p2_go")
-        a.ins("LDY_imm", 0x00); a.jmp("st_p2")
+        # ANYTIME + CONFIDENCE-GATED SLAM. Column-aligned here, and ROT_DONE2 is guaranteed set
+        # (act_p2_n only reaches mv_p2/dn_p2 after the orient-lock), so the min-think floor +
+        # rotation-complete preconditions already hold. DONE still slams (the shipped ceiling);
+        # otherwise slam once the published argmax has been stable for a phase-dependent K hooks.
+        a.ins16("LDA_abs", ARMED2); a.br("BEQ", "dn_p2_go")       # DONE -> slam (unchanged ceiling)
+        if SLAM:
+            # PHASE-AWARE K (TEMPO_DESIGN §8), two axes:
+            #  feasibility -- reactive crossover: still searching while the capsule is already low
+            #    (Y < CROSS_LOWY) => DONE won't arrive in time, commit on minimal stability K_CROSS.
+            #  safety -- virus_count: endgame (vc < VC_ENDGAME) uses K_END (255 = require DONE);
+            #    opening/mid uses the aggressive K_OPEN. Feasibility dominates (checked first).
+            # If the argmax column later CHANGES, nf2 refreshes TGT_C2 + zeroes STABLE_CT2, so the
+            # next hook is un-aligned -> mv_p2 re-steers and the slam self-aborts (no latch needed).
+            a.ins16("LDA_abs", 0x0386); a.ins("CMP_imm", CROSS_LOWY); a.br("BCC", "dn_slam_cross")
+            a.ins16("LDA_abs", VCOUNT_P2); a.ins("CMP_imm", VC_ENDGAME); a.br("BCC", "dn_slam_end")
+            a.ins16("LDA_abs", STABLE_CT2); a.ins("CMP_imm", K_OPEN); a.br("BCS", "dn_p2_go")
+            a.jmp("dn_hold")
+            a.label("dn_slam_cross")                             # low + still searching -> feasibility K
+            a.ins16("LDA_abs", STABLE_CT2); a.ins("CMP_imm", K_CROSS); a.br("BCS", "dn_p2_go")
+            a.jmp("dn_hold")
+            a.label("dn_slam_end")                               # endgame -> conservative K (255=DONE-only)
+            a.ins16("LDA_abs", STABLE_CT2); a.ins("CMP_imm", K_END); a.br("BCS", "dn_p2_go")
+            a.label("dn_hold")
+        a.ins("LDY_imm", 0x00); a.jmp("st_p2")                    # hold: no button, fall at gravity
         a.label("dn_p2_go")
     a.ins("LDY_imm", 0x04)
     a.label("st_p2"); a.ins("STY_zp", 0xF6)
