@@ -19,18 +19,45 @@ FOOTER_TILE_IDS = tuple(range(0xE8, 0xF0))
 FOOTER_CHR_PAGE = 2
 FOOTER_HOOK_OFFSET = 0x0C34
 FOOTER_HOOK_ORIGINAL = bytes((0x20, 0xF6, 0x88))  # JSR $88F6
-FOOTER_HOOK_PATCHED = bytes((0x20, 0x56, 0xBE))   # JSR $BE56
-FOOTER_ROUTINE_OFFSET = 0x3E66
-FOOTER_ROUTINE = bytes((
-    0x20, 0xF6, 0x88,       # JSR $88F6: draw final original title metasprite
-    0xA9, 0xF8, 0x85, 0x47, # footer data pointer = $9FF8
-    0xA9, 0x9F, 0x85, 0x48,
-    0xA9, 0x60, 0x85, 0x44, # base X = 96
-    0xA9, 0xD7, 0x85, 0x45, # base Y = 215 (visible row 216)
-    0x20, 0x06, 0x89,       # JSR $8906: native metasprite renderer
-    0x60,                   # RTS
-))
-FOOTER_DATA_OFFSET = 0x2008
+
+# The 23-byte footer routine and its 33-byte metasprite table live in dead PRG
+# runs.  v7 put them at $BE56 / $9FF8, but those are DRSTUDY v3.3's part3b /
+# part2 runs, so a build that also carries the study (TE v8) must relocate them
+# via the routine_off / data_off parameters of apply_training_edition_title.
+# The routine is position-independent apart from the two-byte pointer to its
+# metasprite table, and the title hook is a JSR to the routine; both the hook
+# target and that pointer are derived from the chosen offsets below.
+FOOTER_ROUTINE_OFFSET = 0x3E66   # v7 default ($BE56); TE v8 overrides to a free run
+FOOTER_DATA_OFFSET = 0x2008      # v7 default ($9FF8); TE v8 overrides to a free run
+
+
+def _prg_cpu_addr(file_off):
+    """CPU address of a byte in the linear 32 KiB Dr. Mario PRG image."""
+    return file_off - 0x10 + 0x8000
+
+
+def footer_hook_patched(routine_off):
+    """`JSR <routine>` opcode bytes for the title hook at FOOTER_HOOK_OFFSET."""
+    cpu = _prg_cpu_addr(routine_off)
+    return bytes((0x20, cpu & 0xFF, (cpu >> 8) & 0xFF))
+
+
+def footer_routine(data_off):
+    """The footer routine, with its metasprite pointer aimed at ``data_off``."""
+    cpu = _prg_cpu_addr(data_off)
+    return bytes((
+        0x20, 0xF6, 0x88,               # JSR $88F6: draw final original title metasprite
+        0xA9, cpu & 0xFF, 0x85, 0x47,   # footer data pointer lo
+        0xA9, (cpu >> 8) & 0xFF, 0x85, 0x48,  # footer data pointer hi
+        0xA9, 0x60, 0x85, 0x44,         # base X = 96
+        0xA9, 0xD7, 0x85, 0x45,         # base Y = 215 (visible row 216)
+        0x20, 0x06, 0x89,               # JSR $8906: native metasprite renderer
+        0x60,                           # RTS
+    ))
+
+
+FOOTER_HOOK_PATCHED = footer_hook_patched(FOOTER_ROUTINE_OFFSET)  # v7: JSR $BE56
+FOOTER_ROUTINE = footer_routine(FOOTER_DATA_OFFSET)               # v7: data ptr $9FF8
 FOOTER_METASPRITE = bytes(
     value
     for index, tile_id in enumerate(FOOTER_TILE_IDS)
@@ -134,6 +161,7 @@ FOOTER_FONT = {
     ".": ("0", "0", "0", "0", "1"),
     "0": ("111", "101", "101", "101", "111"),
     "7": ("111", "001", "010", "010", "010"),
+    "8": ("111", "101", "111", "101", "111"),
     "A": ("010", "101", "111", "101", "101"),
     "B": ("110", "101", "110", "101", "110"),
     "K": ("101", "101", "110", "101", "101"),
@@ -204,15 +232,15 @@ def _text_pixels():
     return body, bevel
 
 
-def _footer_pixels():
+def _footer_pixels(text=FOOTER_TEXT):
     """Return a centered 3x5 footer within an eight-sprite strip."""
-    width = sum(len(FOOTER_FONT[ch][0]) for ch in FOOTER_TEXT)
-    width += len(FOOTER_TEXT) - 1
+    width = sum(len(FOOTER_FONT[ch][0]) for ch in text)
+    width += len(text) - 1
     assert width == 59
 
     body = set()
     cursor_x = (64 - width) // 2
-    for char in FOOTER_TEXT:
+    for char in text:
         glyph = FOOTER_FONT[char]
         for y, row in enumerate(glyph):
             for x, bit in enumerate(row):
@@ -222,11 +250,17 @@ def _footer_pixels():
     return body
 
 
-def apply_training_edition_title(rom):
+def apply_training_edition_title(rom, routine_off=FOOTER_ROUTINE_OFFSET,
+                                 data_off=FOOTER_DATA_OFFSET, footer_text=FOOTER_TEXT):
     """Patch a standard 64 KiB Dr. Mario ROM image in place.
 
     Returns the number of CHR tiles written.  The crash-sensitive title
     nametable remains original; the footer is a title-only metasprite.
+
+    ``routine_off`` / ``data_off`` are the PRG file offsets of the footer
+    routine and its metasprite table.  They default to the v7 runs ($BE56 /
+    $9FF8); TE v8 relocates them off DRSTUDY's part3b / part2 runs.  The hook
+    JSR target and the routine's data pointer are derived from these offsets.
     """
     if len(rom) < CHR_START + 5 * CHR_PAGE_SIZE:
         raise ValueError("ROM is too small for the standard Dr. Mario CHR layout")
@@ -258,7 +292,7 @@ def apply_training_edition_title(rom):
             tiles_written += 1
 
     footer = [[0] * 64 for _ in range(8)]
-    for x, y in _footer_pixels():
+    for x, y in _footer_pixels(footer_text):
         footer[y][x] = 2
 
     for tile_x, tile_id in enumerate(FOOTER_TILE_IDS):
@@ -271,27 +305,23 @@ def apply_training_edition_title(rom):
         rom[off:off + 16] = encoded
         tiles_written += 1
 
+    routine_bytes = footer_routine(data_off)
+    hook_patched = footer_hook_patched(routine_off)
+
     hook = bytes(rom[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3])
-    if hook not in (FOOTER_HOOK_ORIGINAL, FOOTER_HOOK_PATCHED):
+    if hook not in (FOOTER_HOOK_ORIGINAL, hook_patched):
         raise ValueError(f"unexpected title hook at 0x{FOOTER_HOOK_OFFSET:04X}")
 
-    routine = bytes(
-        rom[FOOTER_ROUTINE_OFFSET:FOOTER_ROUTINE_OFFSET + len(FOOTER_ROUTINE)]
-    )
-    if routine not in (bytes((0xFF,)) * len(FOOTER_ROUTINE), FOOTER_ROUTINE):
-        raise ValueError("title footer routine space is not unused")
+    # A dead run is filler (any mix of 0x00/0xFF) or our own bytes from a re-run.
+    existing_routine = bytes(rom[routine_off:routine_off + len(routine_bytes)])
+    if existing_routine != routine_bytes and set(existing_routine) - {0x00, 0xFF}:
+        raise ValueError(f"title footer routine space at 0x{routine_off:04X} is not unused")
 
-    metasprite = bytes(
-        rom[FOOTER_DATA_OFFSET:FOOTER_DATA_OFFSET + len(FOOTER_METASPRITE)]
-    )
-    if metasprite not in (bytes(len(FOOTER_METASPRITE)), FOOTER_METASPRITE):
-        raise ValueError("title footer metasprite space is not unused")
+    existing_data = bytes(rom[data_off:data_off + len(FOOTER_METASPRITE)])
+    if existing_data != FOOTER_METASPRITE and set(existing_data) - {0x00, 0xFF}:
+        raise ValueError(f"title footer metasprite space at 0x{data_off:04X} is not unused")
 
-    rom[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3] = FOOTER_HOOK_PATCHED
-    rom[FOOTER_ROUTINE_OFFSET:FOOTER_ROUTINE_OFFSET + len(FOOTER_ROUTINE)] = (
-        FOOTER_ROUTINE
-    )
-    rom[FOOTER_DATA_OFFSET:FOOTER_DATA_OFFSET + len(FOOTER_METASPRITE)] = (
-        FOOTER_METASPRITE
-    )
+    rom[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3] = hook_patched
+    rom[routine_off:routine_off + len(routine_bytes)] = routine_bytes
+    rom[data_off:data_off + len(FOOTER_METASPRITE)] = FOOTER_METASPRITE
     return tiles_written
