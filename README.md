@@ -1,5 +1,9 @@
 # Dr. Mario NES — FPGA AI Coprocessor
 
+> **ROM-hack release:** [Dr. Mario Training Edition v7](release/RELEASE_NOTES_V7.md) —
+> [download the BPS patch](release/drmario_te_v7.bps). This release carries the published
+> Training Edition v5 forward with crash-safe `TRAINING EDITION` title branding.
+
 A hardware-accelerated depth-3 AI that plays Dr. Mario (NES) on a real
 [MiSTer](https://github.com/MiSTer-devel/Main_MiSTer/wiki) FPGA **and on the Analogue
 Pocket** (custom openFPGA core). A custom mapper drops a
