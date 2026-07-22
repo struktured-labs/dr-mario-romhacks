@@ -235,13 +235,46 @@ def _emit_eh_terms(a):
     a.label("eh_hland")
     a.ins("AND_imm", 0x0F); a.ins("STA_zp", EH_T1)        # EH_T1 = landing low nibble
     a.ins("LDA_zp", EH_T0); a.ins("AND_imm", 0x0F); a.ins("CMP_zp", EH_T1); a.br("BNE", "eh_hnext")
-    a.ins("LDA_zp", D_ADL); a.ins("CLC"); a.ins("ADC_imm", G3.W_HANG); a.ins("STA_zp", D_ADL)
-    a.ins("LDA_zp", D_ADH); a.ins("ADC_imm", 0); a.ins("STA_zp", D_ADH)
+    if G3.HANG_VIRUS_COL_ONLY or G3.HANG_DEPTH_PROP:
+        a.jsr("eh_hcredit")                               # R4 out-of-line credit (keeps loop branches short)
+    else:
+        a.ins("LDA_zp", D_ADL); a.ins("CLC"); a.ins("ADC_imm", G3.W_HANG); a.ins("STA_zp", D_ADL)
+        a.ins("LDA_zp", D_ADH); a.ins("ADC_imm", 0); a.ins("STA_zp", D_ADH)
     a.label("eh_hnext")
     a.ins("INX"); a.jmp("eh_hloop")
     a.label("eh_hdone")
     a.ins("RTS")
+    # --- R4 credit subroutine (JSR-only; on entry X = hang idx, Y = landing idx) ---
+    if G3.HANG_VIRUS_COL_ONLY or G3.HANG_DEPTH_PROP:
+        a.label("eh_hcredit")
+        a.ins("STY_zp", EH_T3)                            # save landing idx (Y clobbered below)
+        if G3.HANG_VIRUS_COL_ONLY:
+            a.ins("TXA"); a.ins("AND_imm", 0x07); a.ins("TAY")   # Y = column c = idx & 7
+            a.label("eh_hvc")                             # scan column c for a virus
+            a.ins16("LDA_absY", CUR); a.ins("CMP_imm", 0xFF); a.br("BEQ", "eh_hvcs")
+            a.ins("AND_imm", 0xF0); a.ins("CMP_imm", 0xD0); a.br("BEQ", "eh_hvok")   # virus present
+            a.label("eh_hvcs")
+            a.ins("TYA"); a.ins("CLC"); a.ins("ADC_imm", 8); a.ins("TAY")
+            a.ins("CPY_imm", 128); a.br("BCC", "eh_hvc"); a.ins("RTS")   # no virus in col -> no credit
+            a.label("eh_hvok")
+        if G3.HANG_DEPTH_PROP:
+            a.ins("STX_zp", EH_T2)                        # save hang idx
+            a.ins("LDA_zp", EH_T3); a.ins("SEC"); a.ins("SBC_zp", EH_T2)   # A = landing - hang (mult of 8)
+            a.ins("LSR_A"); a.ins("LSR_A"); a.ins("LSR_A")                 # >>3 = rows between
+            a.ins("SEC"); a.ins("SBC_imm", 1)                             # gap = rows_between - 1
+            a.ins("TAX")                                                  # X = gap (table index)
+            _lda_absx_label(a, "eh_hang_lo"); a.ins("CLC"); a.ins("ADC_zp", D_ADL); a.ins("STA_zp", D_ADL)
+            _lda_absx_label(a, "eh_hang_hi"); a.ins("ADC_zp", D_ADH); a.ins("STA_zp", D_ADH)
+            a.ins("LDX_zp", EH_T2)                        # restore hang idx
+        else:
+            a.ins("LDA_zp", D_ADL); a.ins("CLC"); a.ins("ADC_imm", G3.W_HANG); a.ins("STA_zp", D_ADL)
+            a.ins("LDA_zp", D_ADH); a.ins("ADC_imm", 0); a.ins("STA_zp", D_ADH)
+        a.ins("RTS")
     a.label("eh_excav_tab"); a.raw(0, G3.W_EXCAV * 1, G3.W_EXCAV * 4, G3.W_EXCAV * 9)   # [min(run,3)]
+    if G3.HANG_DEPTH_PROP:                                 # R4: credit[gap] = W_HANG + W_HANG_GAP*gap
+        _hv = [G3.W_HANG + G3.W_HANG_GAP * g for g in range(16)]
+        a.label("eh_hang_lo"); a.raw(*[v & 0xFF for v in _hv])
+        a.label("eh_hang_hi"); a.raw(*[(v >> 8) & 0xFF for v in _hv])
 
 
 def _emit_search_d3_engine(a):

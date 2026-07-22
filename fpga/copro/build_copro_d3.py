@@ -40,6 +40,16 @@ def build_image(board, cA, cB, nA, nB):
     import nes_d3_golden as _G
     _G.DISC_SHIFT = 1            # golden must match for the py65 gate
     _G.EXCAV_HANG_PLY1 = True    # golden must match for the py65 gate
+    _G.BURIED_COLOR_AWARE = True # R1: color-aware g_buried (matches patched LeafEval.sv RTL)
+    _G.W_VRDY = 24               # R3: vrdy coefficient (matches patched LeafEval.sv S_DONE)
+    _G.W_EXCAV = 24              # R2: eh_terms excav weight -> emitted into copro_rom.hex
+    _G.HANG_DEPTH_PROP = True     # R4: depth-proportional hang credit  (eh_terms -> copro_rom.hex)
+    _G.W_HANG_GAP = 20            # R4
+    _G.HANG_VIRUS_COL_ONLY = True # R4: credit hangs only in virus columns
+    _G.MATCHED_COVER_SETUP = True # R6: matched-cover setup credit (matches patched LeafEval.sv)
+    _G.W_MATCHED_COVER = 60       # R6
+    _G.BURIED_NEAREST2_CAP = True # R7b: buried capped at 2 topmost viruses/col (matches RTL)
+    _G.READINESS_EXT_CAP = 0      # R7a: no-op on resolved boards (run^2<=9)
     # copro RAM is ONLY $0000-$0FFF + $6100-$61FF (CoproDrMario.sv): the SQ tables must be
     # read straight from ROM @$B000 (there is no RAM at the py65 tests' $7A00 location).
     # test_vrdy/test_readiness_ext capture the addresses at import -> override those too.

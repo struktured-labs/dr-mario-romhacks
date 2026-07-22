@@ -9,7 +9,7 @@
 //   done            : high when finished; sco[15:0] (signed) & win valid
 // Bit-exact contract (validated vs the python goldens in tb_leafeval):
 //   sco = 5000 - 12*maxh - 20*holes - 90*toprisk - 150*spawn + 60*setup
-//         - 30*buried + 12*rdy_ext + 12*vrdy - 6*pollution   (16-bit wrap)
+//         - 30*buried + 12*rdy_ext + 24*vrdy - 6*pollution + matched60   (16-bit wrap; buried color-aware + nearest-2 cap, R6 matched-cover pre-scaled)
 //   win = (no virus on board)
 module LeafEval(
 	input             clk,
@@ -85,7 +85,7 @@ localparam S_IDLE=0, S_COLWALK=1, S_VNEXT=2, S_HRUN_L=3, S_HSPAN_L=4, S_HRUN_R=5
            S_HSPAN_R=6, S_VRUN_U=7, S_VSPAN_U=8, S_VRUN_D=9, S_VSPAN_D=10,
            S_POLROW=11, S_POLCOL=12, S_VFIN=13, S_SETUP_H=14, S_SETUP_V=15, S_DONE=16,
            S_COPY=17, S_FO1=18, S_FO2=19, S_PLACE=20, S_SCAN=21, S_EOL=22,
-           S_APPLY=23, S_GRAV=24, S_RESDONE=25, S_CP_R=26, S_CP_W=27, S_CP_P=28;
+           S_APPLY=23, S_GRAV=24, S_RESDONE=25, S_CP_R=26, S_CP_W=27, S_CP_P=28, S_DONE2=29;
 reg [3:0] cmd_l;
 reg [4:0] st;
 reg       node_leaf;           // CMD_NODE: run the leaf after resolve
@@ -109,10 +109,17 @@ reg  [4:0] maxh /*verilator public_flat_rd*/;
 reg  [7:0] holes /*verilator public_flat_rd*/, toprisk /*verilator public_flat_rd*/, spawn /*verilator public_flat_rd*/, setup /*verilator public_flat_rd*/;
 reg [10:0] pollution /*verilator public_flat_rd*/;   // up to 48 viruses x 22 cells = 1056
 reg  [9:0] buried /*verilator public_flat_rd*/;   // up to 48 x 15 = 720
+reg [12:0] matched60 /*verilator public_flat_rd*/; // R6 matched-cover pre-scaled: +60 per virus w/ same-color cover directly on top
 reg [15:0] rdy_ext /*verilator public_flat_rd*/, vrdy /*verilator public_flat_rd*/;
 reg        anyvir;
 reg        seen;               // column walk: first-occupied seen
 reg  [4:0] fillcnt;            // filled-so-far in this column (for buried)
+reg  [1:0] curcol;            // R1 color-aware buried: color of the contiguous same-color
+reg  [4:0] curlen;            // non-virus cover run ending at the previous cell (0 = none)
+reg  [4:0] vseen;             // R7b: viruses seen so far this column (buried charge caps at 2)
+// combine-pipeline: registered multiplier inputs (S_DONE stage1) -> combine in S_DONE2
+reg  [4:0] maxh_p; reg [7:0] holes_p, toprisk_p, spawn_p, setup_p;
+reg [10:0] pollution_p; reg [9:0] buried_p; reg [15:0] rdy_ext_p, vrdy_p; reg [12:0] matched60_p;
 
 reg  [6:0] vo;                 // current virus bcell offset
 wire [3:0] v_r = vo[6:3];
@@ -139,8 +146,8 @@ always @(posedge clk) begin
 			done <= 1'b0;
 			if (start || cmd == 4'd1) begin                      // LEAF on CUR
 				maxh <= 0; holes <= 0; toprisk <= 0; spawn <= 0; setup <= 0;
-				pollution <= 0; buried <= 0; rdy_ext <= 0; vrdy <= 0; anyvir <= 0;
-				wc <= 0; wr_ <= 0; seen <= 0; fillcnt <= 0;
+				pollution <= 0; buried <= 0; rdy_ext <= 0; vrdy <= 0; anyvir <= 0; matched60 <= 13'd0;
+				wc <= 0; wr_ <= 0; seen <= 0; fillcnt <= 0; curcol <= 2'd0; curlen <= 5'd0; vseen <= 5'd0;
 				st <= S_COLWALK;
 			end else if (cmd == 4'd2 || cmd == 4'd3) begin       // slot copies
 				cmd_l <= cmd; st <= S_COPY;
@@ -293,8 +300,8 @@ always @(posedge clk) begin
 			imm <= 16'd180 * rv_vir + 16'd10 * rv_cells;
 			if (node_leaf) begin
 				maxh <= 0; holes <= 0; toprisk <= 0; spawn <= 0; setup <= 0;
-				pollution <= 0; buried <= 0; rdy_ext <= 0; vrdy <= 0; anyvir <= 0;
-				wc <= 0; wr_ <= 0; seen <= 0; fillcnt <= 0;
+				pollution <= 0; buried <= 0; rdy_ext <= 0; vrdy <= 0; anyvir <= 0; matched60 <= 13'd0;
+				wc <= 0; wr_ <= 0; seen <= 0; fillcnt <= 0; curcol <= 2'd0; curlen <= 5'd0; vseen <= 5'd0;
 				st <= S_COLWALK;
 			end else begin
 				done <= 1'b1; st <= S_IDLE;
@@ -310,16 +317,31 @@ always @(posedge clk) begin
 				end
 				if (vir_of[{wr_[3:0], wc[2:0]}]) begin
 					anyvir <= 1'b1;
-					buried <= buried + fillcnt;
+					// R6 matched-cover setup: a same-color non-virus cell resting directly on the virus
+					// (== the R1 exemption condition) counts a started vertical clear.
+					if (curcol == col_of[{wr_[3:0], wc[2:0]}]) matched60 <= matched60 + 13'd60;
+					// R1 color-aware buried; R7b: charge only the 2 topmost viruses in the column.
+					if (vseen < 5'd2)
+						buried <= buried + fillcnt - ((curcol == col_of[{wr_[3:0], wc[2:0]}]) ? curlen : 5'd0);
+					vseen <= vseen + 1'b1;
+					curcol <= 2'd0; curlen <= 5'd0;                 // virus breaks the cover run
+				end else begin                                     // occupied non-virus: extend/restart run
+					if (curcol == col_of[{wr_[3:0], wc[2:0]}])
+						curlen <= curlen + 1'b1;
+					else begin
+						curcol <= col_of[{wr_[3:0], wc[2:0]}]; curlen <= 5'd1;
+					end
 				end
 				fillcnt <= fillcnt + 1'b1;
 				if (wr_ < 3) toprisk <= toprisk + 1'b1;
 				if (wr_ < 4 && (wc == 3 || wc == 4)) spawn <= spawn + 1'b1;
-			end else if (seen)
-				holes <= holes + 1'b1;
+			end else begin
+				if (seen) holes <= holes + 1'b1;
+				curcol <= 2'd0; curlen <= 5'd0;                    // empty cell breaks the cover run
+			end
 			// advance row-major within the column
 			if (wr_ == 4'd15) begin
-				wr_ <= 0; seen <= 0; fillcnt <= 0;
+				wr_ <= 0; seen <= 0; fillcnt <= 0; curcol <= 2'd0; curlen <= 5'd0; vseen <= 5'd0;
 				if (wc == 3'd7) begin
 					vo <= 0; st <= S_VNEXT;
 				end else
@@ -486,19 +508,24 @@ always @(posedge clk) begin
 				wr_ <= wr_ + 1'b1;
 		end
 
-		S_DONE: begin
-			// combine (16-bit wrap semantics, same as the 6502)
-			sco <= 16'd5000
-			     - 16'd12  * maxh
-			     - 16'd20  * holes
-			     - 16'd90  * toprisk
-			     - 16'd150 * spawn
-			     + 16'd60  * setup
-			     - 16'd30  * buried
-			     + 16'd12  * rdy_ext
-			     + 16'd12  * vrdy
-			     - 16'd6   * pollution;
+		S_DONE: begin       // stage 1: register combine (multiplier) inputs near the DSPs
+			maxh_p <= maxh; holes_p <= holes; toprisk_p <= toprisk; spawn_p <= spawn; setup_p <= setup;
+			pollution_p <= pollution; buried_p <= buried; rdy_ext_p <= rdy_ext; vrdy_p <= vrdy; matched60_p <= matched60;
 			win  <= !anyvir;
+			st <= S_DONE2;
+		end
+		S_DONE2: begin      // stage 2: combine from registered inputs (same sco, +1 leaf cycle)
+			sco <= 16'd5000
+			     - 16'd12  * maxh_p
+			     - 16'd20  * holes_p
+			     - 16'd90  * toprisk_p
+			     - 16'd150 * spawn_p
+			     + 16'd60  * setup_p
+			     + matched60_p
+			     - 16'd30  * buried_p
+			     + 16'd12  * rdy_ext_p
+			     + 16'd24  * vrdy_p
+			     - 16'd6   * pollution_p;
 			done <= 1'b1;
 			st <= S_IDLE;
 		end
