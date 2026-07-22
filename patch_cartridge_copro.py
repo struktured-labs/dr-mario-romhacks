@@ -430,6 +430,14 @@ def build_main(level=11, speed=1):
     a.ins16("STA_abs", VSEEN1); a.ins16("STA_abs", VSEEN2)
     if NAVFIX:
         a.ins16("STA_abs", NAV_STABLE)                      # A==0: fresh armed-stability count each boot
+        # FORCE THE MENU BASELINE (don't trust RAM across core reload). Intro mode is game-state-driven
+        # (the reset flow runs it every cold load), so this is a trustworthy once-per-boot hook -- unlike
+        # a RAM latch, which a fresh-RAM reload leaves garbage. The menu FSM's entire state is $0727 (1P/
+        # 2P) + $04 (VS flag) -- the $FF30 toggle reads/writes ONLY these ($0727=1,$04=0 = 1P). Overwriting
+        # the persisted values with the 1P baseline makes the title nav toggle deterministically to VS-CPU
+        # regardless of what the prior run left -- killing the odd/even parity of inherited-state loads.
+        a.ins("LDA_imm", 1); a.ins16("STA_abs", 0x0727)     # $0727 = 1 (1P player-mode)
+        a.ins("LDA_imm", 0); a.ins("STA_zp", 0x04)          # $04 = 0 (VS flag clear -> coherent 1P)
     a.ins("RTS")                                            # intro/init: hands off otherwise
     a.label("menus")
     a.jsr("autonav")
