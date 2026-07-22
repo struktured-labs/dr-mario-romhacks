@@ -72,12 +72,16 @@
 - **Tuck generation**: the pro move space (weave down, last-second snap) — new
   placement class for the search + driver.
 - **Publication**: paper lane (enhancement-chip AI, fairness framework, the
-  DRMC benchmark) — arXiv → IEEE CoG / AIIDE.
+  DRMC benchmark) — arXiv → IEEE CoG 2027. Positioning note: prior art exists
+  and is credited — meatfighter's 2017 real-time depth-2 Dr. Mario AI (emulator
+  brain), and Seta's ST010/ST018 cart chips that shipped game AI in the 90s;
+  our conjunction (in-cart, hardware-accelerated depth-3, fair second player,
+  benchmarked) is the claim, not "first AI."
 
 ## Programs (longer horizon)
 
 - **Expert-agreement scoring**: ship brain vs champions' actual tournament moves —
-  the first benchmark the Dr. Mario AI space has ever had. Then pattern mining
+  the first benchmark corpus for competitive Dr. Mario play. Then pattern mining
   (principled term weights) and personalized coaching reports (the household loop,
   industrialized, pointed both ways).
 - **One brain, N personas**: universal trunk trained on the full corpus (the
