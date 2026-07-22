@@ -49,12 +49,15 @@ def load_build(rotfix, slam=True, mature=2, human=False, pocket=False, patcher=W
     slam=True/False sets DRSLAM; mature sets DRSLAM_MATURE (FAST_HI threshold; 0 disables the gate);
     human/pocket select the shipped variants (DRHUMAN/DRPOCKET); **knobs override the phase table
     (kopen/kend/kcross/vcend/lowy) and the min-think floor (minthink) so scenarios stay deterministic."""
-    for k in ("DRNOFREEZE", "DRROTFIX", "DRHUMAN", "DRPOCKET", "DRSLAM", "DRSLAM_MATURE", *_KNOB_ENV.values()):
+    for k in ("DRNOFREEZE", "DRROTFIX", "DRHUMAN", "DRPOCKET", "DRSLAM", "DRSLAM_MATURE", "DRNAVFIX", *_KNOB_ENV.values()):
         os.environ.pop(k, None)
     os.environ["DRNOFREEZE"] = "1"
     os.environ["DRROTFIX"] = "1" if rotfix else "0"
     os.environ["DRSLAM"] = "1" if slam else "0"
     os.environ["DRSLAM_MATURE"] = str(mature)
+    os.environ["DRNAVFIX"] = "0"   # nav is orthogonal to the slam lane; pin it off so the slam
+                                   #   byte-exactness (DRSLAM=0 == canonical) is unaffected by DRNAVFIX
+
     if human:
         os.environ["DRHUMAN"] = "1"
     if pocket:

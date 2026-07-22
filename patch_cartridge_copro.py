@@ -82,6 +82,12 @@ LAST_COL2, LAST_ORI2, STABLE_CT2 = 0x616F, 0x6170, 0x6171
 # fall back to the proven anytime placement, re-arming on the next fast DONE -- breaking the cold/dense
 # vicious cycle (bad placement -> denser board -> slower search -> worse commit) at its root.
 SLAM_ARM, LAST_LAT = 0x6172, 0x6173
+# NAV_STABLE (DRNAVFIX): consecutive hooks the title menu has read VS-CPU-armed ($04!=0 AND $0727==2).
+# The canonical nav fires START the instant $04!=0; at a cold boot $04 can read garbage-nonzero during
+# the title fade-in (before the menu inits the 1P default $0727=1/$04=0) while NAV_T is still small so
+# the START window is open -> a premature START lands a 1P game (~1-in-3 cold loads, no reset from cart).
+# DRNAVFIX withholds START until the armed state has been STABLE for NAV_M hooks, filtering the transient.
+NAV_STABLE = 0x6174
 import os as _os
 USE_SEEDS = _os.environ.get("DRSEED", "1") != "0"   # DRSEED=0 -> seeds stay 0 = deterministic mirror
 # WEAVE steering: when sliding to the target column is blocked at the pill's row (stuck
@@ -128,6 +134,16 @@ SLAM = (_os.environ.get("DRSLAM", "1") != "0") and ROTFIX
 # patchable via the CMP #FAST_HI immediate. DRSLAM_MATURE=0 disables the gate (pre-fix slam, A/B).
 FAST_HI = int(_os.environ.get("DRSLAM_MATURE", "2"))
 MATURE = (FAST_HI > 0) and SLAM
+# DRNAVFIX=1 (default): STABILITY-GATED AUTONAV. The canonical an_title fires START the instant $04!=0;
+# a cold-boot garbage-nonzero $04 (title fade-in, before menu-init) then STARTs into a 1P game. DRNAVFIX
+# withholds START until VS-CPU-armed ($04!=0 AND $0727==2) has held for NAV_M consecutive hooks -- the
+# same stability principle as the slam gate, applied to nav. Also un-armed no longer over-toggles past
+# VS-CPU (it waits while accumulating). DRNAVFIX=0 rebuilds the byte-exact canonical nav (A/B parity).
+NAVFIX = _os.environ.get("DRNAVFIX", "1") != "0"
+# NAV_M: consecutive VS-CPU-armed hooks required before START (byte-patchable). A cold-boot $04/$0727
+# garbage window resolves once the menu inits (~1-2 frames ~= 5-10 hooks); NAV_M=48 (~10 f, ~0.16 s) is a
+# comfortable filter over that while the legitimately-reached VS-CPU state holds indefinitely until START.
+NAV_M = int(_os.environ.get("DRNAV_M", "48"))
 # Phase-aware tuning table (byte-patchable immediates, DRMINTHINK-style, so per-platform tuning
 # is a rebuild via env or a byte-patch). K is in HOOKS the argmax has been stable (~5 hooks/frame;
 # the FPGA publishes ~1 candidate / ~10 hooks on MiSTer, ~4x slower on the 21.47MHz Pocket -> the
@@ -348,6 +364,8 @@ def build_main(level=11, speed=1):
         a.ins16("STA_abs", STABLE_CT2)
     if MATURE:
         a.ins16("STA_abs", SLAM_ARM); a.ins16("STA_abs", LAST_LAT)   # A==0: slam disarmed, no latency yet
+    if NAVFIX:
+        a.ins16("STA_abs", NAV_STABLE)                      # A==0: nav armed-stability counter
     a.ins("LDA_imm", 3)                                     # sane targets pre-first-publish
     a.ins16("STA_abs", TGT_C1); a.ins16("STA_abs", TGT_O1)
     a.ins16("STA_abs", TGT_C2); a.ins16("STA_abs", TGT_O2)
@@ -397,6 +415,8 @@ def build_main(level=11, speed=1):
     # the nav and the title idled into attract mode). Zeroing here makes every boot nav cleanly.
     a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T); a.ins16("STA_abs", MATCH_ACTIVE)
     a.ins16("STA_abs", VSEEN1); a.ins16("STA_abs", VSEEN2)
+    if NAVFIX:
+        a.ins16("STA_abs", NAV_STABLE)                      # A==0: fresh armed-stability count each boot
     a.ins("RTS")                                            # intro/init: hands off otherwise
     a.label("menus")
     a.jsr("autonav")
@@ -430,17 +450,34 @@ def build_main(level=11, speed=1):
     # neither board is ever uploaded, DONE never fires, both capsules stagnate. That is the
     # v4 AB-cart regression. Gate on $04 (BEQ->toggle past 2P-human, land on VS-CPU): this
     # is the emission that ALL shipped/validated carts use (Pocket + AB); $0727==2 never
-    # shipped. NOTE: keep this a byte-exact "LDA $04; BEQ; JMP" 7-byte block -- any change
-    # here shifts the whole downstream driver and reopens the byte-divergence from the
+    # shipped. NOTE (DRNAVFIX=0): keep this a byte-exact "LDA $04; BEQ; JMP" 7-byte block -- any
+    # change here shifts the whole downstream driver and reopens the byte-divergence from the
     # deployed reference carts.
-    a.ins("LDA_zp", 0x04); a.br("BEQ", "an_tog")
-    a.jmp("an_start")
-    a.label("an_tog")
-    a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 1); a.br("BEQ", "an_tog_go")
-    a.ins("RTS")
-    a.label("an_tog_go")
-    a.jsr(0xFF30)                                           # ONE toggle per window (game needs a
-    a.ins("RTS")                                            #  frame between mode inits; the $04
+    if NAVFIX:
+        # STABILITY-GATED START. armed = ($04 != 0) AND ($0727 == 2) -- the conjunction (not $0727
+        # alone, which is the v4 2P-human trap) uniquely identifies VS-CPU AND rejects a garbage $04
+        # that lacks $0727==2. Require NAV_M consecutive armed hooks before START, so a cold-boot
+        # transient can't fire it. While armed-but-not-yet-stable we WAIT (no toggle -> never over-
+        # toggle past VS-CPU); un-armed resets the counter and toggles once per window toward VS-CPU.
+        a.ins("LDA_zp", 0x04); a.br("BEQ", "an_unarmed")
+        a.ins16("LDA_abs", 0x0727); a.ins("CMP_imm", 2); a.br("BNE", "an_unarmed")
+        a.ins16("LDA_abs", NAV_STABLE); a.ins("CMP_imm", NAV_M); a.br("BCS", "an_start")  # stable -> START
+        a.ins16("INC_abs", NAV_STABLE); a.ins("RTS")        # armed but not yet stable -> wait (no toggle)
+        a.label("an_unarmed")
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_STABLE)  # not VS-CPU -> reset the stability count
+        a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 1); a.br("BEQ", "an_tog_go")
+        a.ins("RTS")
+        a.label("an_tog_go")
+        a.jsr(0xFF30); a.ins("RTS")                          # ONE toggle per window toward VS-CPU
+    else:
+        a.ins("LDA_zp", 0x04); a.br("BEQ", "an_tog")
+        a.jmp("an_start")
+        a.label("an_tog")
+        a.ins16("LDA_abs", NAV_T); a.ins("AND_imm", 0x1F); a.ins("CMP_imm", 1); a.br("BEQ", "an_tog_go")
+        a.ins("RTS")
+        a.label("an_tog_go")
+        a.jsr(0xFF30)                                       # ONE toggle per window (game needs a
+        a.ins("RTS")                                        #  frame between mode inits; the $04
                                                             #  gate above lands VS-CPU deterministically)
     a.label("an_lvl")
     a.ins("LDA_imm", level)
