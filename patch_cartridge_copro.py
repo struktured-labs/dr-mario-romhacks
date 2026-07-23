@@ -138,6 +138,28 @@ SLAM = (_os.environ.get("DRSLAM", "1") != "0") and ROTFIX
 # patchable via the CMP #FAST_HI immediate. DRSLAM_MATURE=0 disables the gate (pre-fix slam, A/B).
 FAST_HI = int(_os.environ.get("DRSLAM_MATURE", "2"))
 MATURE = (FAST_HI > 0) and SLAM
+# DRCOLGATE=1 (default ON with ROTFIX): the confidence-gated slam (dn_p2, below) was originally
+# NO_FREEZE-only. The R47 Pocket freeze fix (2d71333) routed ROTFIX freeze-carts through the no-pin
+# anytime path but did NOT extend THIS gate too -- so the now-unpinned pill soft-drops (dn_p2 -> LDY #4)
+# off the ~MIN_THINK shallow argmax instead of weaving at natural gravity until the argmax is confidently
+# stable. That is the R47 Pocket MISPLACEMENT ("placed the running argmax, not the converged answer").
+# Extend the gate to ROTFIX -- the symmetric completion of the act-path fix at line ~838. NO_FREEZE=1
+# carts are byte-IDENTICAL (the gate was already True). DRCOLGATE=0 reproduces the pre-fix soft-drop;
+# DRROTFIX=0 -> COLGATE off -> canonical byte-exact.
+COLGATE = ROTFIX and (_os.environ.get("DRCOLGATE", "1") != "0")
+# DRRECOMMIT=1 (default ON, FREEZE carts only): the orient LATCHES at MIN_THINK (while the capsule is
+# still HIGH, by design -- rotating a low/flush capsule can lock it backwards) and act_p2 never re-rotates
+# after. So a slow copro whose orient converges AFTER the latch places the shallow orient forever. RECOMMIT
+# re-opens the latch at DONE IFF the capsule is STILL high (Y >= CROSS_LOWY) and the converged orient
+# differs -> act_p2 rotates once to the converged orient and re-latches (safe: high). On today's slow Pocket
+# copro DONE lands BELOW the safe-rotate line => guaranteed no-op; it self-activates the instant the search
+# converges above the line (combo-port's delta -- this is the DRIVER half that lets the delta fix the orient,
+# without it a faster DONE still can't unstick the latch). Freeze-carts-only keeps the validated MiSTer AB
+# (NO_FREEZE=1) byte-exact. Requires MATURE (all shipping carts have it): the block emits inside handle(2)'s
+# DONE path, and only the MATURE idx==2 trampoline reaches {L}_start via a JMP -- without MATURE that path
+# is a short BEQ and the extra bytes push it out of branch range, so gate on MATURE (which implies SLAM/
+# ROTFIX). DRRECOMMIT=0 disables; DRSLAM=0 / DRSLAM_MATURE=0 / DRROTFIX=0 -> off -> byte-exact.
+RECOMMIT = MATURE and (not NO_FREEZE) and (_os.environ.get("DRRECOMMIT", "1") != "0")
 # DRNAVFIX=1 (default): STABILITY-GATED AUTONAV. The canonical an_title fires START the instant $04!=0;
 # a cold-boot garbage-nonzero $04 (title fade-in, before menu-init) then STARTs into a 1P game. DRNAVFIX
 # withholds START until VS-CPU-armed ($04!=0 AND $0727==2) has held for NAV_M consecutive hooks -- the
@@ -754,6 +776,16 @@ def build_main(level=11, speed=1):
         a.label(f"{L}_m2"); a.ins("CMP_imm", 2); a.br("BNE", f"{L}_m3"); a.ins("LDA_imm", 0); a.jmp(f"{L}_pst")
         a.label(f"{L}_m3"); a.ins("LDA_imm", 2)
         a.label(f"{L}_pst"); a.ins16("STA_abs", tgt_o)
+        if idx == 2 and RECOMMIT:
+            # CONVERGED-ORIENT RECOMMIT (see DRRECOMMIT): converged orient is now in tgt_o. If the orient
+            # was latched early to a shallow running argmax AND the capsule is still high enough to rotate
+            # safely, re-open the latch so act_p2 rotates once to the converged orient. Too-low => keep the
+            # committed orient (the no-backwards-lock invariant). Slow copro => DONE below the line => no-op.
+            a.ins16("LDA_abs", ROT_DONE2); a.br("BEQ", f"{L}_rcdone")     # not latched -> nothing to redo
+            a.ins16("LDA_abs", 0x0386); a.ins("CMP_imm", CROSS_LOWY); a.br("BCC", f"{L}_rcdone")  # low->keep
+            a.ins16("LDA_abs", tgt_o); a.ins16("CMP_abs", 0x03A5); a.br("BEQ", f"{L}_rcdone")     # already ok
+            a.ins("LDA_imm", 0); a.ins16("STA_abs", ROT_DONE2)           # re-open -> act_p2 re-rotates
+            a.label(f"{L}_rcdone")
         if MATURE and idx == 2:
             # MATURITY GATE: capture this search's latency (WDOGH2 high byte) BEFORE it is zeroed below,
             # and arm the slam iff the search was FAST (< FAST_HI*256 hooks) -- a fast DONE means its
@@ -966,7 +998,7 @@ def build_main(level=11, speed=1):
     a.ins("LDY_imm", 0x01); a.ins16("LDA_abs", 0x0385); a.ins16("CMP_abs", TGT_C2); a.br("BCC", "st_p2")
     a.ins("LDY_imm", 0x02); a.jmp("st_p2")
     a.label("dn_p2")
-    if NO_FREEZE:
+    if NO_FREEZE or COLGATE:
         # ANYTIME + CONFIDENCE-GATED SLAM. Column-aligned here, and ROT_DONE2 is guaranteed set
         # (act_p2_n only reaches mv_p2/dn_p2 after the orient-lock), so the min-think floor +
         # rotation-complete preconditions already hold. DONE still slams (the shipped ceiling);
