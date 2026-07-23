@@ -574,6 +574,16 @@ def build_main(level=11, speed=1):
         a.ins16("INC_abs", 0x614B)                          # DBG: inject count
     a.label("autonav")
     a.ins16("LDA_abs", 0x0046)
+    if NAV_V4:
+        # v4: re-establish coherent VS-CPU ($0727=2,$04=1) at EVERY menu hook (modes 0-3), not just the
+        # title. Silicon ring: the mis-land boots' title advances in ~1 hook and the 0->1 transition RESETS
+        # $0727=1 -- the SAME 0->1->2->3->8->4 flow runs for both VS and 1P boots (not a separate demo path),
+        # so re-writing (2,1) every menu hook survives each transition and the game commits VS at intro/play.
+        a.ins("CMP_imm", 0x04); a.br("BCS", "an_v4_notmenu")   # mode>=4 (play/intro8/post7): not a menu
+        a.ins("LDA_imm", 2); a.ins16("STA_abs", 0x0727)
+        a.ins("LDA_imm", 1); a.ins("STA_zp", 0x04)
+        a.ins16("LDA_abs", 0x0046)                             # reload mode for the dispatch below
+        a.label("an_v4_notmenu")
     a.ins("CMP_imm", 0x00); a.br("BEQ", "an_title")
     a.ins("CMP_imm", 0x01); a.br("BEQ", "an_lvl")
     a.ins("CMP_imm", 0x07); a.br("BEQ", "an_start")         # post-match: START -> rematch
