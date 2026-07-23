@@ -165,6 +165,15 @@ PROBE = _os.environ.get("DRPROBE", "0") == "1"
 # garbage window is ~5-15 hooks (menu-init), so NAV_M=24 rejects it; the leaky counter fills 24 at a
 # genuine VS-CPU for any flicker interval R>=3 (net rate (R-2)/R), well inside the ~10 s title timeout.
 NAV_M = int(_os.environ.get("DRNAV_M", "24"))
+# DRNAV_V4 (default ON when NAVFIX): state-directed v4 nav. Root cause (silicon ring, 2026-07-22): every
+# boot RESETS $0727/$04 to (1,0) -- inherited menu state is NOT the flip-var. A sticky title-idle advance
+# races the nav: when the title advances fast the 32-hook $FF30 toggle window is starved and the nav never
+# reaches VS-CPU -> 1P mis-land (the 1P,VS,1P sticky alternation); when it lingers the nav toggles -> VS.
+# v4 DIRECTLY writes coherent VS-CPU ($0727=2,$04=1) each title hook (disasm-verified: $FF30 only ever
+# touches $0727/$04, so a direct write == the toggle end-state) with ZERO window latency, holds a short
+# NAV_M4 confirm, then STARTs -- beating the fast advance. DRNAV_V4=0 -> old v3 (leaky toggle + force).
+NAV_V4 = NAVFIX and (_os.environ.get("DRNAV_V4", "1") != "0")
+NAV_M4 = int(_os.environ.get("DRNAV_M4", "4"))    # title hooks (2,1) held before START (short: beat the advance)
 # Phase-aware tuning table (byte-patchable immediates, DRMINTHINK-style, so per-platform tuning
 # is a rebuild via env or a byte-patch). K is in HOOKS the argmax has been stable (~5 hooks/frame;
 # the FPGA publishes ~1 candidate / ~10 hooks on MiSTer, ~4x slower on the 21.47MHz Pocket -> the
@@ -538,13 +547,11 @@ def build_main(level=11, speed=1):
     a.ins("LDA_imm", 0); a.ins16("STA_abs", NAV_T); a.ins16("STA_abs", MATCH_ACTIVE)
     a.ins16("STA_abs", VSEEN1); a.ins16("STA_abs", VSEEN2)
     if NAVFIX:
-        a.ins16("STA_abs", NAV_STABLE)                      # A==0: fresh armed-stability count each boot
-        # FORCE THE MENU BASELINE (don't trust RAM across core reload). Intro mode is game-state-driven
-        # (the reset flow runs it every cold load), so this is a trustworthy once-per-boot hook -- unlike
-        # a RAM latch, which a fresh-RAM reload leaves garbage. The menu FSM's entire state is $0727 (1P/
-        # 2P) + $04 (VS flag) -- the $FF30 toggle reads/writes ONLY these ($0727=1,$04=0 = 1P). Overwriting
-        # the persisted values with the 1P baseline makes the title nav toggle deterministically to VS-CPU
-        # regardless of what the prior run left -- killing the odd/even parity of inherited-state loads.
+        a.ins16("STA_abs", NAV_STABLE)                      # A==0: fresh confirm count each boot
+    if NAVFIX and not NAV_V4:
+        # v3 ONLY: force the 1P baseline here. Silicon showed mode 8 RE-ENTERS during the title, so this
+        # re-fires and fights the toggles (the 5/5-stuck regression). v4 needs no baseline -- it writes
+        # coherent VS-CPU directly at the title (and inherited $0727/$04 are reset to (1,0) every boot).
         a.ins("LDA_imm", 1); a.ins16("STA_abs", 0x0727)     # $0727 = 1 (1P player-mode)
         a.ins("LDA_imm", 0); a.ins("STA_zp", 0x04)          # $04 = 0 (VS flag clear -> coherent 1P)
     a.ins("RTS")                                            # intro/init: hands off otherwise
@@ -583,7 +590,16 @@ def build_main(level=11, speed=1):
     # shipped. NOTE (DRNAVFIX=0): keep this a byte-exact "LDA $04; BEQ; JMP" 7-byte block -- any
     # change here shifts the whole downstream driver and reopens the byte-divergence from the
     # deployed reference carts.
-    if NAVFIX:
+    if NAV_V4:
+        # v4 STATE-DIRECTED (silicon-designed): write coherent VS-CPU ($0727=2,$04=1) DIRECTLY this hook --
+        # no $FF30 toggle, no NAV_T window -- so even a title that advances within a few frames still reaches
+        # VS-CPU immediately (the 32-hook toggle window was the thing the fast advance starved). Hold NAV_M4
+        # hooks (game settles / rejects a 1-hook transient) then START. Never reads/trusts inherited $04.
+        a.ins("LDA_imm", 2); a.ins16("STA_abs", 0x0727)     # $0727 = 2
+        a.ins("LDA_imm", 1); a.ins("STA_zp", 0x04)          # $04 = 1  -> coherent VS-CPU, set every title hook
+        a.ins16("LDA_abs", NAV_STABLE); a.ins("CMP_imm", NAV_M4); a.br("BCS", "an_start")  # confirmed -> START
+        a.ins16("INC_abs", NAV_STABLE); a.ins("RTS")        # holding VS, climbing the confirm
+    elif NAVFIX:
         # LEAKY STABILITY-GATED START. armed = ($04 != 0) AND ($0727 == 2) -- the conjunction (not
         # $0727 alone, the v4 2P-human trap) uniquely identifies VS-CPU AND rejects a garbage $04 that
         # lacks $0727==2. armed -> NAV_STABLE toward NAV_M; un-armed -> DECREMENT (not reset), so a
