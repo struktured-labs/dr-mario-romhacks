@@ -19,7 +19,9 @@ also blocked to our fetcher. The RHDN census below is therefore assembled from s
 snippets plus cross-references, and is *best-effort* on descriptions. The architecture and
 patch-footprint sections do **not** depend on RHDN — they come from the GitHub
 disassemblies, Data Crystal, the drmar.io wiki, and direct IPS diffing, which are stronger
-sources than RHDN prose anyway. Reproduce the diffs with `tools/ipsdiff.py` (committed).
+sources than RHDN prose anyway. Reproduce with `tools/ipsdiff.py` (single-patch footprint),
+`tools/analyze_overlap.py` (TE × community byte-overlap), `tools/disasm_drmc.py` (DrMC
+feature dissection).
 
 ---
 
@@ -74,7 +76,8 @@ announcement for the first project.
 | Tool | What it is |
 |---|---|
 | **dmvs** (`github.com/dmwit/dmvs`) | fceux Lua for online 1v1 (host/connect). The netplay layer; also the natural place a broadcast memory-overlay would hook. |
-| **dr-mario-ngrams** | Exact reimplementation of the NES pill-generation RNG + statistics |
+| **maryodel** (`github.com/dmwit/maryodel`) | dmwit's Dr. Mario engine (Haskell): board model, **exact RNG (`advanceRNG`/`decodeColor`/`decodePosition`)**, pathfinding, fceux client. The authority on the seed encoding (§4b). |
+| **dr-mario-ngrams** | Exact reimplementation of the NES pill-generation RNG + statistics; ships a 32767-seed pill-sequence corpus |
 | **seed map** (`dmwit.com/dr_mario_seed_map.bin`) | Successive-seed data; index = `65534*level + (seed & ~1) - 2` |
 | **Granivore** (`tools.drmar.io/granivore`) | Identifies the exact seed from a board state |
 | **Identify** (`tools.drmar.io/identify`) | ROM-variant validator (patches are ROM-specific) |
@@ -119,8 +122,8 @@ buttons pressed, `$F7/$F8` P1/P2 held, `$0727` number-of-players, `$0731` music 
   `$82AD, $99DD, $9D0B, $9D3E` (file `0x2BD, 0x19ED, 0x1D1B, 0x1D4E`). Proven because
   `SNES_RNG.ips` and `Turbo.ips` redirect precisely these four `20 71 B7` instructions.
 - Low-level primitive `randomNumberGenerator` (~`$B78B` [N]) rotates zp `rng0/rng1`
-  ($17/$18); seed byte is `rngSeed $89`. Virus placement reads `rng0` for height, `rng1`
-  for column/color, forcing one virus of each color per 4 (`rndColorQty=$01`).
+  ($17/$18); the 16-bit LFSR is specified exactly in §4b. Virus placement reads `rng0` for
+  height, `rng1` for column/color, forcing one virus of each color per 4 (`rndColorQty=$01`).
 - The **SNES RNG mod** is an 84-byte drop-in: 4 call-site redirects + a new generator at
   `$FB00`. This is the cleanest template for swapping RNG.
 
@@ -131,7 +134,7 @@ buttons pressed, `$F7/$F8` P1/P2 held, `$0727` number-of-players, `$0731` music 
   the pill to fall one row. `speedUps_max = $31` (49) caps the ramp.
 - **The broadcast "SPD" number is `speedIndex $0320` / the `$A795` index** — DrMC hooks
   the table read at **`$8D8D`** (`LDA $A795,X` → `JSR $FC60`) to render it, and blanks the
-  coarse LOW/MED/HI text (see §3). The broadcast "Speed Guide" maps SPD 32→Tetris L7 …
+  coarse LOW/MED/HI text (see §4a). The broadcast "Speed Guide" maps SPD 32→Tetris L7 …
   80→L29.
 
 ### 2d. Levels, viruses, field geometry (constants) [N]
@@ -147,9 +150,10 @@ fieldSize=$80`; `pillStartingX=$03 pillStartingY=$0F`; `attackSize_min/max=$02/$
 Congrats screen `0x20CC` "CONGRATULATIONS-", `20DC` VIRUS, `20E1` LEVEL, `20E7` SPEED.
 In-game coarse speed labels `0x224D/2251/2255` LOW/MED/HI (`$A23D`, **blanked by DrMC**).
 Menu `0x3E49` "1 PLAYER GAME", `0x4075` MUSIC TYPE, `0x40E0/40E7/40EE` FEVER/CHILL/OFF
-(**overwritten by DrMC** to reclaim space). Title logo GFX `0x3A29-0x3AC3`; title tilemap
-bottom row `0x3B06` (our branding anchor — **collides with Turbo**). HUD label tile runs
-[N]: VIRUS=`$88-8C`, LEVEL=`$8E-92`, SPEED=`$C8-CC`, value tiles `$95`/`$D4`.
+(**overwritten by DrMC** to reclaim space). Title logo GFX `0x3A29-0x3AC3`. The title-art
+"pocket" beneath MARIO (tilemap anchor file `0x3B06`; subtitle rendered in **CHR**) is
+shared by our TE subtitle **and** Dr. Mario Turbo's — the one TE×community collision (§3).
+HUD label tile runs [N]: VIRUS=`$88-8C`, LEVEL=`$8E-92`, SPEED=`$C8-CC`, values `$95`/`$D4`.
 
 ### 2f. Community free-space convention [Δ][N]
 
@@ -161,105 +165,155 @@ fact** (see §3).
 
 ---
 
-## 3. Overlap / conflict analysis vs OUR footprint
+## 3. Overlap / conflict analysis vs OUR footprint (measured, byte-exact)
 
-### 3a. Our patch footprint (measured)
+I built the real TE v7 ROM (`build_te_v7.py`, md5 `f9403fb1…`) and intersected its
+changed-offset set with each community patch (`tools/analyze_overlap.py`):
 
-| Build | Region | File / CPU | Notes |
+| Community patch | bytes changed | TE v7 ∩ | verdict |
 |---|---|---|---|
-| **TE v5** (#9292, 30 B) | Pause routine | `0x17CA/0x17D4-D6/0x17DC` (`$97BA/$97C4/$97CC`) | keep-bg-on, drop OAM-clear, STUDY Y-pos |
-| | Sprite table | `0x2969-0x2979` (`$A959`) | STUDY tiles |
-| | CHR | `0x0AA18-0x0AA38` | STUDY letters |
-| **v6/v7 branding** | Title tilemap | **`0x3B06` (`$BAF6`)** | STRUK LABS footer / subtitle anchor |
-| | Footer hook | `0x0C34` (`$8C24`) | `JSR $88F6` → `JSR $BE56` |
-| | Footer routine / data | `0x3E66` (`$BE56`) / `0x2008` (`$A1F8`) | |
-| **STUDY v3.3** | Pause edits `$97B6-$97F3` + **5-part chain** | `$D2CC → $9FF8 → $A371 → $BE56 → $BC26` | uses **`$D2CC`** unused region + nametable gaps |
+| DrMC v1.0 | 839 | **0** | clean — stacks |
+| Seed | 458 | **0** | clean — stacks |
+| SNES-RNG | 51 | **0** | clean — stacks |
+| God speed | 84 | **0** | clean — stacks |
+| Turbo | 228127 | 316 | collision — **CHR graphics only** |
 
-### 3b. Conflicts
+**Headline: TE is byte-clean against the entire seed/SPD ecosystem (DrMC, Seed, SNES-RNG,
+GodSpeed) — zero overlapping bytes.** TE can be layered on top of any of them (or they on
+TE) with no code or data conflict, because every community hack lives in the fixed-bank
+tail `$FB00-$FFFF`, whereas TE lives in the pause routine (`$97xx`), a footer routine at
+`$BE56`, footer metasprite data at `$9FF9-$A017`, a sprite-table tweak at `$A959`, and CHR
+— none of which the community touches.
 
-1. **Turbo × our branding — DIRECT COLLISION.** Both rewrite title tilemap **file
-   `0x3B06`**. TE expects the base bytes `42 FC FC…` there; Turbo overwrites with
-   `16 17 18…`. **TE branding + Turbo cannot be naively stacked**; the title edit would
-   need relocating. (Turbo also expands the ROM and stamps a `DiskDude!` header — it is a
-   whole-ROM replacement, not a small IPS.)
-2. **`$FB00` free block — NO collision with our core.** Published TE v5 and STUDY v3.3
-   deliberately live in the **pause routine + `$D2CC` + nametable gaps**, *not* `$FB00`.
-   So TE's engine coexists with DrMC/Seed/SNES-RNG/GodSpeed, which all occupy `$FB00`.
-   **This is a genuine, bankable compatibility win** and should be preserved.
-3. **Nametable data block `$BB00-$BE10` — adjacency, verify per-combo.** DrMC writes
-   `$BB57-$BBC0` and `$BD5E`; Seed writes `$BDAA-$BE10`. Our STUDY part3c is `$BC26` and
-   our footer/part3b routine is `$BE56` — interleaved in the same block but at distinct
-   offsets. Likely non-overlapping, but any TE+DrMC or TE+Seed combo must be byte-checked
-   here (use `tools/ipsdiff.py`).
-4. **Pause routine `$978E-$97F3` — uncontested.** No community hack touches it; TE owns
-   this region outright.
-5. **Internal note:** our own v6/v7 footer routine and STUDY v3.3 part3b both target
-   `$BE56` (deconflicted in the combined DRROTFIX build) — keep that in mind when layering
-   TE features.
+**The only collision is Turbo, entirely in CHR graphics (316 bytes).** Both TE and Turbo
+render a subtitle into the same title-art pocket and rewrite the same title/font CHR tiles
+(`title_screen.py` itself notes "Dr. Mario Turbo uses the same pocket for its subtitle").
+No PRG/code conflict. A TE+Turbo combo needs the subtitle relocated; every other combo is
+free. (Turbo is also a whole-ROM 128K+128K replacement with a `DiskDude!` header — the
+least stack-friendly hack regardless.)
+
+Measured TE v7 footprint (75 runs): PRG `$8C25` (footer hook), `$97BA/$97C4/$97CC` (pause),
+`$9FF9-$A017` (footer metasprite data), `$A959` (sprite table), `$BE56` (footer routine,
+23 B); CHR title/subtitle/STUDY tiles. STUDY v3.3 additionally uses the unused `$D2CC`
+block + nametable-gap routines (`$9FF8/$A371/$BC26`) — also outside every community
+footprint. Internal-only note: our v6/v7 footer routine and STUDY v3.3 part3b both sit at
+`$BE56` (deconflicted in the combined DRROTFIX build).
 
 ---
 
-## 4. DRMC-ROM identification verdict (issue #4)
+## 4. DrMC tournament ROM — deep dissection
 
-**DRMC = the *Dr. Mario Championship*** — an annual in-person **NES** tournament (2025:
-Nov 7-9, Arcade Legacy, Cincinnati; matches our known live-events list). Its patches are
-hosted on **playdm.net** and curated on `wiki.drmar.io`.
+Issue #4 identity is settled (see the issue-4 comment): the DRMC broadcast build is the
+community **"DrMC" NES hack** `playdm.net/ips/Dr._Mario_-_DrMC_v1.0.ips` on our exact
+Rev 0 base, with the styled broadcast VIR/SPD/next-pill panels an **OBS overlay** over the
+ROM's own on-screen values (SPD←`$0320`, VIR←`$0324/$03A4`, next←`$031A/1B`+`$039A/9B`).
+RHDN #8245 is SNES — not it. This section maps *where each feature lives*, from
+disassembling the patch (`tools/disasm_drmc.py`).
 
-**Verdict:** The broadcast build is the community **"DrMC" NES hack**
-(`playdm.net/ips/Dr._Mario_-_DrMC_v1.0.ips` lineage) applied to the **standard USA NES
-Dr. Mario Rev 0 — the exact ROM we already ship on** (md5 `d3ec4442…`). Its on-ROM
-features are **settable/displayed RNG seed** and a **fine on-screen SPD number**
-(it blanks LOW/MED/HI and hooks the `$A795` gravity read at `$8D8D`; it also disables
-music select to reclaim menu/CHR space). Confirmed by diffing the patch against our base.
+### 4a. Feature → location (all new code in the `$FB00-$FFFF` tail)
 
-**The styled per-player VIR/SPD/next-pill panels + "Speed Guide" are an OBS broadcast
-overlay** (smooth non-NES fonts, bracket-colored boxes) layered on top, fed from game RAM:
+| Feature | Address | What it does |
+|---|---|---|
+| **Seed-select UI** | `$FB00` (from main-loop hook `$9A39`) | digit editor: `$F5` buttons — SELECT (`&$20`) advances digit cursor `$0B` (0-3); Left/Right (`&$03`) ±1 the current hex nibble of the working seed `$19/$1A`; sets dirty `$0C` |
+| **Seed menu widget** | `$FB90` (from music hook `$9AA8`) | draws the seed selector as OAM sprites in the menu, replacing the music-type display (music-select sacrificed) |
+| **Seed on-field render** | `$FF40` (PPU-addr table `$FF78`) | draws committed seed `$1B/$1C` to the nametable via `JSR $864E` (draw-hex), per player |
+| **Seed → RNG commit** | `$FC00` | writes the edited seed `$19/$1A` into the **live LFSR state `rng0/rng1 = $17/$18`**, with a clamp rejecting seed 0 (LFSR would stick) |
+| **SPD shim + cache** | `$FC60` (replaces `LDA $A795,X` at `$8D8D`) | *transparent*: returns `gravityTable[X]` unchanged (gameplay identical), but caches the speed index per player `$0D/$0E`; on change converts it to 2 digits `$0F/$10` (`JSR $FC30`), sets dirty `$11` |
+| **SPD on-field render** | `$FC81` | draws the fine SPD digits to the nametable — 2P at PPU `$20ED`/`$20F1`, 1P at `$22DB` |
+| **ULT speed tier** | `$FF80` (from speedup hook `$8F38`, orig `INC $8A`) | a speed setting faster than HI (traced to the hook site; `$FF80` body not fully disassembled) |
+| **Config init** | `$80B4` area | forces DrMC defaults (music off; speed/seed setup) |
 
-- **SPD** ← `speedIndex $0320` (= the `$A795` index the DrMC hack surfaces)
-- **VIR** ← `virusLeft $0324 / $03A4`
-- **next-pill** ← `$031A/$031B` (P1) and `$039A/$039B` (P2)
-- **seed** ← `rngSeed $89`, exposed by the hack itself
+DrMC zero-page usage: `$0B` seed-digit cursor, `$0C` seed-edit dirty, `$0D/$0E` last speed
+index (per player), `$0F/$10` SPD display digits, `$11` SPD dirty, `$17/$18` live LFSR
+(stock), `$19/$1A` working seed, `$1B/$1C` committed/displayed seed, `$1D` seed-display
+dirty, `$58` player parity. **Correction to earlier note:** DrMC stores the seed in the
+**live RNG state `$17/$18`**, not the stock `rngSeed $89`. Both the SPD and seed numbers
+are genuinely rendered *in-ROM* to the playfield nametable; the broadcast overlay restyles
+them.
 
-Given the community's fceux-Lua tooling (dmvs, bokrifulse, DM Effects are all fceux Lua),
-the overlay is almost certainly **fceux running the DrMC ROM + a memory-reading Lua
-overlay + OBS**. *Confidence:* ROM identity and RAM sources — **high, proven**; the exact
-capture pipeline (fceux-Lua vs hardware+reader) — **high inference, not confirmed from a
-public rules page** (no such page is linked from the wiki; worth a Discord/organizer
-confirmation as the only open sub-question).
+### 4b. Seed encoding — the deterministic-replay spec (for TE issues #2/#3)
 
-**Not the DRMC ROM:** RHDN #8245 "Tournament Edition" is **SNES**.
+From dmwit's `maryodel` engine (`Dr/Mario/Model.hs`) + the `dr-mario-ngrams` corpus — the
+exact NES pill/virus RNG, which the base ROM (and therefore TE and DrMC) already runs:
 
-**Seed-compatibility takeaway for TE:** adopt the DRMC seed encoding directly —
-`rngSeed $89` + the dmwit seed-map (`65534*level + (seed&~1) - 2`) — so TE seeds are
-directly comparable to tournament seeds. Granivore/Identify define the interop contract.
+- **LFSR:** `advanceRNG(seed) = (seed >> 1) | ((bit1(seed) XOR bit9(seed)) << 15)` — 16-bit,
+  taps at bits 1 and 9. (`retreatRNG` inverts it.)
+- **Pill/virus color:** `decodeColor(seed) = colorTable[seed & 0xF]`, colorTable =
+  `[Y,R,B,B,R,Y,Y,R,B,B,R,Y,Y,R,B,R]` (deliberately non-uniform → the ngrams "some
+  sequences too likely" result).
+- **Virus position:** `decodePosition(seed) = { x = seed & 0x7 (col 0-7),
+  y = (seed & 0x0F00) >> 8 (row 0-15) }`, re-rolled until the cell is valid/empty and below
+  the level's max-height line.
+- **Seeds are even 16-bit:** seed 0 is never used (LFSR sticks); an odd seed produces the
+  same sequence as its even neighbor (`seed & ~1`). There are **32767 distinct sequences**
+  (even seeds 2…65534). `dr_mario_seed_map.bin` indexes by `65534*level + (seed & ~1) - 2`
+  → the two bytes of the next seed / initial state.
+
+**What TE must do to be DrMC/corpus-compatible:** (1) let the player set a 16-bit even
+seed, stored into the live LFSR state `$17/$18` at game start — exactly as DrMC does via
+`$FC00`; (2) leave stock pill/virus generation untouched (it already implements the above).
+Then any `(seed, level)` deterministically reproduces the full 128-pill sequence *and* the
+initial virus board — making the corpus replayable and TE runs directly comparable to
+tournament seeds. `Granivore` (board→seed) and `Identify` (ROM variant) define the interop.
+
+### 4c. TE × DrMC compatibility verdict
+
+**Proven compatible — 0 overlapping bytes (§3).** TE (pause `$97xx` + `$BE56`/`$9FF9` +
+CHR) and DrMC (`$FB00-$FFFF` tail + hooks at `$80B4/$8D8D/$8F38/$9A39/$9AA8`) share no
+byte. A combined "TE-over-DrMC" study cart is mechanically a straight IPS stack; the only
+care item is CHR tile budget if both add glyphs (DrMC adds digit tiles at CHR
+`0xB170/0xC170`; TE adds STUDY/subtitle tiles at CHR `0xAA18…/0xAE99…` — currently
+disjoint). This makes "study the actual tournament ROM" a first-class, low-risk option.
 
 ---
 
-## 5. Techniques worth stealing for TE v9 (seed/SPD first)
+## 5. TE v9+ candidate features from the community (ranked training-feature harvest)
 
-Ordered by value for a *study* edition. All of these fit our free-space discipline
-(reuse `$FB00`-family or `$D2CC`) and are proven to apply to our exact base.
+Every community feature with pedagogical value, ranked for a *study/training* edition.
+Port difficulty: **L** = Lua overlay (no ROM change), **P** = small ROM patch in our free
+space, **PP** = larger ROM work. "Conflict" = vs our study-chain/branding bytes.
 
-1. **Fine SPD display** (from DrMC / Speed-display mod). Hook `$8D8D`
-   (`LDA $A795,X` → `JSR <new>`), render `speedIndex $0320` as two digits, blank the coarse
-   LOW/MED/HI at `$A23D`. Highest study value: a study cart should show the *exact* speed.
-2. **Seed display + set** (from Seed.ips / DrMC). Menu-cursor hook at `$65`/`$9A31` for a
-   seed-entry UI writing `rngSeed $89`; draw the seed on the field. Makes every study run
-   reproducible **and comparable to DRMC seeds** — directly closes issue #4's seed ask.
-3. **VIR/SPD HUD panels** mirroring the broadcast, using HUD label tiles (`$88-8C` VIRUS,
-   `$C8-CC` SPEED) + values `$0324/$0320`. Optional cosmetic parity with the tournament.
-4. **Level-cap removal** (level-cap mod): defeat the `lvCap=$18` check to study levels >24.
-5. **SNES-RNG toggle** (84-byte swap of the `$B771` entry): let TE optionally match SNES
-   pill distribution for cross-version study.
-6. **Stack, don't fork.** Keep TE's engine off `$FB00` (it already is) so TE can be
-   **layered on top of the DrMC/Seed patches** to study the actual tournament ROM. Ship TE
-   explicitly against **Rev 0** and publish the md5 (patches are ROM-specific; use the
-   community `Identify` discipline).
-7. **Port against the disassembly.** Use **Nostaljipi** (labeled Rev A source) +
-   **brianhuffman** (Rev 0/A buildable) as the reference for any 6502-side AI/planner port
-   — real labels for `$B771` RNG, `$A795` gravity, `toLevel $817E`, virus placement.
+1. **Fine SPD display** — exact drop-speed as a number. *Source:* DrMC `$FC60` / Speed-display
+   mod. *Port:* **P** (hook `$8D8D`, render `speedIndex`; blank LOW/MED/HI `$A23D`).
+   *Conflict:* none (free-space). Highest study value — a trainee must feel speed precisely.
+2. **Seed set + display** — reproducible drills, comparable to tournament seeds. *Source:*
+   Seed.ips / DrMC (`$FB00`+`$FC00`). *Port:* **P** (seed editor → `$17/$18`). *Conflict:*
+   none. Unlocks deterministic replay (§4b) → closes TE issues #2/#3.
+3. **Board/scenario editor + maneuver trainer** — set up a specific board, repeat a drill.
+   *Source:* **Bo Krif Ulse** (dmwit, fceux Lua). *Port:* **L** now (ship the Lua alongside
+   TE); **PP** for an in-ROM pause-time editor (a natural extension of our STUDY pause).
+   *Conflict:* none. The single most "training" feature in the ecosystem.
+4. **Statistics HUD (Throw/Drop/Land/Clear/Fall timers)** — quantifies execution. *Source:*
+   SNES Stats mod (reimplement for NES). *Port:* **P/PP** (frame-count state transitions,
+   render like SPD). *Conflict:* none. Objective per-input feedback.
+5. **Specific-level / speed-pinned drills** — start at any level & pinned speed. *Source:*
+   Level-cap mod (`lvCap=$18`), God speed (WR-seed pinning). *Port:* **P**. *Conflict:* none.
+6. **Constrained-practice modes** — combo-only, combo-rollback (retry until you combo),
+   self-garbage. *Source:* playdm combo/garbage mods (`rndColorQty`, match logic). *Port:*
+   **P**. *Conflict:* none. Forces a specific skill (combo building / recovery).
+7. **AI sparring w/ adjustable difficulty** — practice vs a bot. *Source:* Versus Trainer
+   v1/v2; meatfighter AI; **our own copro/planner**. *Port:* **L/PP**. *Conflict:* none. We
+   already have a stronger AI than the community — expose it as a training opponent.
+8. **Piece-sequence lookahead / history panel** — show pills beyond "next", plus history.
+   *Source:* seed determinism + `lookaheadTable` (§4b); Granivore for seed-ID. *Port:* **L**
+   (compute from seed) or **P**. *Conflict:* none. Lets a student plan multi-pill.
+9. **Slow-motion / frame-step study** — step the game to inspect placements. *Source:*
+   emulator/Lua (fceux). *Port:* **L**. Pairs with our STUDY pause.
+10. **Hard-drop (Up to place)** — faster iteration during drills. *Source:* Turbo. *Port:*
+    **P** (input hook). *Conflict:* CHR-only vs Turbo; the mechanic alone is a small patch.
+11. **Handicap / rating for practice ladders** — *Source:* MC Mario, DM Glampers (session
+    length). *Port:* **L** (external companions).
+12. **Seed-analysis companions** — board→seed (Granivore), ROM-ID (Identify), n-gram drought
+    stats (dr-mario-ngrams). *Port:* **L**. *Conflict:* none.
+
+Cross-cutting guidance: **stack, don't fork** — TE is byte-clean vs the seed/SPD hacks (§3),
+so the cleanest path is TE + the community IPS as layered patches plus Lua companions,
+rather than re-implementing everything in one ROM. **Port the engine against the
+disassembly** (Nostaljipi Rev A labels / brianhuffman buildable) for anything deeper.
 
 ---
 
-*Reproduce all patch footprints:* `./tools/ipsdiff.py <patch.ips>` (diffs against the
-Rev 0 base). Community IPS files are hosted at `playdm.net/ips/`.
+*Reproduce:* `tools/ipsdiff.py <patch.ips>` (footprint vs Rev 0 base) ·
+`tools/analyze_overlap.py <te.nes> <patches…>` (TE × community overlap) ·
+`tools/disasm_drmc.py <DrMC.ips>` (feature dissection). Set `DRMARIO_BASE` to the clean
+Rev 0 ROM. Community IPS files are hosted at `playdm.net/ips/`.
