@@ -174,6 +174,10 @@ NAV_M = int(_os.environ.get("DRNAV_M", "24"))
 # NAV_M4 confirm, then STARTs -- beating the fast advance. DRNAV_V4=0 -> old v3 (leaky toggle + force).
 NAV_V4 = NAVFIX and (_os.environ.get("DRNAV_V4", "1") != "0")
 NAV_M4 = int(_os.environ.get("DRNAV_M4", "4"))    # title hooks (2,1) held before START (short: beat the advance)
+# DRNAV_HOLD (default ON with V4): reset waitFrames ($51)=0 each title hook so the attract demo NEVER trips
+# (labeled-disasm confirmed: base $98FE does inc $51 / cmp #$08 / beq @toDemo, and @toDemo forces
+# nbPlayers=1). This is THE fix for the mis-land; DRNAV_HOLD=0 reproduces the pre-hold 3/6 (demo wins).
+NAV_HOLD = NAV_V4 and (_os.environ.get("DRNAV_HOLD", "1") != "0")
 # Phase-aware tuning table (byte-patchable immediates, DRMINTHINK-style, so per-platform tuning
 # is a rebuild via env or a byte-patch). K is in HOOKS the argmax has been stable (~5 hooks/frame;
 # the FPGA publishes ~1 candidate / ~10 hooks on MiSTer, ~4x slower on the 21.47MHz Pocket -> the
@@ -601,11 +605,17 @@ def build_main(level=11, speed=1):
     # change here shifts the whole downstream driver and reopens the byte-divergence from the
     # deployed reference carts.
     if NAV_V4:
-        # v4 STATE-DIRECTED (silicon-designed): write coherent VS-CPU ($0727=2,$04=1) DIRECTLY this hook --
-        # no $FF30 toggle, no NAV_T window -- so even a title that advances within a few frames still reaches
-        # VS-CPU immediately (the 32-hook toggle window was the thing the fast advance starved). Hold NAV_M4
-        # hooks (game settles / rejects a 1-hook transient) then START. Never reads/trusts inherited $04.
-        a.ins("LDA_imm", 2); a.ins16("STA_abs", 0x0727)     # $0727 = 2
+        # v4 STATE-DIRECTED + TITLE-HOLD (silicon + labeled-disasm confirmed): the mis-land is the ATTRACT
+        # DEMO, not $04. The title mode-0 loop (base $98FE) increments waitFrames ($51) every 256 frames and
+        # at waitFrames==demoStart_delay($08) runs @toDemo, which FORCES nbPlayers($0727)=1 -> 1P. waitFrames
+        # is reset ONLY by UP/DOWN/SELECT; the nav uses $FF30 direct-writes (never those) so waitFrames rides
+        # STICKY across boots -- on the mis-land boots it's inherited near 8 and the demo trips before the nav
+        # commits VS. FIX: reset waitFrames=0 every title hook (what a cursor press does) so the demo NEVER
+        # trips -> the title holds indefinitely and the nav always reaches VS. Then write coherent VS-CPU
+        # ($0727=2,$04=1) directly (disasm-verified: $FF30 touches only these two), hold NAV_M4 hooks, START.
+        if NAV_HOLD:
+            a.ins("LDA_imm", 0); a.ins("STA_zp", 0x51)      # waitFrames = 0 -> demo never trips (title HOLD)
+        a.ins("LDA_imm", 2); a.ins16("STA_abs", 0x0727)     # $0727 (nbPlayers) = 2
         a.ins("LDA_imm", 1); a.ins("STA_zp", 0x04)          # $04 = 1  -> coherent VS-CPU, set every title hook
         a.ins16("LDA_abs", NAV_STABLE); a.ins("CMP_imm", NAV_M4); a.br("BCS", "an_start")  # confirmed -> START
         a.ins16("INC_abs", NAV_STABLE); a.ins("RTS")        # holding VS, climbing the confirm
