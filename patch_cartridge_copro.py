@@ -92,7 +92,16 @@ SLAM_ARM, LAST_LAT = 0x6172, 0x6173
 # NAV_1P is a diagnostic latch: set if the cart ever runs play-mode with $0727==1 (a 1P game or the
 # attract demo) = the nav did NOT land VS-CPU. Readable on hardware to score a cold-load gauntlet.
 NAV_STABLE, NAV_1P = 0x6174, 0x6175
+# RE-ENTRANCY GUARD latch (build_wrapper): the 0x37CF hook fires from BOTH the NMI and the main loop, so a
+# main-loop driver invocation can be INTERRUPTED by the NMI which RE-ENTERS the driver and clobbers the
+# shared abs-addr state (armed/pend/wdog) -> the driver re-issues GO every hook -> the ~83M-clk search never
+# DONEs -> the game spins on $5084 = the R47 Pocket HARD-FREEZE (combo-port co-sim proven: cadence not
+# silicon, so div2 froze identically; SEI can't help -- NMI is non-maskable). A BUSY latch in free PRG-RAM
+# ($6176-$6185) makes the trampoline bail on re-entry BEFORE the bank switch (a re-entrant _sel would corrupt
+# the interrupted invocation's bank). Byte-exact for the build_main goldens -- the guard is in the trampoline.
+BUSY = 0x6176
 import os as _os
+REENTRY_GUARD = _os.environ.get("DRREENTRY", "1") != "0"
 USE_SEEDS = _os.environ.get("DRSEED", "1") != "0"   # DRSEED=0 -> seeds stay 0 = deterministic mirror
 # WEAVE steering: when sliding to the target column is blocked at the pill's row (stuck
 # >= WEAVE_LIM hook-cycles), release the gravity freeze for one drop so the pill descends
@@ -1066,11 +1075,24 @@ def _sel(w, value):
 
 
 def build_wrapper(main_cpu):
-    """Trampoline (every frame, all modes): bank2 -> JSR main -> bank0 -> RTS."""
+    """Trampoline (every frame, all modes): [re-entry guard] -> bank2 -> JSR main -> bank0 -> RTS."""
     w = Asm6502(WRAP_CPU)
+    if REENTRY_GUARD:
+        # RE-ENTRANCY GUARD (see BUSY): bail if the driver is already running so the NMI can't re-enter and
+        # corrupt the shared state (the GO-storm freeze). BEFORE _sel, so a re-entrant bail never touches the
+        # bank. Bootstrap: BUSY is uninit PRG-RAM, so on cold boot (NAV_MAGIC != $A5, before main's init sets
+        # it) force BUSY=0 -- else a garbage-set BUSY would bail forever = deadlock.
+        w.ins16("LDA_abs", NAV_MAGIC); w.ins("CMP_imm", 0xA5); w.br("BEQ", "w_warm")
+        w.ins("LDA_imm", 0); w.ins16("STA_abs", BUSY)             # cold boot -> clear garbage BUSY
+        w.label("w_warm")
+        w.ins16("LDA_abs", BUSY); w.br("BEQ", "w_run"); w.ins("RTS")   # already running -> bail (no bank touch)
+        w.label("w_run")
+        w.ins("LDA_imm", 1); w.ins16("STA_abs", BUSY)            # mark running
     _sel(w, 2)
     w.jsr(main_cpu)
     _sel(w, 0)
+    if REENTRY_GUARD:
+        w.ins("LDA_imm", 0); w.ins16("STA_abs", BUSY)            # clear -> next hook may run
     w.ins("RTS")
     return w.assemble()
 
