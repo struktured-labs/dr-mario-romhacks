@@ -504,6 +504,15 @@ def build_main(level=11, speed=1):
     # => STAGE CLEAR screen. Inject START (press window) to advance it so the demo LOOPS instead
     # of halting. Gated by MATCH_ACTIVE (set once play dispatched) so boot-init count==0 can't
     # false-trigger (which would wreck the boot state machine). ----
+    if NAV_V4:
+        # v4 FIX (the REAL mis-land cause -- silicon+py65 confirmed 2026-07-23): the full-clear auto-advance
+        # is mode-INDEPENDENT and gated only by MATCH_ACTIVE, which is INHERITED != 0 at a cold boot (the
+        # power-on init that clears it runs once-ever via the sticky magic; the mode-8 intro that also clears
+        # it never runs at boot). At the title (virus counts read 0, VSEEN inherited from the prior game) it
+        # FALSE-fires, injects START, and RTSs -- SKIPPING the autonav entirely -> the title advances to a
+        # 1P game (nbPlayers never gets set to 2). Gate it to play/post (mode>=4) so it can never fire in the
+        # menus. py65-confirmed: inherited MATCH_ACTIVE=1 -> nbPlayers stays 1 (1P); gated -> autonav runs -> VS.
+        a.ins16("LDA_abs", 0x0046); a.ins("CMP_imm", 0x04); a.br("BCC", "fc_no")
     a.ins16("LDA_abs", MATCH_ACTIVE); a.br("BEQ", "fc_no")
     a.ins16("LDA_abs", VCOUNT_P1); a.br("BNE", "fc_chk2")
     a.ins16("LDA_abs", VSEEN1); a.br("BNE", "fc_clear")     # P1==0 counts only if it was ever >0
