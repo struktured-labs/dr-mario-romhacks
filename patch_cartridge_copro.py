@@ -541,6 +541,19 @@ def build_main(level=11, speed=1):
         a.ins16("LDA_abs", MATCH_ACTIVE); a.br("BNE", "ga_slam_ok")
         a.ins("LDA_imm", 0); a.ins16("STA_abs", SLAM_ARM)
         a.label("ga_slam_ok")
+    if not NO_FREEZE:
+        # COLD-STATE INIT (freeze carts only): PEND1/2, DELAY1/2, LASTY1/2 are NOT in the power-on init
+        # (boot garbage). On a freeze cart, garbage PEND2 makes freeze_pending pin GRAV_P2 on the first
+        # frames and garbage LASTY2 mis-fires the pill-lock edge. Clear them on the first play frame of a
+        # match (MATCH_ACTIVE==0) so the first capsule starts from a known state. Anytime carts (NO_FREEZE)
+        # never pin so they don't need it (and stay byte-exact) -- this is the sibling of the 2026-07-18
+        # PEND1-gate fix, but it clears the actual state instead of only guarding P1's pin.
+        a.ins16("LDA_abs", MATCH_ACTIVE); a.br("BNE", "ga_cold_ok")
+        a.ins("LDA_imm", 0)
+        a.ins16("STA_abs", PEND1); a.ins16("STA_abs", PEND2)
+        a.ins16("STA_abs", DELAY1); a.ins16("STA_abs", DELAY2)
+        a.ins16("STA_abs", LASTY1); a.ins16("STA_abs", LASTY2)
+        a.label("ga_cold_ok")
     if USE_SEEDS:
         a.ins16("LDA_abs", MATCH_ACTIVE); a.br("BNE", "ga_on")  # first play frame of this match:
         a.ins16("LDA_abs", NAV_T); a.ins("ORA_imm", 0x01); a.ins16("STA_abs", SEED1)   # root seed
@@ -822,8 +835,13 @@ def build_main(level=11, speed=1):
     a.jsr("freeze_pending")
     # P2 first (only if we're not currently freezing it)
     a.ins16("LDA_abs", ARMED2); a.br("BEQ", "act_p2")      # not searching P2 -> steer it
-    if NO_FREEZE:
-        # ANYTIME: refresh TGT from the LIVE mailbox and keep steering during the search.
+    if NO_FREEZE or ROTFIX:
+        # ANYTIME (NO_FREEZE, or ANY ROTFIX shipping cart): refresh TGT from the LIVE mailbox and keep
+        # steering during the search -- NEVER pin GRAV_P2 while ARMED (the fairness rework). The legacy
+        # `else` below pins GRAV_P2=0 for the WHOLE search; on the Pocket (freeze cart, 4x-slower copro)
+        # a heavy R47 first-pill depth-3 search then holds the pin for seconds..minutes (WDOG=~4min) = the
+        # R47 Pocket HARD-FREEZE. ROTFIX carts fall under live gravity + weave toward the running argmax
+        # instead (copro live-publishes; orient=0xFF = no result yet -> nf2_hold, also no pin under ROTFIX).
         # Scratch = $616C/$616D free driver RAM (NOT zp $DB/$DC = v28cs eval scratch).
         a.ins16("LDA_abs", W2_BASE + 0x86); a.ins("CMP_imm", 0xFF); a.br("BEQ", "nf2_hold")
         a.ins16("STA_abs", 0x616C)
