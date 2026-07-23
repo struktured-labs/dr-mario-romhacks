@@ -20,7 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import title_screen as ts
 from title_screen import (apply_training_edition_title, footer_routine, footer_metasprite,
                           footer_layout, FOOTER_HOOK_OFFSET, FOOTER_CHR_PAGE, FOOTER_TILE_IDS,
-                          TITLE_TOP_TILE_IDS, TITLE_CHR_PAGES, CHR_PAGE_SIZE)
+                          TITLE_TOP_TILE_IDS, TITLE_CHR_PAGES, CHR_PAGE_SIZE, TM_TILE_ID)
 
 # Identical relocation to build_te_v8.py.
 V8_ROUTINE_OFF, V8_DATA_OFF, V8_FOOTER_TEXT = 0x40B9, 0x40FF, "V8.00 SL"
@@ -49,7 +49,8 @@ CHR_BASE = 16 + cart[4] * 16384          # 0x10010 for a 4-bank cart
 orig = ts.CHR_START
 ts.CHR_START = CHR_BASE
 try:
-    apply_training_edition_title(cart, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_FOOTER_TEXT)
+    apply_training_edition_title(cart, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF,
+                                 footer_text=V8_FOOTER_TEXT, mark_te=True)
 finally:
     ts.CHR_START = orig
 # duplicate the high-half branding into index 3 (expand() would have; keep index1 == index3)
@@ -68,6 +69,8 @@ for page in TITLE_CHR_PAGES:
         allowed |= set(range(cchr(page, t), cchr(page, t) + 16))
 for i in range(n_tiles):
     allowed |= set(range(cchr(FOOTER_CHR_PAGE, FOOTER_TILE_IDS[0] + i), cchr(FOOTER_CHR_PAGE, FOOTER_TILE_IDS[0] + i) + 16))
+for page in TITLE_CHR_PAGES:      # "™" -> "TE" mark tile
+    allowed |= set(range(cchr(page, TM_TILE_ID), cchr(page, TM_TILE_ID) + 16))
 changed = {i for i in range(len(cart)) if cart[i] != before[i]}
 stray = changed - allowed
 print(f"changed {len(changed)} bytes; confined to branding set: {not stray} (stray {len(stray)})")
@@ -89,7 +92,9 @@ for page in TITLE_CHR_PAGES:
 for i in range(n_tiles):
     t = FOOTER_TILE_IDS[0] + i
     ident &= base[bchr(FOOTER_CHR_PAGE, t):bchr(FOOTER_CHR_PAGE, t) + 16] == bytes(cart[cchr(FOOTER_CHR_PAGE, t):cchr(FOOTER_CHR_PAGE, t) + 16])
-print(f"  {'OK ' if ident else 'FAIL'} all 24 CHR tiles (subtitle + footer) == public v8")
+for page in TITLE_CHR_PAGES:      # "™" -> "TE" mark tile
+    ident &= base[bchr(page, TM_TILE_ID):bchr(page, TM_TILE_ID) + 16] == bytes(cart[cchr(page, TM_TILE_ID):cchr(page, TM_TILE_ID) + 16])
+print(f"  {'OK ' if ident else 'FAIL'} all 26 CHR tiles (subtitle + footer + TE mark) == public v8")
 assert ident, "branding bytes DIVERGE from public TE v8"
 
 open(cart_out, "wb").write(cart)

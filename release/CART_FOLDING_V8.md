@@ -36,6 +36,7 @@ file offset.
 | footer metasprite (17 B) | `0x40FF` | `$C0EF` | 24-byte run filler | 4-tile `V8.00 SL` table + `$80` |
 | footer CHR tiles `0xE8-0xEB` | pg 2 | PPU `$2E80` | filler | 4 footer tiles |
 | subtitle CHR (10 tiles ×2) | pages 3/4 | — | `== base title art` | subtitle overlay |
+| `™`→`TE` mark tile `$0F` | pages 3/4 | — | `== base "™" M-half` | repaint M-half to `E` |
 | title tilemap | `0x3B06-0x3B0F` | — | `== 42 FC×9` (untouched) | *(no write)* |
 
 Both dead runs (`$C0A9`, `$C0EF`) are in the always-mapped high half and are confirmed filler in
@@ -52,7 +53,7 @@ $ python build_te_v8_cart.py [core=tmp/drmario_v28cs.nes] [base_v8=tmp/drmario_t
 
 It: (1) applies DRSTUDY v3.3; (2) asserts the hook/routine/data runs are filler; (3) applies the
 identical v8 branding; (4) asserts DRSTUDY `part2`/`part3b` are intact; (5) **asserts every branding
-region equals the public v8 ROM at the same file offset** (hook, routine, metasprite, all 24 CHR
+region equals the public v8 ROM at the same file offset** (hook, routine, metasprite, all 26 CHR
 tiles); (6) `expand()`s to the mapper-100 cart and asserts unit0 is unchanged. A green run is the
 acceptance proof that the public BPS is the cart byte-basis.
 

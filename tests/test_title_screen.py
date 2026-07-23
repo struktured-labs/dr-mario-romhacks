@@ -19,7 +19,11 @@ from title_screen import (
     TITLE_CHR_PAGES,
     TITLE_TILEMAP_OFFSET,
     TITLE_TOP_TILE_IDS,
+    TM_TILE_ID,
+    TM_M_HALF,
+    TE_E_HALF,
     _decode_strip,
+    _tile_offset,
     apply_training_edition_title,
     footer_hook_patched,
     footer_layout,
@@ -91,7 +95,7 @@ def test_title_patch_is_idempotent():
     assert bytes(patched) == once
 
 
-def _allowed_offsets_at(routine_off, data_off, footer_text):
+def _allowed_offsets_at(routine_off, data_off, footer_text, mark_te=True):
     n_tiles, base_x = footer_layout(footer_text)
     allowed = set(range(TITLE_TILEMAP_OFFSET, TITLE_TILEMAP_OFFSET + 10))
     allowed.update(range(FOOTER_HOOK_OFFSET, FOOTER_HOOK_OFFSET + 3))
@@ -104,6 +108,10 @@ def _allowed_offsets_at(routine_off, data_off, footer_text):
     for i in range(n_tiles):
         off = CHR_START + FOOTER_CHR_PAGE * CHR_PAGE_SIZE + (FOOTER_TILE_IDS[0] + i) * 16
         allowed.update(range(off, off + 16))
+    if mark_te:
+        for page in TITLE_CHR_PAGES:
+            off = CHR_START + page * CHR_PAGE_SIZE + TM_TILE_ID * 16
+            allowed.update(range(off, off + 16))
     return allowed
 
 
@@ -116,13 +124,13 @@ def test_footer_helpers_reproduce_v7_defaults():
 def test_relocated_v8_footer_is_a_scoped_patch():
     original = Path("drmario.nes").read_bytes()
     patched = bytearray(original)
-    # subtitle (10 tiles x 2 pages) + footer (4 tiles for "V8.00 SL") = 24 CHR tiles
+    # subtitle (10x2) + footer (4 for "V8.00 SL") + TM->TE mark (1 tile x 2 pages) = 26 CHR tiles
     assert apply_training_edition_title(
-        patched, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_TEXT) == 24
+        patched, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_TEXT, mark_te=True) == 26
 
     changed = {i for i, (a, b) in enumerate(zip(original, patched)) if a != b}
     assert changed
-    assert changed <= _allowed_offsets_at(V8_ROUTINE_OFF, V8_DATA_OFF, V8_TEXT)
+    assert changed <= _allowed_offsets_at(V8_ROUTINE_OFF, V8_DATA_OFF, V8_TEXT, mark_te=True)
     # hook -> JSR $C0A9; routine carries the $C0EF data pointer; metasprite (<=24 B) at $C0EF
     n_tiles, base_x = footer_layout(V8_TEXT)
     assert bytes(patched[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3]) == footer_hook_patched(V8_ROUTINE_OFF)
@@ -135,11 +143,32 @@ def test_relocated_v8_footer_is_a_scoped_patch():
 
 def test_relocated_v8_footer_is_idempotent():
     patched = bytearray(Path("drmario.nes").read_bytes())
-    kw = dict(routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_TEXT)
+    kw = dict(routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_TEXT, mark_te=True)
     apply_training_edition_title(patched, **kw)
     once = bytes(patched)
-    assert apply_training_edition_title(patched, **kw) == 24
+    assert apply_training_edition_title(patched, **kw) == 26
     assert bytes(patched) == once
+
+
+def test_tm_to_te_repaints_only_tile_0F_and_default_keeps_tm():
+    original = Path("drmario.nes").read_bytes()
+
+    # default (v7): the "™" M-half is untouched
+    plain = bytearray(original)
+    apply_training_edition_title(plain)
+    for page in TITLE_CHR_PAGES:
+        off = _tile_offset(page, TM_TILE_ID)
+        assert bytes(plain[off:off + 16]) == TM_M_HALF
+        assert bytes(original[off:off + 16]) == TM_M_HALF     # base ROM really has the "™" there
+
+    # mark_te: tile $0F on both title CHR pages becomes the "E"; the T-half ($0E) is untouched
+    marked = bytearray(original)
+    apply_training_edition_title(marked, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF,
+                                 footer_text=V8_TEXT, mark_te=True)
+    for page in TITLE_CHR_PAGES:
+        assert bytes(marked[_tile_offset(page, TM_TILE_ID):_tile_offset(page, TM_TILE_ID) + 16]) == TE_E_HALF
+        t_off = _tile_offset(page, 0x0E)
+        assert bytes(marked[t_off:t_off + 16]) == bytes(original[t_off:t_off + 16])   # T-half kept
 
 
 def test_v8_footer_leaves_drstudy_runs_intact():

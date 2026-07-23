@@ -78,6 +78,14 @@ FOOTER_HOOK_PATCHED = footer_hook_patched(FOOTER_ROUTINE_OFFSET)  # v7: JSR $BE5
 FOOTER_ROUTINE = footer_routine(FOOTER_DATA_OFFSET)               # v7: data ptr $9FF8
 FOOTER_METASPRITE = footer_metasprite(len(FOOTER_TILE_IDS))       # v7: 8 tiles, 33 bytes
 
+# Trademark mark -> "TE".  The title's "™" is two background tiles on the title CHR pages: $0E
+# (the T-half) + $0F (the M-half).  For Training Edition we repaint the M-half into an E so it
+# reads "TE".  The T-half's right column already draws the E's left stem, so ONLY tile $0F
+# changes; the crash-sensitive title nametable keeps $0E/$0F in place (opt-in via mark_te=).
+TM_TILE_ID = 0x0F
+TM_M_HALF = bytes.fromhex("fffff76797f7f7f7" * 2)   # original ™ M-half (drmario.nes, pages 3 & 4)
+TE_E_HALF = bytes.fromhex("ffff0fff1fffff0f" * 2)   # repainted E (pairs with the T-half's stem)
+
 SUBTITLE_TEXT = "TRAINING EDITION"
 TRAINING_TEXT = "TRAINING"
 EDITION_TEXT = "EDITION"
@@ -265,7 +273,8 @@ def _footer_pixels(text=FOOTER_TEXT, n_tiles=8):
 
 
 def apply_training_edition_title(rom, routine_off=FOOTER_ROUTINE_OFFSET,
-                                 data_off=FOOTER_DATA_OFFSET, footer_text=FOOTER_TEXT):
+                                 data_off=FOOTER_DATA_OFFSET, footer_text=FOOTER_TEXT,
+                                 mark_te=False):
     """Patch a standard 64 KiB Dr. Mario ROM image in place.
 
     Returns the number of CHR tiles written.  The crash-sensitive title
@@ -275,6 +284,8 @@ def apply_training_edition_title(rom, routine_off=FOOTER_ROUTINE_OFFSET,
     routine and its metasprite table.  They default to the v7 runs ($BE56 /
     $9FF8); TE v8 relocates them off DRSTUDY's part3b / part2 runs.  The hook
     JSR target and the routine's data pointer are derived from these offsets.
+    ``mark_te`` repaints the title "™" M-half tile into an E so the mark reads
+    "TE" (Training Edition); off by default so v7 keeps its "™".
     """
     if len(rom) < CHR_START + 5 * CHR_PAGE_SIZE:
         raise ValueError("ROM is too small for the standard Dr. Mario CHR layout")
@@ -322,6 +333,17 @@ def apply_training_edition_title(rom, routine_off=FOOTER_ROUTINE_OFFSET,
             raise ValueError(f"footer CHR tile 0x{tile_id:02X} is not unused")
         rom[off:off + 16] = encoded
         tiles_written += 1
+
+    if mark_te:
+        for page in TITLE_CHR_PAGES:
+            off = _tile_offset(page, TM_TILE_ID)
+            existing = bytes(rom[off:off + 16])
+            if existing not in (TM_M_HALF, TE_E_HALF):
+                raise ValueError(
+                    f"trademark M-half tile 0x{TM_TILE_ID:02X} on CHR page {page} "
+                    f"is not the expected mark: {existing.hex()}")
+            rom[off:off + 16] = TE_E_HALF
+            tiles_written += 1
 
     routine_bytes = footer_routine(data_off, base_x)
     hook_patched = footer_hook_patched(routine_off)

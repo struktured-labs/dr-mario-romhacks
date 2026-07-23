@@ -29,7 +29,8 @@ V8_ROUTINE_OFF, V8_DATA_OFF, V8_FOOTER_TEXT = 0x40B9, 0x40FF, "V8.00 SL"
 # 1) brand the clean 32 KB core (title_screen's default CHR_START is correct for 32 KB PRG)
 core = bytearray(open(V28CS_CLEAN, "rb").read())
 assert core[4] == 2, "expected a clean 32 KB-PRG v28cs core"
-apply_training_edition_title(core, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_FOOTER_TEXT)
+apply_training_edition_title(core, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF,
+                             footer_text=V8_FOOTER_TEXT, mark_te=True)
 os.makedirs("tmp", exist_ok=True)
 branded_core = "tmp/_v28cs_te_core.nes"
 open(branded_core, "wb").write(core)

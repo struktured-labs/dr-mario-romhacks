@@ -38,6 +38,7 @@ Path A and Path B produce the **byte-identical** cart (verified: AB cart md5 mat
 | footer metasprite (17 B) | `0x40FF` + index-3 `0xC0FF` | 4-tile `V8.00 SL` table + `$80` |
 | footer CHR `0xE8-0xEB` | CHR page 2 | 4 tiles |
 | subtitle CHR | CHR pages 3/4 | 10 tiles ×2 |
+| `™`→`TE` mark CHR `$0F` | CHR pages 3/4 | 1 tile ×2 |
 
 `brand_copro_cart.py` asserts, for every cart: (1) the runs are filler pre-brand; (2) **only** these
 bytes change (⇒ DRSTUDY chain `$D2CC/$9FF8/$A371/$BE56/$BC26` + driver wrapper `$FF54` + AI bank 2
@@ -47,16 +48,16 @@ are byte-intact — 0 stray); (3) every branding byte equals public TE v8. A gre
 
 | cart | flags | study | branded md5 | staged |
 |------|-------|-------|-------------|--------|
-| `drmario_copro_ab_slam_te.nes` | *(default: DRROTFIX+DRSLAM+MATURE)* | no (CPU-vs-CPU) | `a3189355…` | `tmp/` |
-| `drmario_copro_pocket_slam_mat_te.nes` | `DRHUMAN=1 DRPOCKET=1` | yes (v3.3) | `f054e77e…` | `tmp/` |
+| `drmario_copro_ab_slam_te.nes` | *(default: DRROTFIX+DRSLAM+MATURE)* | no (CPU-vs-CPU) | `4536242d…` | `tmp/` |
+| `drmario_copro_pocket_slam_mat_te.nes` | `DRHUMAN=1 DRPOCKET=1` | yes (v3.3) | `ba61cc61…` | `tmp/` |
 
 Unbranded canonical references: AB `d14f0bee…`, Pocket `a2609cf1…`.
 
 ## Validation
 
 - **Branding renders** — the branded cart core (unit 0, a Mesen-emulable mapper-1 ROM) shows
-  `TRAINING EDITION` + `V8.00 SL` on the title (menu is clean — the v6/v17 middle-row artifact is
-  not in the v28cs lineage). The human/Pocket cart lingers on the title so the user sees it.
+  `Dr. MARIO ᵀᴱ`, `TRAINING EDITION` + `V8.00 SL` on the title (menu is clean — the v6/v17
+  middle-row artifact is not in the v28cs lineage). The human/Pocket cart lingers on the title.
 - **Study + branding coexist** — the Pocket core (v28cs + study-v3.3 + branding) still shows the
   frozen board, `STUDY` (OAM 32-36) and the next-pill preview (37-38) on pause.
 - Mapper-100 carts are not Mesen-emulable, so the assembled cart itself needs a MiSTer/Pocket check

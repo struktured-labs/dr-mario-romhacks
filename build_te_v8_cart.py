@@ -20,7 +20,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from patch_cartridge_copro import apply_study_pause, STUDY_BLOB2, STUDY_BLOB2_CPU, STUDY_BLOB4, STUDY_BLOB4_CPU
 from title_screen import (apply_training_edition_title, footer_routine, footer_hook_patched,
                           footer_metasprite, footer_layout, FOOTER_HOOK_OFFSET, FOOTER_CHR_PAGE,
-                          FOOTER_TILE_IDS, TITLE_TOP_TILE_IDS, TITLE_CHR_PAGES, CHR_PAGE_SIZE)
+                          FOOTER_TILE_IDS, TITLE_TOP_TILE_IDS, TITLE_CHR_PAGES, CHR_PAGE_SIZE,
+                          TM_TILE_ID)
 from expand_prg import expand
 
 # Identical relocation to build_te_v8.py (this identity is the whole point):
@@ -42,8 +43,9 @@ n_study = apply_study_pause(core)
 assert bytes(core[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3]) == b"\x20\xF6\x88", "hook not original in core"
 assert set(core[V8_ROUTINE_OFF:V8_ROUTINE_OFF + routine_len]) <= {0x00, 0xFF}, "routine run $C0A9 not free in core"
 assert set(core[V8_DATA_OFF:V8_DATA_OFF + data_len]) <= {0x00, 0xFF}, "data run $C0EF not free in core"
-# 3) apply the IDENTICAL v8 branding
-apply_training_edition_title(core, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_FOOTER_TEXT)
+# 3) apply the IDENTICAL v8 branding (footer + "™"->"TE")
+apply_training_edition_title(core, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF,
+                             footer_text=V8_FOOTER_TEXT, mark_te=True)
 # study intact after branding
 p2, p4 = 16 + (STUDY_BLOB2_CPU - 0x8000), 16 + (STUDY_BLOB4_CPU - 0x8000)
 assert bytes(core[p2:p2 + len(STUDY_BLOB2)]) == STUDY_BLOB2, "study part2 clobbered"
@@ -63,6 +65,8 @@ for page in TITLE_CHR_PAGES:
 for i in range(n_tiles):
     t = FOOTER_TILE_IDS[0] + i
     regions.append((f"footer CHR pg2 0x{t:02X}", chr_off(FOOTER_CHR_PAGE, t), 16))
+for page in TITLE_CHR_PAGES:
+    regions.append((f"TE mark CHR pg{page} 0x{TM_TILE_ID:02X}", chr_off(page, TM_TILE_ID), 16))
 
 ok = True
 print("BRANDING BYTE-IDENTITY  base-v8  vs  v28cs+study-v3.3+branding core (same file offsets):")

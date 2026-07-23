@@ -30,8 +30,9 @@ from patch_cartridge_copro import (apply_study_pause,
                                    STUDY_BLOB2, STUDY_BLOB2_CPU,
                                    STUDY_BLOB4, STUDY_BLOB4_CPU)
 from title_screen import (apply_training_edition_title, footer_routine, footer_hook_patched,
-                          footer_metasprite, footer_layout,
-                          FOOTER_HOOK_OFFSET, TITLE_TILEMAP_OFFSET, TITLE_BOTTOM_BASE_TILE_IDS)
+                          footer_metasprite, footer_layout, _tile_offset,
+                          FOOTER_HOOK_OFFSET, TITLE_TILEMAP_OFFSET, TITLE_BOTTOM_BASE_TILE_IDS,
+                          TITLE_CHR_PAGES, TM_TILE_ID, TE_E_HALF)
 from make_bps import make_bps, apply_bps
 
 BASE = "drmario.nes"
@@ -58,9 +59,9 @@ patch_vs_cpu.apply_patches(BASE, rom_out)
 # 2) v3.3 study-pause (freeze + reconnect STUDY + both previews)
 d = bytearray(open(rom_out, "rb").read())
 n_study = apply_study_pause(d)
-# 3) title branding with the footer routine/data RELOCATED off the study runs
+# 3) title branding: relocated footer + "™"->"TE" mark (Training Edition)
 tiles_written = apply_training_edition_title(
-    d, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_FOOTER_TEXT)
+    d, routine_off=V8_ROUTINE_OFF, data_off=V8_DATA_OFF, footer_text=V8_FOOTER_TEXT, mark_te=True)
 open(rom_out, "wb").write(d)
 tgt = bytes(d)
 
@@ -79,6 +80,9 @@ assert tgt[FOOTER_HOOK_OFFSET:FOOTER_HOOK_OFFSET + 3] == footer_hook_patched(V8_
 assert tgt[V8_ROUTINE_OFF:V8_ROUTINE_OFF + len(exp_routine)] == exp_routine, "footer routine not at $C0A9"
 assert tgt[V8_DATA_OFF:V8_DATA_OFF + len(exp_meta)] == exp_meta, "footer metasprite not at $C0EF"
 assert len(exp_meta) <= 24, "footer metasprite must fit a 24-byte common run for the cart basis"
+for page in TITLE_CHR_PAGES:                                    # "™" -> "TE" on both title CHR pages
+    off = _tile_offset(page, TM_TILE_ID)
+    assert tgt[off:off + 16] == TE_E_HALF, f"TM->TE mark not applied on CHR page {page}"
 assert tgt[TITLE_TILEMAP_OFFSET:TITLE_TILEMAP_OFFSET + 10] == bytes(TITLE_BOTTOM_BASE_TILE_IDS), \
     "crash-sensitive title tilemap disturbed"
 

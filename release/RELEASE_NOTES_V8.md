@@ -24,7 +24,8 @@ patcher (Floating IPS / beat).
   Works in 1P, 2-player and VS-CPU; in 2P/VS `STUDY` is lifted clear of the score header.
 - **VS-CPU mode** — a third title option (`1 PLAYER` → `2 PLAYER` → `VS CPU`) with an AI-controlled
   Player 2.
-- **Training Edition title branding** — a two-tone `TRAINING EDITION` subtitle beneath `Dr. MARIO`.
+- **Training Edition title branding** — a two-tone `TRAINING EDITION` subtitle beneath `Dr. MARIO`,
+  and the logo's `™` mark repainted to **`TE`** so it reads `Dr. MARIO ᵀᴱ`.
 - **Version credit** — `V8.00 SL` centered beneath the title menu.
 - **Attract demo preserved** — the title nametable is byte-for-byte original and the footer is a
   title-only sprite overlay, so the title→attract-demo handoff and gameplay are untouched.
@@ -36,8 +37,8 @@ patcher (Floating IPS / beat).
 
 - **Base ROM:** Dr. Mario (USA)
 - **Base-ROM MD5:** `d3ec44424b5ac1a4dc77709829f721c9`
-- **Patched-ROM MD5:** `2dd25dad2a11d9c9ac7183b73edc57d2`
-- **Patch (BPS) MD5:** `2b07da40c74859c1080ccbefaea4e0ef`
+- **Patched-ROM MD5:** `be75fc4752560d9d76d025fb17a9352f`
+- **Patch (BPS) MD5:** `da57efc54725b4278637db86ff5d4fc2`
 - **Mapper:** standard MMC1 (mapper 1)
 
 ## Implementation notes — how the collision was resolved
@@ -61,21 +62,25 @@ target, the routine's data pointer, the tile count and the centering X are all d
 offsets and text. `title_screen.py` was parameterized (`routine_off` / `data_off` / `footer_text`)
 with defaults that still reproduce the exact committed v7 bytes; the v6 study patcher is unchanged.
 
+The `™`→`TE` mark is a single CHR repaint: the trademark is two title tiles, `$0E` (the T-half) +
+`$0F` (the M-half), on CHR pages 3/4; only tile `$0F` is repainted to an `E` (the T-half's right
+column already draws the E's left stem), and the nametable keeps `$0E`/`$0F` in place.
+
 Everything else is the union of v6 and v7: the VS-CPU/study internal patches, the DRSTUDY v3.3
 5-part chain (`part1 $D2CC` … `part3c $BC26`), the study letter tiles (`0xA0-0xA2`, CHR page 2), the
-subtitle tiles (title CHR pages 3/4), and the footer tiles (`0xE8-0xEB`, CHR page 2) — all
-byte-disjoint and verified.
+subtitle tiles (title CHR pages 3/4), the footer tiles (`0xE8-0xEB`, CHR page 2) and the `TE` mark
+tile (`$0F`, CHR pages 3/4) — all byte-disjoint and verified.
 
 ### Coprocessor-cart basis (acceptance-tested)
 
 `build_te_v8_cart.py` folds this exact branding into a v28cs + DRSTUDY-v3.3 core and asserts that
-**every** branding byte — hook, routine, metasprite, and all 24 CHR tiles — is byte-identical (same
+**every** branding byte — hook, routine, metasprite, and all 26 CHR tiles — is byte-identical (same
 file address, same value) to the public v8 ROM, then `expand()`s to the mapper-100 cart. The public
 BPS is therefore the literal byte-basis for the carts: `cart == public TE v8 (unit 0) + AI additions`.
 
 ### Validation (headless Mesen)
 
-- **Title** — `TRAINING EDITION` subtitle and `V8.00 SL` footer both render.
+- **Title** — `Dr. MARIO ᵀᴱ`, the `TRAINING EDITION` subtitle and the `V8.00 SL` footer all render.
 - **1P / 2P / VS-CPU study pause** — capsule(s) frozen, background on (`$2001=$1E`), `STUDY` in OAM
   slots 32-36, P1 preview 37-38, P2 preview 39-40 (2P/VS), clean resume — identical to v6.
 - **Attract demo** — title→demo handoff clean; footer sprites clear with OAM, no bleed into the demo.
@@ -84,7 +89,7 @@ BPS is therefore the literal byte-basis for the carts: `cart == public TE v8 (un
 
 | Version | Changes |
 |---------|---------|
-| **v8** | **Unified v6 study + v7 branding; footer relocated off the DRSTUDY dead runs into cart-shared runs; credit → `V8.00 SL`; the public BPS is the byte-basis for the copro carts** |
+| **v8** | **Unified v6 study + v7 branding; footer relocated off the DRSTUDY dead runs into cart-shared runs; credit → `V8.00 SL`; logo `™`→`TE`; the public BPS is the byte-basis for the copro carts** |
 | v7 | `TRAINING EDITION` branding + `V7.00 STRUK LABS` credit on the public v5 title |
 | v6 | VS-CPU AI + DRSTUDY v3.3 study-pause (both previews, 2P/VS STUDY lift) |
 | v5 | Fixed FEVER menu text corruption |
