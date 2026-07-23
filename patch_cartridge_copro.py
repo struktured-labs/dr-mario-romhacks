@@ -154,6 +154,13 @@ NAVFIX = _os.environ.get("DRNAVFIX", "1") != "0"
 # real data. The ring survives reset (RAM persists across core reload -- the very thing we're diagnosing),
 # so boots are identified by their mode==8 entries. Written to BOTH copro window $5000 and PRG-RAM $6200.
 TRACE = _os.environ.get("DRTRACE", "0") == "1"
+# DRPROBE=1: instrument the FULL cart (nav + AI stay LIVE -- unlike DRTRACE which strips them). Logs
+# ($0046,$0727,$04) ON CHANGE into the same $6200 ring as DRTRACE, so the CANONICAL AB cart's real
+# menu-state evolution AND its per-boot EXIT/residual state (what the next boot inherits via sticky
+# RAM) can be dumped from a save-state (PROVEN 2026-07-22: the copro .ss carries $6200 -- decoded a
+# real ring at .ss offset 0x103508). NO on-screen render / NO PPU writes (main runs main-loop timing,
+# not vblank) -> cannot corrupt scroll. DRPROBE=0 (default) rebuilds byte-exact (nothing emitted).
+PROBE = _os.environ.get("DRPROBE", "0") == "1"
 # NAV_M: NET armed hooks (arm minus flicker) required before START (byte-patchable). The cold-boot
 # garbage window is ~5-15 hooks (menu-init), so NAV_M=24 rejects it; the leaky counter fills 24 at a
 # genuine VS-CPU for any flicker interval R>=3 (net rate (R-2)/R), well inside the ~10 s title timeout.
@@ -444,6 +451,41 @@ def build_main(level=11, speed=1):
     a.ins16("STA_abs", TGT_C2); a.ins16("STA_abs", TGT_O2)
     a.ins("LDA_imm", 2); a.ins16("STA_abs", TURN)          # fair-serve round-robin seed
     a.label("inited")
+    if PROBE and not TRACE:
+        # ===== DRPROBE: continuous ($0046,$0727,$04) ring log (nav+AI stay live; no render) =====
+        # Same on-disk layout as the DRTRACE ring so tests/decode_trace.py reads it unchanged: 64x3B
+        # ring at $6200, header +0xC0 write-idx, +0xC1/C2 count, +0xC3..C5 live snapshot, +0xC6 magic.
+        # Read via save-state ($6200 is captured). Logs on CHANGE -> captures menu transitions AND the
+        # post-game EXIT/residual (the last entries before the next boot inherits them via sticky RAM).
+        PR_IDX, PR_CNT, PR_L0, PR_L1, PR_L2, PR_MAG = 0x6186, 0x6187, 0x6189, 0x618A, 0x618B, 0x618C
+        RINGP = 0x6200
+        a.ins16("LDA_abs", PR_MAG); a.ins("CMP_imm", 0x5A); a.br("BEQ", "pr_go")   # lazy init (once ever)
+        a.ins("LDA_imm", 0x5A); a.ins16("STA_abs", PR_MAG)
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", PR_IDX); a.ins16("STA_abs", PR_CNT); a.ins16("STA_abs", PR_CNT + 1)
+        a.ins("LDA_imm", 0xFF); a.ins16("STA_abs", PR_L0); a.ins16("STA_abs", PR_L1); a.ins16("STA_abs", PR_L2)
+        a.label("pr_go")
+        a.ins16("LDA_abs", 0x0046); a.ins16("STA_abs", RINGP + 0xC3)   # live snapshot + magic every hook
+        a.ins16("LDA_abs", 0x0727); a.ins16("STA_abs", RINGP + 0xC4)
+        a.ins("LDA_zp", 0x04); a.ins16("STA_abs", RINGP + 0xC5)
+        a.ins("LDA_imm", 0x54); a.ins16("STA_abs", RINGP + 0xC6)
+        a.ins16("LDA_abs", 0x0046); a.ins16("CMP_abs", PR_L0); a.br("BNE", "pr_log")   # change detect
+        a.ins16("LDA_abs", 0x0727); a.ins16("CMP_abs", PR_L1); a.br("BNE", "pr_log")
+        a.ins("LDA_zp", 0x04); a.ins16("CMP_abs", PR_L2); a.br("BEQ", "pr_done")
+        a.label("pr_log")
+        a.ins16("LDX_abs", PR_IDX)
+        a.ins16("LDA_abs", 0x0046); a.ins16("STA_absX", RINGP + 0)
+        a.ins16("LDA_abs", 0x0727); a.ins16("STA_absX", RINGP + 1)
+        a.ins("LDA_zp", 0x04); a.ins16("STA_absX", RINGP + 2)
+        a.ins16("LDA_abs", PR_IDX); a.ins("CLC"); a.ins("ADC_imm", 3)   # advance idx, wrap at 192
+        a.ins("CMP_imm", 192); a.br("BCC", "pr_iok"); a.ins("LDA_imm", 0); a.label("pr_iok")
+        a.ins16("STA_abs", PR_IDX); a.ins16("STA_abs", RINGP + 0xC0)
+        a.ins16("LDA_abs", 0x0046); a.ins16("STA_abs", PR_L0)
+        a.ins16("LDA_abs", 0x0727); a.ins16("STA_abs", PR_L1)
+        a.ins("LDA_zp", 0x04); a.ins16("STA_abs", PR_L2)
+        a.ins16("INC_abs", PR_CNT); a.br("BNE", "pr_c"); a.ins16("INC_abs", PR_CNT + 1); a.label("pr_c")
+        a.ins16("LDA_abs", PR_CNT); a.ins16("STA_abs", RINGP + 0xC1)
+        a.ins16("LDA_abs", PR_CNT + 1); a.ins16("STA_abs", RINGP + 0xC2)
+        a.label("pr_done")
     a.ins16("INC_abs", NAV_T)                               # tick every hook call (autonav only ticked in menus)
     # ---- full-clear auto-advance (mode-independent): a player's virus count ($0324/$03A4) hit 0
     # => STAGE CLEAR screen. Inject START (press window) to advance it so the demo LOOPS instead
