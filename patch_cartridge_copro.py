@@ -102,6 +102,13 @@ NAV_STABLE, NAV_1P = 0x6174, 0x6175
 BUSY = 0x6176
 import os as _os
 REENTRY_GUARD = _os.environ.get("DRREENTRY", "1") != "0"
+# DRWRETRY (default OFF -- touches build_main, so off keeps the goldens == published c300acb canonical;
+# the shipping cart opts in): fix the "re-queue once per pill" watchdog latch. Two bugs: (A) handle()'s
+# _start epilogue clears `wretry` every search START (so a re-queued timeout re-GOs indefinitely); (B) the
+# P2 pill-lock reset writes WRETRY ($615D=P1) not WRETRY2 ($6163=P2) -- copy-paste bug, so P2's latch never
+# resets per-pill. FIX = drop the _start clear AND write WRETRY2 in the P2 path -> correct once-per-pill for
+# both. Secondary to the re-entrancy guard (only bites on genuine ~48s timeouts, rare once the storm is gone).
+WRETRY_FIX = _os.environ.get("DRWRETRY", "0") != "0"
 USE_SEEDS = _os.environ.get("DRSEED", "1") != "0"   # DRSEED=0 -> seeds stay 0 = deterministic mirror
 # WEAVE steering: when sliding to the target column is blocked at the pill's row (stuck
 # >= WEAVE_LIM hook-cycles), release the gravity freeze for one drop so the pill descends
@@ -729,7 +736,8 @@ def build_main(level=11, speed=1):
     a.br("BCC", "no_p2_new"); a.br("BEQ", "no_p2_new")
     a.ins("LDA_imm", 1); a.ins16("STA_abs", PEND2)
     a.ins("LDA_imm", 15); a.ins16("STA_abs", DELAY2)        # ~3 frames settle before upload
-    a.ins("LDA_imm", 0); a.ins16("STA_abs", WRETRY)
+    a.ins("LDA_imm", 0)
+    a.ins16("STA_abs", WRETRY2 if WRETRY_FIX else WRETRY)   # FIX(B): reset P2's latch per P2 pill (was WRETRY=P1)
     if ROTFIX:
         a.ins16("STA_abs", ROT_DONE2)                       # A==0 here: new P2 pill -> re-enter pre-phase
     if SLAM:
@@ -844,7 +852,9 @@ def build_main(level=11, speed=1):
             a.ins16("STA_abs", wbase + 0x80 + k)
         a.ins16("STA_abs", wgo)          # GO: write to +$84 pulses copro reset, clears DONE
         a.ins("LDA_imm", 1); a.ins16("STA_abs", armed)
-        a.ins("LDA_imm", 0); a.ins16("STA_abs", pend); a.ins16("STA_abs", wretry)
+        a.ins("LDA_imm", 0); a.ins16("STA_abs", pend)
+        if not WRETRY_FIX:
+            a.ins16("STA_abs", wretry)                      # FIX(A): dropping this keeps the re-queue-once latch
         a.ins16("STA_abs", wdog); a.ins16("STA_abs", wdogh)
         a.label(f"{L}_done")
     if not HUMAN_P1:
